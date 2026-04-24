@@ -50,3 +50,7 @@ Thumbs.db
 .env.development.local
 .env.test.local
 .env.production.local
+/src/environments
+/old_design
+/BRANCHING_STRATEGY.md
+/CLAUDE.md
