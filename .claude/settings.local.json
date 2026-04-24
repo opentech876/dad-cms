@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(ts|js|json|md\\)$\")",
+      "Bash(git -C '/c/Users/Elvis Destin O/Desktop/OPEN-TECH/Projets/Projet-05-Day-After-Day/dad-cms' log --oneline)"
+    ]
+  },
+  "enabledPlugins": {
+    "supabase@claude-plugins-official": true
+  }
+}

@@ -1,0 +1,470 @@
+.step {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f4f4f5;
+  padding: 40px 24px;
+}
+
+.step__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 460px;
+}
+
+.step__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #18181b, #52525b);
+  margin-bottom: 28px;
+  flex-shrink: 0;
+}
+
+.step__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #09090b;
+  text-align: center;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+}
+
+.step__subtitle {
+  font-size: 14px;
+  color: #71717a;
+  text-align: center;
+  line-height: 1.6;
+  margin: 0 0 24px;
+}
+
+// ── Create workspace card ─────────────────────────────────────────────────────
+
+.step__create {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #d4d4d8;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #09090b;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  margin-bottom: 12px;
+
+  &:hover {
+    border-color: #a1a1aa;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: #18181b;
+    box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
+  }
+}
+
+.step__create-icon {
+  font-size: 16px;
+  color: #3f3f46;
+  flex-shrink: 0;
+}
+
+// ── Legal text ────────────────────────────────────────────────────────────────
+
+.step__legal {
+  font-size: 11px;
+  color: #a1a1aa;
+  text-align: center;
+  line-height: 1.65;
+  margin: 0 0 24px;
+}
+
+.step__legal-link {
+  color: #71717a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: #d4d4d8;
+
+  &:hover {
+    color: #3f3f46;
+    text-decoration-color: #a1a1aa;
+  }
+}
+
+// ── Divider ───────────────────────────────────────────────────────────────────
+
+.step__divider {
+  width: 100%;
+  height: 1px;
+  background: #e4e4e7;
+  margin-bottom: 20px;
+}
+
+// ── Existing workspaces section ───────────────────────────────────────────────
+
+.step__section-header {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.step__section-label {
+  font-size: 13px;
+  color: #71717a;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.step__user-email {
+  font-size: 12px;
+  font-weight: 500;
+  color: #3f3f46;
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.step__state-text {
+  font-size: 13px;
+  color: #a1a1aa;
+  text-align: center;
+  padding: 20px 0;
+  margin: 0;
+}
+
+// ── Workspace rows ────────────────────────────────────────────────────────────
+
+.step__workspaces {
+  width: 100%;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.step__workspace-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #f4f4f5;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: #fafafa;
+  }
+
+  &:focus-visible {
+    outline: none;
+    background: #f4f4f5;
+  }
+}
+
+.step__workspace-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #18181b, #52525b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.step__workspace-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.step__workspace-logo-initial {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1;
+}
+
+.step__workspace-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.step__workspace-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #09090b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step__workspace-meta {
+  font-size: 12px;
+  color: #a1a1aa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step__workspace-arrow {
+  font-size: 14px;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+
+.modal {
+  width: 100%;
+  max-width: 460px;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+}
+
+// Progress bar
+
+.modal__progress {
+  display: flex;
+  gap: 4px;
+  padding: 16px 16px 0;
+}
+
+.modal__progress-step {
+  flex: 1;
+  height: 3px;
+  border-radius: 99px;
+  background: #e4e4e7;
+  transition: background 0.3s ease;
+
+  &--done {
+    background: #18181b;
+  }
+}
+
+// Body
+
+.modal__body {
+  display: flex;
+  flex-direction: column;
+  padding: 28px 28px 32px;
+}
+
+.modal__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #09090b;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+.modal__subtitle {
+  font-size: 14px;
+  color: #71717a;
+  line-height: 1.6;
+  margin: 0 0 24px;
+}
+
+// Inputs
+
+.modal__input {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #09090b;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &::placeholder { color: #a1a1aa; }
+
+  &:focus {
+    border-color: #18181b;
+    box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
+  }
+
+  &--flex {
+    flex: 1;
+    margin-bottom: 0;
+  }
+}
+
+// Buttons
+
+.modal__btn-primary {
+  width: 100%;
+  height: 40px;
+  background: #18181b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.15s ease;
+
+  &:hover { background: #27272a; }
+}
+
+.modal__btn-secondary {
+  height: 40px;
+  padding: 0 18px;
+  background: #18181b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+
+  &:hover { background: #27272a; }
+}
+
+.modal__btn-outline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  background: transparent;
+  color: #3f3f46;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background: #f4f4f5;
+    border-color: #a1a1aa;
+  }
+}
+
+.modal__btn-icon {
+  font-size: 14px;
+}
+
+.modal__btn-skip {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 20px;
+  font-size: 13px;
+  color: #a1a1aa;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: #d4d4d8;
+  align-self: center;
+  transition: color 0.15s ease;
+
+  &:hover { color: #71717a; }
+}
+
+// Invite row
+
+.modal__invite-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+// Avatar upload
+
+.modal__avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.modal__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #f4f4f5;
+  border: 1px dashed #d4d4d8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    border-color: #a1a1aa;
+    background: #e4e4e7;
+  }
+}
+
+.modal__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modal__avatar-icon {
+  font-size: 22px;
+  color: #a1a1aa;
+}
+
+.modal__avatar-file {
+  display: none;
+}
+
+.modal__avatar-hint {
+  font-size: 12px;
+  color: #a1a1aa;
+}

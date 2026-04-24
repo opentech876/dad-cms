@@ -1,0 +1,133 @@
+.landing {
+  min-height: 100vh;
+  background: #f4f4f5;
+}
+
+.navbar-outer {
+  display: flex;
+  justify-content: center;
+  padding: 16px 24px 0;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 80px 24px 0;
+  max-width: 720px;
+  margin: 0 auto;
+
+  &__tagline {
+    font-size: 12px;
+    font-weight: 500;
+    color: #71717a;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0 0 16px;
+  }
+
+  &__headline {
+    font-size: clamp(36px, 5vw, 56px);
+    font-weight: 700;
+    color: #09090b;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin: 0 0 24px;
+  }
+
+  &__description {
+    font-size: 17px;
+    line-height: 1.65;
+    color: #71717a;
+    margin: 0;
+    max-width: 560px;
+  }
+
+  &__cta {
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 28px;
+    margin-top: 36px;
+    background: #18181b;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: #27272a;
+    }
+  }
+}
+
+.navbar {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 12px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.05);
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #18181b, #52525b);
+    flex-shrink: 0;
+  }
+
+  &__name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #09090b;
+    letter-spacing: -0.01em;
+  }
+
+  &__links {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+
+  &__cta {
+    display: inline-flex;
+    align-items: center;
+    height: 36px;
+    padding: 0 18px;
+    background: #18181b;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: #27272a;
+    }
+
+    &--ghost {
+      background: transparent;
+      color: #3f3f46;
+      border: 1px solid #d4d4d8;
+
+      &:hover {
+        background: #f4f4f5;
+        color: #18181b;
+      }
+    }
+  }
+}
