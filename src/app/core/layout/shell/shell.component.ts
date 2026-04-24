@@ -1,7 +1,8 @@
-import { Component, OnInit } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, inject, OnInit } from '@angular/core';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
-import { SupabaseService } from '../../services/supabase.service';
+import { filter, firstValueFrom } from 'rxjs';
+import { AuthService } from '../../auth/auth.service';
 
 @Component({
   selector: 'app-shell',
@@ -10,20 +11,16 @@ import { SupabaseService } from '../../services/supabase.service';
   styleUrl: './shell.component.scss',
 })
 export class ShellComponent implements OnInit {
+  private auth = inject(AuthService);
+
   userEmail = '';
 
-  constructor(
-    private supabase: SupabaseService,
-    private router: Router,
-  ) {}
-
-  async ngOnInit() {
-    const user = await this.supabase.getUser();
-    this.userEmail = user?.email ?? '';
+  async ngOnInit(): Promise<void> {
+    const user = await firstValueFrom(this.auth.getCurrentUser().pipe(filter(Boolean)));
+    this.userEmail = user.email ?? '';
   }
 
-  async logout() {
-    await this.supabase.signOut();
-    this.router.navigate(['/login']);
+  logout(): void {
+    this.auth.signOut().subscribe();
   }
 }

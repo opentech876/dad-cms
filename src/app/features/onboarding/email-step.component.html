@@ -14,7 +14,15 @@
         placeholder="vous@exemple.com"
         autocomplete="email"
       />
-      <button class="step__submit" type="submit">Continuer</button>
+      @if (errorMessage) {
+        <p class="step__error">{{ errorMessage }}</p>
+      }
+      <button class="step__submit" type="submit" [disabled]="loading">
+        @if (loading) {
+          <span class="step__spinner"></span>
+        }
+        Continuer
+      </button>
     </form>
 
     <div class="step__oauth">

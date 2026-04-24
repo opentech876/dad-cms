@@ -1,14 +1,19 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { SupabaseService } from '../services/supabase.service';
+import { firstValueFrom } from 'rxjs';
+import { AuthService } from './auth.service';
 
 export const authGuard: CanActivateFn = async () => {
-  const supabase = inject(SupabaseService);
+  const authService = inject(AuthService);
   const router = inject(Router);
-  const session = await supabase.getSession();
-  if (!session) {
-    router.navigate(['/login']);
-    return false;
+
+  const user = await firstValueFrom(authService.getCurrentUser());
+
+  if (user) {
+    return true;
   }
-  return true;
+
+  // Style de redirection que tu aimais
+  router.navigate(['/login']);
+  return false;
 };

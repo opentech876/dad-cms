@@ -21,6 +21,8 @@
       Créez rapidement les événements historique du jour, gérer les calendriers, assignez des
       annonces publicitaires et collaborez efficacement avec votre équipe éditoriale et commerciale.
     </p>
-    <a routerLink="/demarrer" class="hero__cta">Commencer</a>
+    @if (!isLoading && !isInitialized) {
+      <a routerLink="/demarrer" class="hero__cta">Commencer</a>
+    }
   </div>
 </div>

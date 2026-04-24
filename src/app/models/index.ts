@@ -6,34 +6,47 @@ export type CalendarStatus = 'draft' | 'published' | 'archived';
 export interface Workspace {
   id: string;
   name: string;
-  logo_path: string | null;
+  logo_url: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface WorkspaceSummary {
   id: string;
   name: string;
-  logo_path: string | null;
+  logo_url: string | null;
   member_count: number;
   last_accessed_at: string | null;
+}
+
+export interface Profile {
+  id: string;
+  user_id: string;
+  full_name: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserRole {
   id: string;
   user_id: string;
   role: AppRole;
-  assigned_by: string | null;
+  created_by: string | null;
+  expires_at: string | null;
   created_at: string;
 }
 
 export interface Calendar {
   id: string;
   year: number;
-  label: string | null;
+  name: string;
   status: CalendarStatus;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface Event {
@@ -52,11 +65,12 @@ export interface Event {
 
 export interface AdCampaign {
   id: string;
+  name: string;
   advertiser: string;
   start_date: string;
   end_date: string;
   position: AdPosition;
-  image_path: string | null;
+  image_path: string;
   link_url: string | null;
   active: boolean;
   created_by: string | null;
@@ -68,14 +82,15 @@ export interface AdCampaign {
 export interface CampaignAssignment {
   id: string;
   campaign_id: string;
-  assigned_date: string;
   calendar_id: string;
+  event_date: string;
+  created_by: string | null;
   created_at: string;
 }
 
 export interface ContentVersion {
-  id: string;
   year: number;
   version_hash: string;
   published_at: string | null;
+  updated_at: string;
 }

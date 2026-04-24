@@ -1,6 +1,5 @@
 <div class="step">
   <div class="step__content">
-
     <div class="step__logo"></div>
 
     <h1 class="step__title">Ravi de vous voir&nbsp;!</h1>
@@ -17,8 +16,8 @@
       En continuant, vous acceptez nos
       <a href="#" class="step__legal-link">Conditions d'utilisation</a>
       et notre
-      <a href="#" class="step__legal-link">Politique de confidentialité</a>.
-      Ce site est protégé par reCAPTCHA et les
+      <a href="#" class="step__legal-link">Politique de confidentialité</a>. Ce site est protégé par
+      reCAPTCHA et les
       <a href="#" class="step__legal-link">règles de confidentialité</a>
       et les
       <a href="#" class="step__legal-link">conditions d'utilisation</a>
@@ -41,8 +40,8 @@
         @for (ws of workspaces; track ws.id) {
           <button class="step__workspace-row" type="button" (click)="selectWorkspace(ws)">
             <div class="step__workspace-logo">
-              @if (ws.logo_path) {
-                <img [src]="ws.logo_path" [alt]="ws.name" class="step__workspace-logo-img" />
+              @if (ws.logo_url) {
+                <img [src]="ws.logo_url" [alt]="ws.name" class="step__workspace-logo-img" />
               } @else {
                 <span class="step__workspace-logo-initial">{{ ws.name[0].toUpperCase() }}</span>
               }
@@ -61,19 +60,26 @@
         }
       </div>
     }
-
   </div>
 </div>
 
 @if (showModal) {
   <div class="modal-backdrop" (click)="closeModal()">
     <div class="modal" (click)="$event.stopPropagation()">
-
       <!-- Progress bar -->
       <div class="modal__progress">
-        <div class="modal__progress-step" [class.modal__progress-step--done]="currentStep >= 1"></div>
-        <div class="modal__progress-step" [class.modal__progress-step--done]="currentStep >= 2"></div>
-        <div class="modal__progress-step" [class.modal__progress-step--done]="currentStep >= 3"></div>
+        <div
+          class="modal__progress-step"
+          [class.modal__progress-step--done]="currentStep >= 1"
+        ></div>
+        <div
+          class="modal__progress-step"
+          [class.modal__progress-step--done]="currentStep >= 2"
+        ></div>
+        <div
+          class="modal__progress-step"
+          [class.modal__progress-step--done]="currentStep >= 3"
+        ></div>
       </div>
 
       <!-- Step 1 — Workspace name -->
@@ -92,6 +98,9 @@
             (input)="workspaceName = $any($event.target).value"
             autocomplete="off"
           />
+          @if (stepError) {
+            <p class="modal__error">{{ stepError }}</p>
+          }
           <button class="modal__btn-primary" type="button" (click)="nextStep()">Suivant</button>
         </div>
       }
@@ -138,6 +147,9 @@
             (input)="userPhone = $any($event.target).value"
             autocomplete="tel"
           />
+          @if (stepError) {
+            <p class="modal__error">{{ stepError }}</p>
+          }
           <button class="modal__btn-primary" type="button" (click)="nextStep()">Suivant</button>
         </div>
       }
@@ -147,8 +159,8 @@
         <div class="modal__body">
           <h2 class="modal__title">Invitez votre équipe</h2>
           <p class="modal__subtitle">
-            Ajoutez des collaborateurs à votre espace de travail. Ils recevront une invitation
-            par e-mail pour rejoindre Day After Day.
+            Ajoutez des collaborateurs à votre espace de travail. Ils recevront une invitation par
+            e-mail pour rejoindre Day After Day.
           </p>
 
           <div class="modal__invite-row">
@@ -168,12 +180,22 @@
             Copier le lien d'invitation
           </button>
 
-          <button class="modal__btn-skip" type="button" (click)="finish()">
+          @if (stepError) {
+            <p class="modal__error">{{ stepError }}</p>
+          }
+          <button
+            class="modal__btn-skip"
+            type="button"
+            (click)="finish()"
+            [disabled]="isModalLoading"
+          >
+            @if (isModalLoading) {
+              <span class="step__spinner"></span>
+            }
             Passer cette étape
           </button>
         </div>
       }
-
     </div>
   </div>
 }

@@ -1,7 +1,10 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
+import { roleGuard } from './core/auth/role.guard';
+import { onboardingGuard } from './core/onboarding/onboarding.guard';
 
 export const routes: Routes = [
+  // ── Routes publiques ──────────────────────────────────────────────────────
   {
     path: '',
     pathMatch: 'full',
@@ -23,18 +26,23 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/login/login.component').then((m) => m.LoginComponent),
   },
+
+  // ── Workspace (auth requise, pas d'onboardingGuard — c'est la destination) ─
   {
     path: 'espaces',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/onboarding/workspace-step.component').then(
         (m) => m.WorkspaceStepComponent,
       ),
   },
+
+  // ── Shell protégé ─────────────────────────────────────────────────────────
   {
     path: '',
+    canActivate: [authGuard, onboardingGuard],
     loadComponent: () =>
       import('./core/layout/shell/shell.component').then((m) => m.ShellComponent),
-    canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       {
@@ -49,11 +57,15 @@ export const routes: Routes = [
       },
       {
         path: 'evenements',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['owner', 'chef_equipe', 'editeur'] },
         loadComponent: () =>
           import('./features/events/events.component').then((m) => m.EventsComponent),
       },
       {
         path: 'campagnes',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['owner', 'chef_equipe', 'charge_communication'] },
         loadComponent: () =>
           import('./features/ad-campaigns/ad-campaigns.component').then(
             (m) => m.AdCampaignsComponent,
@@ -61,6 +73,8 @@ export const routes: Routes = [
       },
       {
         path: 'utilisateurs',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['owner'] },
         loadComponent: () =>
           import('./features/users/users.component').then((m) => m.UsersComponent),
       },
@@ -71,5 +85,6 @@ export const routes: Routes = [
       },
     ],
   },
+
   { path: '**', redirectTo: '' },
 ];

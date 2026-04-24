@@ -21,11 +21,20 @@
           pattern="[0-9]"
           autocomplete="one-time-code"
           [value]="digit"
+          [disabled]="isLoading"
           (input)="onInput($index, $event)"
           (keydown)="onKeydown($index, $event)"
         />
       }
     </div>
+
+    @if (isLoading) {
+      <p class="step__state-text">Vérification en cours…</p>
+    }
+
+    @if (errorMessage) {
+      <p class="step__error">{{ errorMessage }}</p>
+    }
 
     <div class="step__mail-links">
       <a
