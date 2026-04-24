@@ -15,10 +15,13 @@ export class OtpStepComponent implements OnInit {
   private router = inject(Router);
 
   email = '';
+  from = '';
   digits = ['', '', '', '', '', ''];
 
   ngOnInit(): void {
-    this.email = this.route.snapshot.queryParamMap.get('email') ?? '';
+    const params = this.route.snapshot.queryParamMap;
+    this.email = params.get('email') ?? '';
+    this.from = params.get('from') ?? '';
   }
 
   onInput(index: number, event: Event): void {
@@ -61,7 +64,7 @@ export class OtpStepComponent implements OnInit {
   }
 
   private advance(): void {
-    this.router.navigate(['/espaces']);
+    this.router.navigate([this.from === 'login' ? '/dashboard' : '/espaces']);
   }
 
   private get inputs(): HTMLInputElement[] {
