@@ -54,3 +54,6 @@ Thumbs.db
 /old_design
 /BRANCHING_STRATEGY.md
 /CLAUDE.md
+/.claude
+/.vscode
+/.gitignore

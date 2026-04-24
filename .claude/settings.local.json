@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(grep -E \"\\\\.\\(ts|js|json|md\\)$\")",
-      "Bash(git -C '/c/Users/Elvis Destin O/Desktop/OPEN-TECH/Projets/Projet-05-Day-After-Day/dad-cms' log --oneline)"
+      "Bash(git -C '/c/Users/Elvis Destin O/Desktop/OPEN-TECH/Projets/Projet-05-Day-After-Day/dad-cms' log --oneline)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__execute_sql"
     ]
   },
   "enabledPlugins": {
