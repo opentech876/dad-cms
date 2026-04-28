@@ -1,9 +1,9 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
-import { filter, firstValueFrom } from 'rxjs';
-import { WorkspaceSummary } from '../../models';
+import { firstValueFrom } from 'rxjs';
+import { AppRole, WorkspaceSummary } from '../../models';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { OnboardingService } from '../../core/onboarding/onboarding.service';
@@ -21,85 +21,114 @@ export class WorkspaceStepComponent implements OnInit {
   private workspaceService = inject(WorkspaceService);
   private onboardingService = inject(OnboardingService);
 
-  email = '';
-  workspaces: WorkspaceSummary[] = [];
-  isLoading = false;
+  readonly email = signal('');
+  readonly workspaces = signal<WorkspaceSummary[]>([]);
+  readonly isLoading = signal(false);
 
-  showModal = false;
-  currentStep = 1;
-  isModalLoading = false;
-  stepError = '';
+  readonly showModal = signal(false);
+  readonly currentStep = signal(1);
+  readonly isModalLoading = signal(false);
+  readonly stepError = signal('');
 
-  workspaceName = '';
-  userName = '';
-  userPhone = '';
-  userPhotoUrl: string | null = null;
-  inviteEmail = '';
+  readonly workspaceName = signal('');
+  readonly userName = signal('');
+  readonly userPhone = signal('');
+  readonly userPhotoUrl = signal<string | null>(null);
+  readonly inviteEmail = signal('');
+  readonly inviteRole = signal<AppRole>('editeur');
+  readonly inviteStatus = signal<'idle' | 'loading' | 'sent' | 'error'>('idle');
+  readonly inviteError = signal('');
 
   private currentUserId = '';
 
   async ngOnInit(): Promise<void> {
-    this.isLoading = true;
+    this.isLoading.set(true);
 
-    const user = await firstValueFrom(this.supabase.currentUser$.pipe(filter(Boolean)));
-    this.email = user.email ?? '';
-    this.currentUserId = user.id;
+    // getUser() reads the session from localStorage — no BehaviorSubject timing issues
+    const { data: { user } } = await this.supabase.client.auth.getUser();
+    this.email.set(user?.email ?? '');
+    this.currentUserId = user?.id ?? '';
 
-    // Chargement correct des workspaces
-    this.workspaces = await firstValueFrom(this.workspaceService.getWorkspaceSummaries());
-    this.isLoading = false;
+    this.workspaces.set(await firstValueFrom(this.workspaceService.getWorkspaceSummaries()));
+    this.isLoading.set(false);
   }
 
   createWorkspace(): void {
-    this.showModal = true;
-    this.currentStep = 1;
-    this.stepError = '';
-    this.workspaceName = '';
+    this.showModal.set(true);
+    this.currentStep.set(1);
+    this.stepError.set('');
+    this.workspaceName.set('');
   }
 
   closeModal(): void {
-    this.showModal = false;
-    this.stepError = '';
+    this.showModal.set(false);
+    this.stepError.set('');
   }
 
   nextStep(): void {
-    this.stepError = '';
-    if (this.currentStep === 1 && !this.workspaceName.trim()) {
-      this.stepError = "Le nom de l'espace de travail est requis.";
+    this.stepError.set('');
+    if (this.currentStep() === 1 && !this.workspaceName().trim()) {
+      this.stepError.set("Le nom de l'espace de travail est requis.");
       return;
     }
-    if (this.currentStep === 2 && !this.userName.trim()) {
-      this.stepError = 'Votre nom complet est requis.';
+    if (this.currentStep() === 2 && !this.userName().trim()) {
+      this.stepError.set('Votre nom complet est requis.');
       return;
     }
-    if (this.currentStep < 3) this.currentStep++;
+    if (this.currentStep() < 3) this.currentStep.update(s => s + 1);
   }
 
   onPhotoSelected(event: Event): void {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => (this.userPhotoUrl = e.target?.result as string);
+    reader.onload = (e) => this.userPhotoUrl.set(e.target?.result as string);
     reader.readAsDataURL(file);
   }
 
   async finish(): Promise<void> {
-    if (this.isModalLoading) return;
-    this.isModalLoading = true;
-    this.stepError = '';
+    if (this.isModalLoading()) return;
+    this.isModalLoading.set(true);
+    this.stepError.set('');
 
     const result = await firstValueFrom(
-      this.onboardingService.completeOnboarding(this.workspaceName),
+      this.onboardingService.completeOnboarding(this.workspaceName()),
     );
 
     if (!result?.success) {
-      this.stepError = "Impossible de créer l'espace de travail. Veuillez réessayer.";
-      this.isModalLoading = false;
+      this.stepError.set("Impossible de créer l'espace de travail. Veuillez réessayer.");
+      this.isModalLoading.set(false);
       return;
     }
 
-    console.log('✅ Workspace créé avec succès');
+    // Save personal info collected in Step 2
+    if (this.currentUserId) {
+      await firstValueFrom(
+        this.workspaceService.upsertProfile(this.currentUserId, this.userName(), this.userPhone()),
+      );
+    }
+
+    console.log('✅ Workspace créé, profil sauvegardé');
     this.router.navigate(['/dashboard']);
+  }
+
+  async sendInvite(): Promise<void> {
+    if (!this.inviteEmail().trim() || this.inviteStatus() === 'loading') return;
+    this.inviteStatus.set('loading');
+    this.inviteError.set('');
+
+    const result = await firstValueFrom(
+      this.workspaceService.inviteUser(this.inviteEmail().trim(), this.inviteRole()),
+    );
+
+    if (!result.success) {
+      this.inviteStatus.set('error');
+      this.inviteError.set(result.error ?? "Impossible d'envoyer l'invitation.");
+      return;
+    }
+
+    this.inviteStatus.set('sent');
+    this.inviteEmail.set('');
   }
 
   selectWorkspace(_ws: WorkspaceSummary): void {

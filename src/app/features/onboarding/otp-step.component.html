@@ -5,13 +5,13 @@
 
     <h1 class="step__title">Nous vous avons envoyé un code par e-mail</h1>
     <p class="step__subtitle">
-      Nous avons envoyé un e-mail à <strong>{{ email }}</strong>.
+      Nous avons envoyé un e-mail à <strong>{{ email() }}</strong>.
       Saisissez le code ici ou appuyez sur le bouton dans l'e-mail pour continuer.
       Si vous ne trouvez pas l'e-mail, consultez votre dossier Spam ou la corbeille.
     </p>
 
     <div class="step__otp" (paste)="onPaste($event)">
-      @for (digit of digits; track $index) {
+      @for (digit of digits(); track $index) {
         <input
           #otpInput
           class="step__otp-box"
@@ -21,19 +21,19 @@
           pattern="[0-9]"
           autocomplete="one-time-code"
           [value]="digit"
-          [disabled]="isLoading"
+          [disabled]="isLoading()"
           (input)="onInput($index, $event)"
           (keydown)="onKeydown($index, $event)"
         />
       }
     </div>
 
-    @if (isLoading) {
+    @if (isLoading()) {
       <p class="step__state-text">Vérification en cours…</p>
     }
 
-    @if (errorMessage) {
-      <p class="step__error">{{ errorMessage }}</p>
+    @if (errorMessage()) {
+      <p class="step__error">{{ errorMessage() }}</p>
     }
 
     <div class="step__mail-links">

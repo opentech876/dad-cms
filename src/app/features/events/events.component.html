@@ -1,1 +1,315 @@
-<p>events works!</p>
+@if (editorView()) {
+
+  <!-- ══ EDITOR VIEW ══ -->
+  <div class="events-page">
+    <button class="btn btn-flat btn-sm" style="align-self:flex-start; display:inline-flex; align-items:center; gap:4px; margin-bottom:16px;" type="button" (click)="closeEditor()">
+      <tui-icon icon="@tui.chevron-left" style="font-size:14px;" />
+      Retour aux événements
+    </button>
+
+    <div class="event-editor-grid">
+
+      <!-- ── Left: Form ── -->
+      <div class="event-editor-col">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Événement historique</div>
+              <div class="card-subtitle">Position 1 · affiché par défaut sur mobile</div>
+            </div>
+            @if (editorStatus() === 'published') {
+              <span class="badge badge-success badge-dot">Publié</span>
+            } @else {
+              <span class="badge badge-warning badge-dot">Brouillon</span>
+            }
+          </div>
+          <div class="card-body" style="display:flex; flex-direction:column; gap:16px;">
+
+            <!-- Titre -->
+            <div class="field required">
+              <label class="field-label">Titre</label>
+              <input class="input" style="font-family:var(--font-serif); font-size:16px;"
+                     placeholder="Indépendance de la République du Congo"
+                     [value]="editorTitle()" (input)="editorTitle.set($any($event.target).value)" />
+              <span class="field-hint">{{ titleCharCount() }} / 80 caractères · idéalement 4 à 8 mots</span>
+            </div>
+
+            <!-- Date + Calendrier -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div class="field required">
+                <label class="field-label">Date</label>
+                <div class="input-group">
+                  <span class="input-icon"><tui-icon icon="@tui.calendar" style="font-size:15px;" /></span>
+                  <input class="input has-icon" placeholder="15 août 1960"
+                         [value]="editorDate()" (input)="editorDate.set($any($event.target).value)" />
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label">Calendrier</label>
+                <select class="select" [value]="editorCalendar()" (change)="editorCalendar.set($any($event.target).value)">
+                  <option value="2025">2025 — Calendrier en cours</option>
+                  <option value="2026">2026 — Brouillon</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Description -->
+            <div class="field required">
+              <label class="field-label">Description historique</label>
+              <textarea class="textarea" rows="6"
+                        style="font-family:var(--font-serif); font-size:14px; line-height:1.55;"
+                        placeholder="Le Congo accède à l'indépendance, mettant fin à la période coloniale française…"
+                        [value]="editorDescription()" (input)="editorDescription.set($any($event.target).value)"></textarea>
+              <div style="display:flex; justify-content:space-between;">
+                <span class="field-hint">Markdown léger toléré : **gras**, *italique*</span>
+                <span class="field-hint">{{ descCharCount() }} / 500 caractères</span>
+              </div>
+            </div>
+
+            <!-- Image -->
+            <div class="field required">
+              <label class="field-label">Image illustrative</label>
+              @if (editorHasImage()) {
+                <div style="display:grid; grid-template-columns:160px 1fr; gap:14px;">
+                  <div class="event-img-preview">
+                    <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                      <span style="font-family:var(--font-serif); font-style:italic; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:90px;">{{ editorImageName() }}</span>
+                      <label class="btn btn-flat btn-icon btn-sm" style="background:rgba(255,255,255,0.2); color:#fff; height:24px; width:24px; cursor:pointer;" title="Remplacer">
+                        <tui-icon icon="@tui.refresh-cw" style="font-size:12px;" />
+                        <input type="file" accept="image/*" style="display:none;" (change)="onImageChange($event)" />
+                      </label>
+                    </div>
+                  </div>
+                  <div style="display:flex; flex-direction:column; justify-content:space-between;">
+                    <div style="font-size:12px; color:var(--fg-2); display:flex; flex-direction:column; gap:5px;">
+                      <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--fg-3);">Dimensions</span>
+                        <span><strong>800 × 600 px</strong> ✓</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--fg-3);">Poids</span>
+                        <span><strong>{{ editorImageSizeKb() }} Ko</strong> / 150 Ko @if (editorImageSizeKb() <= 150) { ✓ }</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--fg-3);">Format</span><span>JPEG</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--fg-3);">Bucket</span>
+                        <span style="font-family:monospace; font-size:11px;">historical-images/</span>
+                      </div>
+                    </div>
+                    <label class="btn btn-secondary btn-sm" style="align-self:flex-start; margin-top:8px; cursor:pointer;">
+                      <tui-icon icon="@tui.upload" style="font-size:14px;" />
+                      Remplacer l'image
+                      <input type="file" accept="image/*" style="display:none;" (change)="onImageChange($event)" />
+                    </label>
+                  </div>
+                </div>
+              } @else {
+                <label class="event-upload-zone">
+                  <tui-icon icon="@tui.image" style="font-size:28px; color:var(--fg-3);" />
+                  <span style="font-size:13px; color:var(--fg-2); margin-top:8px;">Cliquer pour ajouter une image</span>
+                  <span class="field-hint" style="margin-top:2px;">800 × 600 px · ≤ 150 Ko · JPEG ou PNG</span>
+                  <input type="file" accept="image/*" style="display:none;" (change)="onImageChange($event)" />
+                </label>
+              }
+            </div>
+
+            <!-- Légende -->
+            <div class="field">
+              <label class="field-label">Légende (optionnelle)</label>
+              <input class="input" placeholder="Source, date, auteur de la photo…"
+                     [value]="editorCaption()" (input)="editorCaption.set($any($event.target).value)" />
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button class="btn btn-flat btn-sm" style="color:var(--danger);" type="button">
+              <tui-icon icon="@tui.trash-2" style="font-size:14px;" />
+              Supprimer
+            </button>
+            <div style="flex:1;"></div>
+            <button class="btn btn-flat btn-sm" type="button" (click)="closeEditor()">Annuler</button>
+            <button class="btn btn-secondary btn-sm" type="button" (click)="saveDraft()">Enregistrer brouillon</button>
+            <button class="btn btn-primary btn-sm" type="button" (click)="publish()">
+              Publier
+              <tui-icon icon="@tui.check" style="font-size:14px;" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Right: Preview + Validation ── -->
+      <div class="event-editor-col">
+
+        <!-- Mobile preview -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Aperçu mobile</div>
+          </div>
+          <div class="card-body" style="background:var(--bg-sunken); display:flex; justify-content:center; padding:24px;">
+            <div class="mobile-preview">
+              <div class="mobile-preview__inner">
+                <div class="mobile-preview__ad mobile-preview__ad--header">MTN · FORFAIT ÉTUDIANT</div>
+                <div class="mobile-preview__content">
+                  <div class="mobile-preview__date">{{ editorDate() || '15 août 1960' }}</div>
+                  <div class="mobile-preview__title">{{ editorTitle() || "Titre de l'événement" }}</div>
+                  <div class="mobile-preview__image"></div>
+                  <div class="mobile-preview__text">
+                    {{ (editorDescription() || "La description de l'événement apparaîtra ici…") | slice:0:140 }}{{ editorDescription().length > 140 ? '…' : '' }}
+                  </div>
+                  <div class="mobile-preview__link">C'est aussi → …</div>
+                </div>
+                <div class="mobile-preview__ad mobile-preview__ad--footer">SG CONGO · TONTINE+</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Validation checklist -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Validation</div>
+          </div>
+          <div>
+            @for (item of validationItems(); track item.label; let i = $index) {
+              <div class="event-validation-row" [class.event-validation-row--first]="i === 0">
+                <span class="event-validation-dot"
+                      [class.event-validation-dot--ok]="item.ok"
+                      [class.event-validation-dot--warn]="!item.ok">
+                  @if (item.ok) {
+                    <tui-icon icon="@tui.check" style="font-size:11px;" />
+                  } @else {
+                    <tui-icon icon="@tui.triangle-alert" style="font-size:11px;" />
+                  }
+                </span>
+                <span [style.color]="item.ok ? 'var(--fg-1)' : 'var(--fg-2)'">{{ item.label }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+} @else {
+
+  <!-- ══ LIST VIEW ══ -->
+  <div class="events-page">
+
+    <!-- ── KPI strip ── -->
+    <div class="kpi-grid" style="margin-bottom:16px;">
+      <div class="card" style="padding:18px 20px;">
+        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Total dates</div>
+        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1;">{{ stats.total }}</div>
+        <div style="margin-top:10px;"><span class="badge badge-success">Calendrier 2025</span></div>
+      </div>
+      <div class="card" style="padding:18px 20px;">
+        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Complètes</div>
+        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--success);">{{ stats.complete }}</div>
+        <div style="margin-top:10px;"><span class="badge badge-success badge-dot">2 / 2 événements</span></div>
+      </div>
+      <div class="card" style="padding:18px 20px;">
+        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Partielles</div>
+        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--warning);">{{ stats.partial }}</div>
+        <div style="margin-top:10px;"><span class="badge badge-warning">1 / 2 événements</span></div>
+      </div>
+      <div class="card" style="padding:18px 20px;">
+        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Vides</div>
+        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--danger);">{{ stats.empty }}</div>
+        <div style="margin-top:10px;"><span class="badge badge-danger">À compléter</span></div>
+      </div>
+    </div>
+
+    <!-- ── Toolbar ── -->
+    <div class="card" style="padding:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+      <div class="input-group" style="width:320px;">
+        <span class="input-icon">&#128269;</span>
+        <input class="input has-icon" placeholder="Rechercher par titre, date…"
+               [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)"
+               style="height:36px; font-size:13px;">
+      </div>
+      <select class="select" style="width:130px; height:36px; font-size:13px;"
+              [value]="selectedYear()" (change)="selectedYear.set(+$any($event.target).value)">
+        <option [value]="0">Toutes années</option>
+        @for (y of yearOptions; track y) {
+          <option [value]="y">{{ y }}</option>
+        }
+      </select>
+      <select class="select" style="width:140px; height:36px; font-size:13px;"
+              [value]="selectedStatus()" (change)="selectedStatus.set($any($event.target).value)">
+        <option value="all">Tous statuts</option>
+        <option value="published">Publiées</option>
+        <option value="draft">Brouillons</option>
+        <option value="empty">Vides</option>
+      </select>
+      <div style="flex:1;"></div>
+      <button class="btn btn-secondary btn-sm" type="button">Importer</button>
+      <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
+        <tui-icon icon="@tui.plus" style="font-size:14px;" />
+        Nouvel événement
+      </button>
+    </div>
+
+    <!-- ── Dates table ── -->
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:160px;">Date</th>
+            <th>Événements</th>
+            <th style="width:80px; text-align:center;">Nb.</th>
+            <th style="width:200px;">Publicités</th>
+            <th style="width:110px;">Statut</th>
+            <th style="width:60px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows; track row.date) {
+            <tr style="cursor:pointer;" (click)="openEditor(row)">
+              <td>
+                <div style="display:flex; flex-direction:column; line-height:1.2;">
+                  <span style="font-family:var(--font-serif); font-size:15px; font-weight:600;">{{ row.date }}</span>
+                  <span style="font-size:11.5px; color:var(--fg-3);">{{ row.dow }}</span>
+                </div>
+              </td>
+              <td>
+                @if (row.title) {
+                  <div>
+                    <div style="font-family:var(--font-serif); font-style:italic; color:var(--fg-1);">« {{ row.title }} »</div>
+                    @if (row.sub) {
+                      <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ row.sub }}</div>
+                    }
+                  </div>
+                } @else {
+                  <span style="color:var(--fg-3); font-style:italic;">Aucun événement</span>
+                }
+              </td>
+              <td style="text-align:center;">
+                <span class="badge"
+                      [style.background]="row.count === 2 ? 'var(--success-soft)' : row.count === 1 ? 'var(--warning-soft)' : 'var(--bg-sunken)'"
+                      [style.color]="row.count === 2 ? 'var(--success)' : row.count === 1 ? 'var(--warning)' : 'var(--fg-3)'">
+                  {{ row.count }} / 2
+                </span>
+              </td>
+              <td style="color:var(--fg-2); font-size:12.5px;">{{ row.ad }}</td>
+              <td>
+                @if (row.status === 'published') { <span class="badge badge-success badge-dot">Publié</span> }
+                @if (row.status === 'draft') { <span class="badge badge-warning badge-dot">Brouillon</span> }
+                @if (row.status === 'empty') { <span class="badge badge-dot">Vide</span> }
+              </td>
+              <td>
+                <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="$event.stopPropagation(); openEditor(row)">
+                  <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+}

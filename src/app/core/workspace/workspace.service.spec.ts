@@ -25,7 +25,7 @@ describe('WorkspaceService', () => {
   beforeEach(() => {
     mockSupabase = {
       client: buildClient(0),
-      invoke: jasmine.createSpy('invoke').and.resolveTo({ data: { id: 'ws-new' }, error: null }),
+      invoke: jest.fn().mockResolvedValue({ data: { id: 'ws-new' }, error: null }),
     };
 
     TestBed.configureTestingModule({
@@ -43,12 +43,12 @@ describe('WorkspaceService', () => {
   describe('hasWorkspace()', () => {
     it('returns false when no workspaces exist', async () => {
       mockSupabase.client = buildClient(0);
-      expect(await firstValueFrom(service.hasWorkspace())).toBeFalse();
+      expect(await firstValueFrom(service.hasWorkspace())).toBe(false);
     });
 
     it('returns true when at least one workspace exists', async () => {
       mockSupabase.client = buildClient(1);
-      expect(await firstValueFrom(service.hasWorkspace())).toBeTrue();
+      expect(await firstValueFrom(service.hasWorkspace())).toBe(true);
     });
   });
 
@@ -82,14 +82,39 @@ describe('WorkspaceService', () => {
 
     it('returns success true and workspaceId on success', async () => {
       const result = await firstValueFrom(service.createWorkspace('OPEN-TECH'));
-      expect(result.success).toBeTrue();
+      expect(result.success).toBe(true);
       expect(result.workspaceId).toBe('ws-new');
     });
 
     it('returns success false when invoke returns an error', async () => {
-      mockSupabase.invoke.and.resolveTo({ data: null, error: { message: 'Erreur serveur' } });
+      mockSupabase.invoke.mockResolvedValueOnce({ data: null, error: { message: 'Erreur serveur' } });
       const result = await firstValueFrom(service.createWorkspace('OPEN-TECH'));
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
+    });
+  });
+
+  // ── inviteUser() ───────────────────────────────────────────────────────────
+
+  describe('inviteUser()', () => {
+    it("appelle invoke avec 'invite-user', l'email et le rôle", async () => {
+      await firstValueFrom(service.inviteUser('invite@exemple.com', 'editeur'));
+      expect(mockSupabase.invoke).toHaveBeenCalledWith('invite-user', {
+        email: 'invite@exemple.com',
+        role: 'editeur',
+      });
+    });
+
+    it('retourne { success: true } en cas de succès', async () => {
+      mockSupabase.invoke.mockResolvedValueOnce({ data: { id: 'u1', email: 'invite@exemple.com' }, error: null });
+      const result = await firstValueFrom(service.inviteUser('invite@exemple.com', 'editeur'));
+      expect(result.success).toBe(true);
+    });
+
+    it('retourne { success: false, error } en cas d\'erreur', async () => {
+      mockSupabase.invoke.mockResolvedValueOnce({ data: null, error: { message: 'Utilisateur déjà invité' } });
+      const result = await firstValueFrom(service.inviteUser('invite@exemple.com', 'editeur'));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Utilisateur déjà invité');
     });
   });
 });

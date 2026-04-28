@@ -36,12 +36,12 @@ describe('roleGuard', () => {
 
   it('allows owner through any protected route', async () => {
     roleSubject.next('owner');
-    expect(await run(['editeur'])).toBeTrue();
+    expect(await run(['editeur'])).toBe(true);
   });
 
   it('allows a role that is listed in requiredRoles', async () => {
     roleSubject.next('editeur');
-    expect(await run(['editeur', 'chef_equipe'])).toBeTrue();
+    expect(await run(['editeur', 'chef_equipe'])).toBe(true);
   });
 
   it('redirects to /dashboard when role is not in requiredRoles', async () => {
@@ -51,6 +51,6 @@ describe('roleGuard', () => {
 
   it('allows any authenticated role when requiredRoles is empty', async () => {
     roleSubject.next('charge_communication');
-    expect(await run([])).toBeTrue();
+    expect(await run([])).toBe(true);
   });
 });

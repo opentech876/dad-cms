@@ -12,7 +12,10 @@
       "Bash(ng build *)",
       "mcp__claude_ai_Supabase__deploy_edge_function",
       "Bash(ng test *)",
-      "mcp__claude_ai_Supabase__get_publishable_keys"
+      "mcp__claude_ai_Supabase__get_publishable_keys",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(npx jest *)"
     ]
   },
   "enabledPlugins": {

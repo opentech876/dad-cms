@@ -4,12 +4,12 @@ import { authGuard } from './auth.guard';
 import { SupabaseService } from '../supabase/supabase.service';
 
 describe('authGuard', () => {
-  let router: jasmine.SpyObj<Router>;
-  let supabase: jasmine.SpyObj<SupabaseService>;
+  let router: { navigate: jest.Mock };
+  let supabase: { client: { auth: { getSession: jest.Mock } } };
 
   beforeEach(() => {
-    router = jasmine.createSpyObj('Router', ['navigate']);
-    supabase = jasmine.createSpyObj('SupabaseService', ['getSession']);
+    router = { navigate: jest.fn() };
+    supabase = { client: { auth: { getSession: jest.fn() } } };
 
     TestBed.configureTestingModule({
       providers: [
@@ -20,23 +20,25 @@ describe('authGuard', () => {
   });
 
   it('returns true when a session exists', async () => {
-    supabase.getSession.and.resolveTo({ user: { id: 'u1' } } as any);
+    supabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { user: { id: 'u1' } } },
+    });
 
     const result = await TestBed.runInInjectionContext(() =>
       authGuard({} as any, {} as any),
     );
 
-    expect(result).toBeTrue();
+    expect(result).toBe(true);
   });
 
   it('navigates to /login and returns false when no session', async () => {
-    supabase.getSession.and.resolveTo(null);
+    supabase.client.auth.getSession.mockResolvedValue({ data: { session: null } });
 
     const result = await TestBed.runInInjectionContext(() =>
       authGuard({} as any, {} as any),
     );
 
     expect(router.navigate).toHaveBeenCalledWith(['/login']);
-    expect(result).toBeFalse();
+    expect(result).toBe(false);
   });
 });

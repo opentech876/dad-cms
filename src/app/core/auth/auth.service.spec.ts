@@ -6,17 +6,16 @@ import { SupabaseService } from '../supabase/supabase.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let router: jasmine.SpyObj<Router>;
+  let router: { navigate: jest.Mock };
   let mockSupabase: any;
 
   beforeEach(() => {
-    router = jasmine.createSpyObj('Router', ['navigate']);
+    router = { navigate: jest.fn() };
 
-    // currentUser$ starts as null so listenToRoleChanges never hits the DB
     const userSubject = new BehaviorSubject<any>(null);
     mockSupabase = {
       currentUser$: userSubject.asObservable(),
-      signOut: jasmine.createSpy('signOut').and.resolveTo({ error: null }),
+      signOut: jest.fn().mockResolvedValue({ error: null }),
       client: {
         from: () => ({
           select: () => ({
@@ -48,17 +47,17 @@ describe('AuthService', () => {
   describe('isOwner()', () => {
     it('returns true when role is owner', (done) => {
       (service as any).currentRoleSubject.next('owner');
-      service.isOwner().subscribe((v) => { expect(v).toBeTrue(); done(); });
+      service.isOwner().subscribe((v) => { expect(v).toBe(true); done(); });
     });
 
     it('returns false for editeur', (done) => {
       (service as any).currentRoleSubject.next('editeur');
-      service.isOwner().subscribe((v) => { expect(v).toBeFalse(); done(); });
+      service.isOwner().subscribe((v) => { expect(v).toBe(false); done(); });
     });
 
     it('returns false when no role', (done) => {
       (service as any).currentRoleSubject.next(null);
-      service.isOwner().subscribe((v) => { expect(v).toBeFalse(); done(); });
+      service.isOwner().subscribe((v) => { expect(v).toBe(false); done(); });
     });
   });
 
@@ -68,37 +67,37 @@ describe('AuthService', () => {
     it('owner passes every role check', (done) => {
       (service as any).currentRoleSubject.next('owner');
       service.hasRoleAtLeast('charge_communication').subscribe((v) => {
-        expect(v).toBeTrue(); done();
+        expect(v).toBe(true); done();
       });
     });
 
     it('chef_equipe passes editeur check', (done) => {
       (service as any).currentRoleSubject.next('chef_equipe');
-      service.hasRoleAtLeast('editeur').subscribe((v) => { expect(v).toBeTrue(); done(); });
+      service.hasRoleAtLeast('editeur').subscribe((v) => { expect(v).toBe(true); done(); });
     });
 
     it('chef_equipe passes charge_communication check', (done) => {
       (service as any).currentRoleSubject.next('chef_equipe');
       service.hasRoleAtLeast('charge_communication').subscribe((v) => {
-        expect(v).toBeTrue(); done();
+        expect(v).toBe(true); done();
       });
     });
 
     it('editeur fails charge_communication check', (done) => {
       (service as any).currentRoleSubject.next('editeur');
       service.hasRoleAtLeast('charge_communication').subscribe((v) => {
-        expect(v).toBeFalse(); done();
+        expect(v).toBe(false); done();
       });
     });
 
     it('charge_communication fails editeur check', (done) => {
       (service as any).currentRoleSubject.next('charge_communication');
-      service.hasRoleAtLeast('editeur').subscribe((v) => { expect(v).toBeFalse(); done(); });
+      service.hasRoleAtLeast('editeur').subscribe((v) => { expect(v).toBe(false); done(); });
     });
 
     it('no role returns false', (done) => {
       (service as any).currentRoleSubject.next(null);
-      service.hasRoleAtLeast('editeur').subscribe((v) => { expect(v).toBeFalse(); done(); });
+      service.hasRoleAtLeast('editeur').subscribe((v) => { expect(v).toBe(false); done(); });
     });
   });
 

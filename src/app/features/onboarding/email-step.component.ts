@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { SupabaseService } from '../../core/supabase/supabase.service';
@@ -18,20 +18,20 @@ export class EmailStepComponent {
     email: new FormControl('', [Validators.required, Validators.email]),
   });
 
-  loading = false;
-  errorMessage = '';
+  readonly loading = signal(false);
+  readonly errorMessage = signal('');
 
   async submit(): Promise<void> {
-    if (this.form.invalid || this.loading) return;
-    this.loading = true;
-    this.errorMessage = '';
+    if (this.form.invalid || this.loading()) return;
+    this.loading.set(true);
+    this.errorMessage.set('');
 
     const email = this.form.value.email!;
     const { error } = await this.supabase.sendOtp(email, true);
 
     if (error) {
-      this.errorMessage = 'Une erreur est survenue. Veuillez réessayer.';
-      this.loading = false;
+      this.errorMessage.set('Une erreur est survenue. Veuillez réessayer.');
+      this.loading.set(false);
       return;
     }
 
@@ -39,6 +39,5 @@ export class EmailStepComponent {
   }
 
   loginWithGoogle(): void {}
-
   loginWithApple(): void {}
 }

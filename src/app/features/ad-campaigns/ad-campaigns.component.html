@@ -1,0 +1,98 @@
+<div class="campaigns-page">
+
+  <!-- ── KPI grid ── -->
+  <div class="kpi-grid" style="margin-bottom:16px;">
+    <div class="card" style="padding:18px 20px;">
+      <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Campagnes actives</div>
+      <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--success);">{{ stats.active }}</div>
+      <div style="margin-top:10px; font-size:12px; color:var(--fg-3);">2 entête · 2 pied</div>
+    </div>
+    <div class="card" style="padding:18px 20px;">
+      <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Dates couvertes</div>
+      <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1;">{{ stats.datesCovered }}</div>
+      <div style="margin-top:10px; font-size:12px; color:var(--fg-3);">sur 365 dates 2026</div>
+    </div>
+    <div class="card" style="padding:18px 20px;">
+      <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Impressions / mois</div>
+      <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1;">{{ stats.impressions }}</div>
+      <div style="margin-top:10px;"><span class="badge badge-success">↑ +8% · moyenne 90 j</span></div>
+    </div>
+    <div class="card" style="padding:18px 20px;">
+      <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">CTR moyen</div>
+      <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1;">{{ stats.ctr }}</div>
+      <div style="margin-top:10px;"><span class="badge badge-success">↑ +0,12 pt</span></div>
+    </div>
+  </div>
+
+  <!-- ── Toolbar ── -->
+  <div class="card" style="padding:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+    <div class="input-group" style="width:320px;">
+      <span class="input-icon">&#128269;</span>
+      <input class="input has-icon" placeholder="Rechercher une campagne, un annonceur…"
+             [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)"
+             style="height:36px; font-size:13px;">
+    </div>
+    <select class="select" style="width:150px; height:36px; font-size:13px;"
+            [value]="selectedPosition()" (change)="selectedPosition.set($any($event.target).value)">
+      <option value="all">Toutes positions</option>
+      <option value="header">Entête</option>
+      <option value="footer">Pied de page</option>
+    </select>
+    <select class="select" style="width:140px; height:36px; font-size:13px;"
+            [value]="selectedStatus()" (change)="selectedStatus.set($any($event.target).value)">
+      <option value="all">Tous statuts</option>
+      <option value="active">Active</option>
+      <option value="scheduled">Planifiée</option>
+      <option value="ended">Terminée</option>
+    </select>
+    <div style="flex:1;"></div>
+    <button class="btn btn-primary btn-sm">+ Nouvelle campagne</button>
+  </div>
+
+  <!-- ── Campaigns table ── -->
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Campagne</th>
+          <th>Annonceur</th>
+          <th style="width:100px;">Position</th>
+          <th style="width:180px;">Période</th>
+          <th style="width:70px; text-align:center;">Dates</th>
+          <th style="width:110px;">Statut</th>
+          <th style="width:60px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (c of campaigns; track c.id) {
+          <tr style="cursor:pointer;">
+            <td>
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div [style.background]="c.color"
+                     style="width:40px; height:28px; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:700; flex:none;">
+                  {{ advertiserInitials(c.advertiser) }}
+                </div>
+                <span style="font-weight:500;">{{ c.name }}</span>
+              </div>
+            </td>
+            <td style="color:var(--fg-2);">{{ c.advertiser }}</td>
+            <td>
+              <span class="badge">{{ c.position === 'header' ? '↑ Entête' : '↓ Pied' }}</span>
+            </td>
+            <td style="color:var(--fg-2); font-size:12.5px; font-variant-numeric:tabular-nums;">{{ c.from }} → {{ c.to }}</td>
+            <td style="text-align:center; font-variant-numeric:tabular-nums; font-weight:600;">{{ c.dates }}</td>
+            <td>
+              @if (c.status === 'active') { <span class="badge badge-success badge-dot">Active</span> }
+              @if (c.status === 'scheduled') { <span class="badge badge-info badge-dot">Planifiée</span> }
+              @if (c.status === 'ended') { <span class="badge badge-dot">Terminée</span> }
+            </td>
+            <td>
+              <button class="btn btn-flat btn-icon btn-sm">⋯</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+</div>

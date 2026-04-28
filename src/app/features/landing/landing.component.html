@@ -1,28 +1,95 @@
-<div class="landing">
-  <div class="navbar-outer">
-    <nav class="navbar">
-      <div class="navbar__brand">
-        <div class="navbar__logo"></div>
-        <span class="navbar__name">Day After Day</span>
+@if (!isLoading()) {
+  <div class="landing-page">
+
+    <!-- ── Topbar ── -->
+    <header class="landing-header">
+      <div class="landing-header__inner">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+            <rect width="40" height="40" rx="8" fill="var(--accent)"/>
+            <rect x="8" y="12" width="24" height="2" rx="1" fill="#f3e6c8"/>
+            <rect x="8" y="17" width="16" height="2" rx="1" fill="#f3e6c8" opacity="0.7"/>
+            <rect x="8" y="22" width="20" height="2" rx="1" fill="#f3e6c8" opacity="0.7"/>
+            <rect x="8" y="27" width="12" height="2" rx="1" fill="#f3e6c8" opacity="0.5"/>
+          </svg>
+          <div>
+            <div style="font-family:var(--font-serif); font-size:16px; font-weight:700; letter-spacing:-0.01em; color:var(--fg-1);">Day After Day</div>
+            <div style="font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--accent); font-weight:600;">Plateforme éditoriale</div>
+          </div>
+        </div>
+        <a routerLink="/connexion" class="btn btn-secondary btn-sm">Se connecter</a>
       </div>
+    </header>
 
-      <div class="navbar__links">
-        <!-- navigation links will go here -->
+    <!-- ── Hero ── -->
+    <main class="landing-hero">
+      <div class="landing-hero__inner">
+
+        <!-- Left: editorial copy -->
+        <div class="landing-hero__copy">
+          <div class="eyebrow" style="color:var(--accent);">Numéro du jour · Brazzaville</div>
+          <h1 class="landing-hero__headline">
+            L'histoire de la Nation,<br>
+            <em style="font-style:italic; color:var(--accent);">jour après jour.</em>
+          </h1>
+          <p class="landing-hero__desc">
+            La plateforme éditoriale qui alimente l'éphéméride mobile de la République du Congo.
+            Calendriers, événements historiques, campagnes publicitaires — tout depuis un seul espace de travail.
+          </p>
+          <hr class="rule" style="margin:28px 0;">
+          <div style="display:flex; gap:32px; margin-bottom:36px;">
+            <div>
+              <div style="font-family:var(--font-serif); font-size:28px; font-weight:700; color:var(--fg-1);">365</div>
+              <div style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--fg-3);">Dates / an</div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-serif); font-size:28px; font-weight:700; color:var(--fg-1);">×2</div>
+              <div style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--fg-3);">Événements</div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-serif); font-size:28px; font-weight:700; color:var(--fg-1);">4</div>
+              <div style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--fg-3);">Rôles</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <a routerLink="/connexion" class="btn btn-primary" style="padding:0 28px; height:44px; font-size:14px;">Se connecter →</a>
+            @if (!isInitialized()) {
+              <a routerLink="/demarrer" class="btn btn-secondary" style="padding:0 28px; height:44px; font-size:14px;">Créer un espace</a>
+            }
+          </div>
+        </div>
+
+        <!-- Right: decorative editorial panel -->
+        <div class="landing-hero__panel">
+          <div class="landing-hero__panel-inner">
+            <div style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; opacity:0.7; display:flex; justify-content:space-between;">
+              <span>Aperçu mobile</span>
+              <span>DAD · CMS</span>
+            </div>
+            <div style="text-align:center; padding:32px 0;">
+              <div style="font-family:var(--font-serif); font-size:80px; font-weight:700; line-height:1; color:#f3e6c8; letter-spacing:-0.04em;">
+                {{ todayDay }}
+              </div>
+              <div style="font-family:var(--font-serif); font-size:18px; font-style:italic; margin-top:6px; opacity:0.85; color:#f3e6c8;">{{ todayMonth }}</div>
+              <div style="margin-top:20px; height:1px; background:rgba(243,230,200,0.2);"></div>
+              <div style="margin-top:16px; font-family:var(--font-serif); font-size:13px; line-height:1.5; opacity:0.75; padding:0 8px; color:#f3e6c8;">
+                « Indépendance de la<br>République du Congo »
+              </div>
+              <div style="margin-top:8px; font-size:10px; letter-spacing:0.1em; opacity:0.5; color:#f3e6c8;">— C'est aussi —</div>
+              <div style="margin-top:6px; font-family:var(--font-serif); font-size:11px; opacity:0.65; color:#f3e6c8;">Premier Conseil des ministres</div>
+            </div>
+            <div style="font-size:10px; opacity:0.45; text-align:right; color:#f3e6c8;">Day After Day · v1.0</div>
+          </div>
+        </div>
+
       </div>
+    </main>
 
-      <a routerLink="/login" class="navbar__cta navbar__cta--ghost">Se connecter</a>
-    </nav>
-  </div>
+    <!-- ── Footer ── -->
+    <footer class="landing-footer">
+      <span>© 2026 OPEN-TECH · Brazzaville, République du Congo</span>
+      <span class="dateline" style="font-style:italic; color:var(--accent);">Vol. I — № 1</span>
+    </footer>
 
-  <div class="hero">
-    <p class="hero__tagline">Votre hub central de production de contenu historique</p>
-    <h1 class="hero__headline">Plateforme Éditoriale<br />Day After Day</h1>
-    <p class="hero__description">
-      Créez rapidement les événements historique du jour, gérer les calendriers, assignez des
-      annonces publicitaires et collaborez efficacement avec votre équipe éditoriale et commerciale.
-    </p>
-    @if (!isLoading && !isInitialized) {
-      <a routerLink="/demarrer" class="hero__cta">Commencer</a>
-    }
   </div>
-</div>
+}

@@ -1,49 +1,133 @@
-<div class="shell">
-  <aside class="sidebar">
-    <div class="sidebar__brand">
-      <div class="sidebar__logo">D</div>
-      <span class="sidebar__name">Day After Day</span>
+<div class="shell" [class.shell--collapsed]="collapsed()">
+
+  <!-- ───── Sidebar ───── -->
+  <aside class="sidebar scroll-pretty">
+
+    <!-- Logo block -->
+    <div class="sidebar-logo">
+      <svg class="sidebar-logomark" width="32" height="32" viewBox="0 0 40 40" fill="none">
+        <rect x="3.5" y="6" width="33" height="29" rx="2.5" fill="var(--sidebar-accent)"/>
+        <rect x="3.5" y="6" width="33" height="6.5" fill="rgba(0,0,0,0.18)"/>
+        <circle cx="11" cy="4.5" r="1.5" fill="var(--sidebar-accent)" stroke="var(--sidebar-bg)" stroke-width="1"/>
+        <circle cx="20" cy="4.5" r="1.5" fill="var(--sidebar-accent)" stroke="var(--sidebar-bg)" stroke-width="1"/>
+        <circle cx="29" cy="4.5" r="1.5" fill="var(--sidebar-accent)" stroke="var(--sidebar-bg)" stroke-width="1"/>
+        <text x="20" y="28" text-anchor="middle" font-family="serif" font-weight="700" font-size="12" fill="#1f1a14" letter-spacing="0.5">DAD</text>
+      </svg>
+      @if (!collapsed()) {
+        <div class="sidebar-brand">
+          <span class="sidebar-brand-name">Day After Day</span>
+          <span class="sidebar-brand-sub">Éphéméride</span>
+        </div>
+      }
     </div>
 
-    <nav class="sidebar__nav">
-      <a class="sidebar__item" routerLink="/dashboard" routerLinkActive="sidebar__item--active" [routerLinkActiveOptions]="{exact: false}">
-        <tui-icon icon="@tui.layout-dashboard" class="sidebar__icon" />
-        <span>Tableau de bord</span>
-      </a>
-      <a class="sidebar__item" routerLink="/calendrier" routerLinkActive="sidebar__item--active">
-        <tui-icon icon="@tui.calendar" class="sidebar__icon" />
-        <span>Calendrier</span>
-      </a>
-      <a class="sidebar__item" routerLink="/evenements" routerLinkActive="sidebar__item--active">
-        <tui-icon icon="@tui.book-open" class="sidebar__icon" />
-        <span>Événements</span>
-      </a>
-      <a class="sidebar__item" routerLink="/campagnes" routerLinkActive="sidebar__item--active">
-        <tui-icon icon="@tui.megaphone" class="sidebar__icon" />
-        <span>Campagnes</span>
-      </a>
-      <a class="sidebar__item" routerLink="/utilisateurs" routerLinkActive="sidebar__item--active">
-        <tui-icon icon="@tui.users" class="sidebar__icon" />
-        <span>Utilisateurs</span>
-      </a>
-      <a class="sidebar__item" routerLink="/metriques" routerLinkActive="sidebar__item--active">
-        <tui-icon icon="@tui.bar-chart-2" class="sidebar__icon" />
-        <span>Métriques</span>
-      </a>
+    <!-- Workspace badge -->
+    @if (!collapsed()) {
+      <div class="sidebar-workspace">
+        <button class="sidebar-workspace-btn">
+          <div class="sidebar-workspace-icon">DA</div>
+          <div class="sidebar-workspace-info">
+            <span class="sidebar-workspace-name">Day After Day</span>
+            <span class="sidebar-workspace-sub">Espace principal</span>
+          </div>
+          <tui-icon icon="@tui.chevron-down" style="font-size:14px; color: var(--sidebar-fg); opacity:.6;" />
+        </button>
+      </div>
+    }
+
+    <!-- Main nav -->
+    <nav class="sidebar-nav scroll-pretty">
+      @if (!collapsed()) {
+        <div class="sidebar-section-label">Édition</div>
+      }
+      @for (item of navItems; track item.id) {
+        <a
+          class="sidebar-nav-item"
+          [routerLink]="item.path"
+          routerLinkActive="sidebar-nav-item--active"
+          [title]="collapsed() ? item.label : ''"
+        >
+          <tui-icon [icon]="item.icon" class="sidebar-nav-icon" />
+          @if (!collapsed()) {
+            <span class="sidebar-nav-label">{{ item.label }}</span>
+            @if (item.badge) {
+              <span class="sidebar-nav-badge">{{ item.badge }}</span>
+            }
+          }
+        </a>
+      }
+
+      <div class="sidebar-admin-section">
+        @if (!collapsed()) {
+          <div class="sidebar-section-label">Administration</div>
+        }
+        @for (item of adminItems; track item.id) {
+          <a
+            class="sidebar-nav-item"
+            [routerLink]="item.path"
+            routerLinkActive="sidebar-nav-item--active"
+            [title]="collapsed() ? item.label : ''"
+          >
+            <tui-icon [icon]="item.icon" class="sidebar-nav-icon" />
+            @if (!collapsed()) {
+              <span class="sidebar-nav-label">{{ item.label }}</span>
+            }
+          </a>
+        }
+      </div>
     </nav>
 
-    <div class="sidebar__footer">
-      <div class="sidebar__user">
-        <div class="sidebar__avatar">{{ userEmail[0]?.toUpperCase() }}</div>
-        <span class="sidebar__email">{{ userEmail }}</span>
-      </div>
-      <button class="sidebar__logout" (click)="logout()" title="Se déconnecter">
-        <tui-icon icon="@tui.log-out" />
-      </button>
+    <!-- User card -->
+    <div class="sidebar-footer">
+      <div class="sidebar-user-avatar">{{ userInitials }}</div>
+      @if (!collapsed()) {
+        <div class="sidebar-user-info">
+          <span class="sidebar-user-name">{{ userName }}</span>
+          <span class="sidebar-user-email">{{ userEmail }}</span>
+        </div>
+        <button class="sidebar-toggle-btn" (click)="toggleCollapsed()" title="Réduire la barre">
+          <tui-icon icon="@tui.panel-left" style="font-size:16px;" />
+        </button>
+      }
     </div>
+
+    <!-- Expand button when collapsed -->
+    @if (collapsed()) {
+      <button class="sidebar-expand-btn" (click)="toggleCollapsed()" title="Étendre">
+        <tui-icon icon="@tui.chevron-right" style="font-size:12px;" />
+      </button>
+    }
   </aside>
 
-  <main class="main">
-    <router-outlet />
-  </main>
+  <!-- ───── Main area ───── -->
+  <div class="shell-main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <h1 class="topbar-title">{{ pageTitle() }}</h1>
+      <div class="topbar-actions">
+        <div class="input-group topbar-search">
+          <span class="input-icon">
+            <tui-icon icon="@tui.search" style="font-size:16px;" />
+          </span>
+          <input class="input has-icon" placeholder="Rechercher événements, dates…" style="height:36px; font-size:13px; padding-right:44px;" />
+          <span style="position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex;">
+            <span class="kbd">⌘K</span>
+          </span>
+        </div>
+        <button class="btn btn-flat btn-icon btn-sm topbar-notif-btn" title="Notifications">
+          <tui-icon icon="@tui.bell" style="font-size:18px;" />
+          <span class="topbar-notif-dot"></span>
+        </button>
+        <button class="btn btn-flat btn-icon btn-sm" title="Se déconnecter" (click)="logout()">
+          <tui-icon icon="@tui.log-out" style="font-size:18px;" />
+        </button>
+      </div>
+    </header>
+
+    <!-- Page content -->
+    <div class="shell-content scroll-pretty">
+      <router-outlet />
+    </div>
+  </div>
 </div>

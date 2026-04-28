@@ -1,40 +1,75 @@
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { firstValueFrom, of } from 'rxjs';
 import { onboardingGuard } from './onboarding.guard';
-import { OnboardingService } from './onboarding.service';
+import { SupabaseService } from '../supabase/supabase.service';
 
 describe('onboardingGuard', () => {
-  let router: jasmine.SpyObj<Router>;
+  let router: { createUrlTree: jest.Mock };
 
-  function setup(shouldGo: boolean) {
-    router = jasmine.createSpyObj('Router', ['createUrlTree']);
-    router.createUrlTree.and.callFake((cmds: any[]) => cmds as any);
+  function buildClient(roleData: any, workspaceCount: number) {
+    return {
+      from: (table: string) => ({
+        select: (_cols: string, _opts?: any) => {
+          if (table === 'user_roles') {
+            return { single: () => Promise.resolve({ data: roleData }) };
+          }
+          return Promise.resolve({ count: workspaceCount });
+        },
+      }),
+    };
+  }
+
+  function setup(roleData: any, workspaceCount = 0) {
+    router = { createUrlTree: jest.fn((cmds: any[]) => cmds as any) };
 
     TestBed.configureTestingModule({
       providers: [
         { provide: Router, useValue: router },
         {
-          provide: OnboardingService,
-          useValue: { shouldGoToOnboarding: () => of(shouldGo) },
+          provide: SupabaseService,
+          useValue: { client: buildClient(roleData, workspaceCount) },
         },
       ],
     });
   }
 
-  it('redirects to /espaces when owner has no workspace yet', async () => {
-    setup(true);
-    const result = await firstValueFrom(
-      TestBed.runInInjectionContext(() => onboardingGuard({} as any, {} as any)) as any,
+  it('returns true when user is not owner', async () => {
+    setup({ role: 'editeur', expires_at: null });
+    const result = await TestBed.runInInjectionContext(() =>
+      onboardingGuard({} as any, {} as any),
+    );
+    expect(result).toBe(true);
+  });
+
+  it('returns true when user has no role', async () => {
+    setup(null);
+    const result = await TestBed.runInInjectionContext(() =>
+      onboardingGuard({} as any, {} as any),
+    );
+    expect(result).toBe(true);
+  });
+
+  it('returns true when owner role is expired', async () => {
+    setup({ role: 'owner', expires_at: '2020-01-01T00:00:00Z' });
+    const result = await TestBed.runInInjectionContext(() =>
+      onboardingGuard({} as any, {} as any),
+    );
+    expect(result).toBe(true);
+  });
+
+  it('redirects to /espaces when active owner has no workspace', async () => {
+    setup({ role: 'owner', expires_at: null }, 0);
+    const result = await TestBed.runInInjectionContext(() =>
+      onboardingGuard({} as any, {} as any),
     );
     expect(result).toEqual(['/espaces']);
   });
 
-  it('returns true when no onboarding is required', async () => {
-    setup(false);
-    const result = await firstValueFrom(
-      TestBed.runInInjectionContext(() => onboardingGuard({} as any, {} as any)) as any,
+  it('returns true when active owner already has a workspace', async () => {
+    setup({ role: 'owner', expires_at: null }, 1);
+    const result = await TestBed.runInInjectionContext(() =>
+      onboardingGuard({} as any, {} as any),
     );
-    expect(result).toBeTrue();
+    expect(result).toBe(true);
   });
 });

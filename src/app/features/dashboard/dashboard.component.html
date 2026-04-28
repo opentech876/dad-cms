@@ -1,1 +1,282 @@
-<p>dashboard works!</p>
+<div class="dashboard-page">
+
+  <!-- ── Hero — today's date ── -->
+  <div class="card" style="display:grid; grid-template-columns:1.6fr 1fr; overflow:hidden; border-radius:16px; margin-bottom:20px;">
+    <div style="padding:28px 32px; display:flex; flex-direction:column; justify-content:space-between; gap:20px;">
+      <div>
+        <div class="dateline">Aujourd'hui · {{ todayLabel }}</div>
+        <div class="eyebrow" style="margin-top:8px;">Événement publié sur mobile</div>
+        <h2 style="font-family:var(--font-serif); font-size:30px; font-weight:600; margin-top:8px; letter-spacing:-0.015em; line-height:1.15;">
+          {{ featuredEvent.title }}
+        </h2>
+        <p style="margin-top:12px; font-family:var(--font-serif); font-size:15px; line-height:1.55; color:var(--fg-2);">
+          <span class="hero-dropcap">{{ featuredEvent.dropLetter }}</span>{{ featuredEvent.excerpt }}
+        </p>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span class="badge badge-success badge-dot">Publié</span>
+        <span class="tag">2 événements · 800×600</span>
+        <span class="tag">2 bannières actives</span>
+        <div style="flex:1;"></div>
+        <button class="btn btn-flat btn-sm">Aperçu mobile</button>
+        <a routerLink="/evenements" class="btn btn-secondary btn-sm">Modifier</a>
+      </div>
+    </div>
+    <div style="background:linear-gradient(135deg, rgba(138,42,35,0.85) 0%, rgba(31,26,20,0.97) 100%), repeating-linear-gradient(45deg, rgba(216,161,85,0.15) 0 2px, transparent 2px 8px); color:#f3e6c8; padding:32px; display:flex; flex-direction:column; justify-content:space-between; border-left:1px solid var(--border-1);">
+      <div style="display:flex; justify-content:space-between; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; opacity:0.8;">
+        <span>Aperçu mobile</span>
+        <span>{{ featuredEvent.day }} {{ featuredEvent.month }}</span>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-family:var(--font-serif); font-size:96px; font-weight:700; line-height:1; color:#f3e6c8;">{{ featuredEvent.day }}</div>
+        <div style="font-family:var(--font-serif); font-size:22px; font-style:italic; margin-top:4px;">{{ featuredEvent.month }} {{ featuredEvent.year }}</div>
+        <div style="margin-top:14px; font-size:12px; opacity:0.7; letter-spacing:0.08em;">—— C'est aussi ——</div>
+        <div style="font-family:var(--font-serif); font-size:14px; margin-top:6px; opacity:0.9;">{{ featuredEvent.also }}</div>
+      </div>
+      <div style="font-size:10.5px; opacity:0.55; text-align:right;">Day After Day · v2025.1</div>
+    </div>
+  </div>
+
+  <!-- ── KPI grid ── -->
+  @if (loading()) {
+    <div class="kpi-grid" style="margin-bottom:20px;">
+      @for (_ of [1,2,3,4]; track $index) {
+        <div class="card" style="padding:20px;">
+          <div class="skeleton" style="height:11px; width:55%;"></div>
+          <div class="skeleton" style="height:38px; width:40%; margin-top:12px;"></div>
+          <div class="skeleton" style="height:11px; width:70%; margin-top:10px;"></div>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="kpi-grid" style="margin-bottom:20px;">
+      <div class="card" style="padding:20px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+          <div>
+            <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Événements publiés</div>
+            <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1;">{{ stats().totalEvents }}</div>
+            <div style="font-size:12.5px; color:var(--fg-3); margin-top:4px;">sur 730 attendus</div>
+          </div>
+          <svg width="120" height="36" viewBox="0 0 120 36" style="flex:none;">
+            <polygon [attr.points]="sparkEvents.area" fill="var(--accent)" opacity="0.12"/>
+            <polyline [attr.points]="sparkEvents.pts" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle [attr.cx]="sparkEvents.cx" [attr.cy]="sparkEvents.cy" r="2.5" fill="var(--accent)"/>
+          </svg>
+        </div>
+        <div style="margin-top:14px; display:flex; align-items:center; gap:8px;">
+          <span class="badge badge-success">↑ +12 cette semaine</span>
+          <span style="font-size:12px; color:var(--fg-3);">vs sem. dernière</span>
+        </div>
+      </div>
+      <div class="card" style="padding:20px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+          <div>
+            <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Couverture {{ currentYear }}</div>
+            <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--success);">{{ fillRate() }}%</div>
+            <div style="font-size:12.5px; color:var(--fg-3); margin-top:4px;">{{ stats().yearEvents }} dates renseignées</div>
+          </div>
+          <svg width="120" height="36" viewBox="0 0 120 36" style="flex:none;">
+            <polygon [attr.points]="sparkCoverage.area" fill="var(--success)" opacity="0.12"/>
+            <polyline [attr.points]="sparkCoverage.pts" fill="none" stroke="var(--success)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle [attr.cx]="sparkCoverage.cx" [attr.cy]="sparkCoverage.cy" r="2.5" fill="var(--success)"/>
+          </svg>
+        </div>
+        <div style="margin-top:14px;">
+          <span class="badge badge-success">↑ +3,2 pts</span>
+        </div>
+      </div>
+      <div class="card" style="padding:20px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+          <div>
+            <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Campagnes actives</div>
+            <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--warning);">{{ stats().activeCampaigns }}</div>
+            <div style="font-size:12.5px; color:var(--fg-3); margin-top:4px;">2 entête · 2 pied de page</div>
+          </div>
+          <svg width="120" height="36" viewBox="0 0 120 36" style="flex:none;">
+            <polygon [attr.points]="sparkCampaigns.area" fill="var(--warning)" opacity="0.12"/>
+            <polyline [attr.points]="sparkCampaigns.pts" fill="none" stroke="var(--warning)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle [attr.cx]="sparkCampaigns.cx" [attr.cy]="sparkCampaigns.cy" r="2.5" fill="var(--warning)"/>
+          </svg>
+        </div>
+        <div style="margin-top:14px;">
+          <span class="badge badge-warning">↓ −1 cette semaine</span>
+        </div>
+      </div>
+      <div class="card" style="padding:20px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+          <div>
+            <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Lecteurs / jour</div>
+            <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--info);">12,4 K</div>
+            <div style="font-size:12.5px; color:var(--fg-3); margin-top:4px;">moyenne 7 derniers jours</div>
+          </div>
+          <svg width="120" height="36" viewBox="0 0 120 36" style="flex:none;">
+            <polygon [attr.points]="sparkReaders.area" fill="var(--info)" opacity="0.12"/>
+            <polyline [attr.points]="sparkReaders.pts" fill="none" stroke="var(--info)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle [attr.cx]="sparkReaders.cx" [attr.cy]="sparkReaders.cy" r="2.5" fill="var(--info)"/>
+          </svg>
+        </div>
+        <div style="margin-top:14px;">
+          <span class="badge badge-info">↑ +8,1%</span>
+          <span style="font-size:12px; color:var(--fg-3); margin-left:6px;">vs sem. dernière</span>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ── Two-column: activity + coverage ── -->
+  <div class="dashboard-two-col" style="margin-bottom:20px;">
+
+    <!-- Activity feed -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Activité éditoriale récente</div>
+          <div class="card-subtitle">Dernières publications et modifications</div>
+        </div>
+        <a routerLink="/evenements" class="btn btn-flat btn-sm">Tout voir →</a>
+      </div>
+      <div>
+        @for (a of activityFeed; track a.id) {
+          <div style="display:flex; gap:12px; padding:14px 20px; border-top:1px solid var(--border-1); align-items:flex-start;">
+            <div class="avatar avatar-sm" style="margin-top:2px;">{{ a.initials }}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:13.5px;">
+                <strong>{{ a.who }}</strong>
+                <span style="color:var(--fg-3);"> {{ a.action }} </span>
+                <span style="font-family:var(--font-serif); font-style:italic; color:var(--accent);">« {{ a.target }} »</span>
+              </div>
+              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ a.meta }}</div>
+            </div>
+            <span style="font-size:11.5px; color:var(--fg-3); white-space:nowrap;">{{ a.time }}</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- Coverage bar chart -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Remplissage par mois — {{ currentYear }}</div>
+            <div class="card-subtitle">% de dates avec ≥ 1 événement</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="display:grid; grid-template-columns:repeat(12,1fr); gap:6px; align-items:flex-end; height:100px;">
+            @for (bar of coverageBars; track $index) {
+              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+                <div style="flex:1; width:100%; display:flex; align-items:flex-end;">
+                  <div [style.height]="bar.pct + '%'"
+                       [style.background]="bar.current ? 'var(--accent)' : 'var(--accent-2-soft)'"
+                       style="width:100%; border-radius:3px 3px 0 0; border:1px solid rgba(0,0,0,0.06); border-bottom:none;">
+                  </div>
+                </div>
+                <div style="font-size:10px; color:var(--fg-3);">{{ bar.label }}</div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- To-do before publication -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Avant publication {{ currentYear }}</div>
+        </div>
+        <div>
+          @for (todo of publicationTodos; track todo.text; let i = $index) {
+            <div style="display:flex; align-items:center; gap:12px; padding:12px 20px;"
+                 [style.border-top]="i > 0 ? '1px solid var(--border-1)' : 'none'">
+              <div [style.background]="todo.bg" [style.color]="todo.fg"
+                   style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex:none;">
+                {{ todo.icon }}
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px; font-weight:500;">{{ todo.text }}</div>
+                <div style="font-size:11.5px; color:var(--fg-3);">{{ todo.meta }}</div>
+              </div>
+              <span style="color:var(--fg-3); font-size:18px;">›</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Ad performance table ── -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Performances publicitaires</div>
+        <div class="card-subtitle">Impressions estimées sur les 30 derniers jours</div>
+      </div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span class="tag">30 j</span>
+        <a routerLink="/campagnes" class="btn btn-flat btn-sm">Exporter CSV</a>
+      </div>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Campagne</th>
+          <th>Annonceur</th>
+          <th>Position</th>
+          <th style="text-align:right;">Impressions</th>
+          <th style="text-align:right;">Clics</th>
+          <th style="text-align:right;">CTR</th>
+          <th>Période</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of adPerformance; track r.name) {
+          <tr>
+            <td style="font-weight:500;">{{ r.name }}</td>
+            <td style="color:var(--fg-2);">{{ r.advertiser }}</td>
+            <td>
+              <span class="badge">{{ r.position === 'header' ? '↑ Entête' : '↓ Pied de page' }}</span>
+            </td>
+            <td style="text-align:right; font-variant-numeric:tabular-nums;">{{ r.impressions }}</td>
+            <td style="text-align:right; font-variant-numeric:tabular-nums;">{{ r.clicks }}</td>
+            <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">{{ r.ctr }}</td>
+            <td style="color:var(--fg-3); font-size:12.5px;">{{ r.period }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Quick access ── -->
+  <div class="quick-access-grid">
+    <a routerLink="/evenements" class="card quick-action-card">
+      <div class="quick-action-icon">📖</div>
+      <div>
+        <div class="quick-action-title">Événements historiques</div>
+        <div class="quick-action-sub">Gérer les éphémérides</div>
+      </div>
+    </a>
+    <a routerLink="/campagnes" class="card quick-action-card">
+      <div class="quick-action-icon">📢</div>
+      <div>
+        <div class="quick-action-title">Campagnes publicitaires</div>
+        <div class="quick-action-sub">Créer et planifier</div>
+      </div>
+    </a>
+    <a routerLink="/calendrier" class="card quick-action-card">
+      <div class="quick-action-icon">📅</div>
+      <div>
+        <div class="quick-action-title">Calendrier éditorial</div>
+        <div class="quick-action-sub">Vue mensuelle</div>
+      </div>
+    </a>
+    <a routerLink="/utilisateurs" class="card quick-action-card">
+      <div class="quick-action-icon">👥</div>
+      <div>
+        <div class="quick-action-title">Équipe</div>
+        <div class="quick-action-sub">Membres et rôles</div>
+      </div>
+    </a>
+  </div>
+</div>

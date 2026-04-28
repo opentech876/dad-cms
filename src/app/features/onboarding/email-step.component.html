@@ -14,11 +14,11 @@
         placeholder="vous@exemple.com"
         autocomplete="email"
       />
-      @if (errorMessage) {
-        <p class="step__error">{{ errorMessage }}</p>
+      @if (errorMessage()) {
+        <p class="step__error">{{ errorMessage() }}</p>
       }
-      <button class="step__submit" type="submit" [disabled]="loading">
-        @if (loading) {
+      <button class="step__submit" type="submit" [disabled]="loading()">
+        @if (loading()) {
           <span class="step__spinner"></span>
         }
         Continuer

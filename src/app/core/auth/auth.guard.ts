@@ -1,19 +1,16 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { AuthService } from './auth.service';
+import { SupabaseService } from '../supabase/supabase.service';
 
 export const authGuard: CanActivateFn = async () => {
-  const authService = inject(AuthService);
+  const supabase = inject(SupabaseService);
   const router = inject(Router);
 
-  const user = await firstValueFrom(authService.getCurrentUser());
+  // getSession() reads from localStorage synchronously — no race condition with BehaviorSubject
+  const { data: { session } } = await supabase.client.auth.getSession();
 
-  if (user) {
-    return true;
-  }
+  if (session) return true;
 
-  // Style de redirection que tu aimais
   router.navigate(['/login']);
   return false;
 };

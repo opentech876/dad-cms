@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, forkJoin, from } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { Workspace, WorkspaceSummary } from '../../models';
+import { AppRole, Workspace, WorkspaceSummary } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
 
 @Injectable({ providedIn: 'root' })
@@ -61,6 +61,16 @@ export class WorkspaceService {
         if (error) return { success: false, error };
         return { success: true, workspaceId: data?.id };
       }),
+    );
+  }
+
+  inviteUser(email: string, role: AppRole): Observable<{ success: boolean; error?: string }> {
+    return from(
+      this.supabaseService.invoke<{ id: string; email: string }>('invite-user', { email, role }),
+    ).pipe(
+      map(({ error }) =>
+        error ? { success: false, error: error.message } : { success: true },
+      ),
     );
   }
 }
