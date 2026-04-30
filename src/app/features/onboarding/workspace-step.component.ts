@@ -45,7 +45,9 @@ export class WorkspaceStepComponent implements OnInit {
     this.isLoading.set(true);
 
     // getUser() reads the session from localStorage — no BehaviorSubject timing issues
-    const { data: { user } } = await this.supabase.client.auth.getUser();
+    const {
+      data: { user },
+    } = await this.supabase.client.auth.getUser();
     this.email.set(user?.email ?? '');
     this.currentUserId = user?.id ?? '';
 
@@ -75,7 +77,7 @@ export class WorkspaceStepComponent implements OnInit {
       this.stepError.set('Votre nom complet est requis.');
       return;
     }
-    if (this.currentStep() < 3) this.currentStep.update(s => s + 1);
+    if (this.currentStep() < 3) this.currentStep.update((s) => s + 1);
   }
 
   onPhotoSelected(event: Event): void {
