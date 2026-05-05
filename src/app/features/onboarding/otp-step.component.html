@@ -3,70 +3,117 @@
 
     <div class="step__logo"></div>
 
-    <h1 class="step__title">Nous vous avons envoyé un code par e-mail</h1>
-    <p class="step__subtitle">
-      Nous avons envoyé un e-mail à <strong>{{ email() }}</strong>.
-      Saisissez le code ici ou appuyez sur le bouton dans l'e-mail pour continuer.
-      Si vous ne trouvez pas l'e-mail, consultez votre dossier Spam ou la corbeille.
-    </p>
+    @if (isSignupMode()) {
 
-    <div class="step__otp" (paste)="onPaste($event)">
-      @for (digit of digits(); track $index) {
-        <input
-          #otpInput
-          class="step__otp-box"
-          type="text"
-          inputmode="numeric"
-          maxlength="1"
-          pattern="[0-9]"
-          autocomplete="one-time-code"
-          [value]="digit"
-          [disabled]="isLoading()"
-          (input)="onInput($index, $event)"
-          (keydown)="onKeydown($index, $event)"
-        />
+      <!-- ── Signup mode: magic-link waiting screen ── -->
+      <h1 class="step__title">Vérifiez votre boîte mail</h1>
+      <p class="step__subtitle">
+        Nous avons envoyé un lien de confirmation à <strong>{{ email() }}</strong>.
+        Cliquez sur le bouton dans l'e-mail pour activer votre compte et continuer.
+        Si vous ne trouvez pas l'e-mail, consultez votre dossier Spam ou la corbeille.
+      </p>
+
+      <div class="step__mail-links">
+        <a
+          href="https://mail.google.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="step__mail-link"
+        >
+          Ouvrir Gmail
+        </a>
+        <a
+          href="https://outlook.live.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="step__mail-link"
+        >
+          Ouvrir Outlook
+        </a>
+      </div>
+
+      <div class="step__footer">
+        <p class="step__footer-line">
+          Vous n'avez pas reçu le lien ?
+          <button class="step__footer-action" type="button" (click)="resendCode()">
+            Renvoyer le lien
+          </button>
+        </p>
+        <p class="step__footer-line">
+          Vous rencontrez des difficultés ?
+          <a routerLink="/login" class="step__footer-action">Contacter le support</a>
+        </p>
+      </div>
+
+    } @else {
+
+      <!-- ── Login mode: OTP input screen ── -->
+      <h1 class="step__title">Nous vous avons envoyé un code par e-mail</h1>
+      <p class="step__subtitle">
+        Nous avons envoyé un e-mail à <strong>{{ email() }}</strong>.
+        Saisissez le code ici pour continuer.
+        Si vous ne trouvez pas l'e-mail, consultez votre dossier Spam ou la corbeille.
+      </p>
+
+      <div class="step__otp" (paste)="onPaste($event)">
+        @for (digit of digits(); track $index) {
+          <input
+            #otpInput
+            class="step__otp-box"
+            type="text"
+            inputmode="numeric"
+            maxlength="1"
+            pattern="[0-9]"
+            autocomplete="one-time-code"
+            [value]="digit"
+            [disabled]="isLoading()"
+            (input)="onInput($index, $event)"
+            (keydown)="onKeydown($index, $event)"
+          />
+        }
+      </div>
+
+      @if (isLoading()) {
+        <p class="step__state-text">Vérification en cours…</p>
       }
-    </div>
 
-    @if (isLoading()) {
-      <p class="step__state-text">Vérification en cours…</p>
+      @if (errorMessage()) {
+        <p class="step__error">{{ errorMessage() }}</p>
+      }
+
+      <div class="step__mail-links">
+        <a
+          href="https://mail.google.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="step__mail-link"
+        >
+          Ouvrir Gmail
+        </a>
+        <a
+          href="https://outlook.live.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="step__mail-link"
+        >
+          Ouvrir Outlook
+        </a>
+      </div>
+
+      <div class="step__footer">
+        <p class="step__footer-line">
+          Vous ne trouvez pas votre code ?
+          <button class="step__footer-action" type="button" (click)="resendCode()">
+            Demander un nouveau code
+          </button>
+        </p>
+        <p class="step__footer-line">
+          Vous rencontrez des difficultés ?
+          <a routerLink="/login" class="step__footer-action">Contacter le support</a>
+        </p>
+      </div>
+
     }
-
-    @if (errorMessage()) {
-      <p class="step__error">{{ errorMessage() }}</p>
-    }
-
-    <div class="step__mail-links">
-      <a
-        href="https://mail.google.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="step__mail-link"
-      >
-        Ouvrir Gmail
-      </a>
-      <a
-        href="https://outlook.live.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="step__mail-link"
-      >
-        Ouvrir Outlook
-      </a>
-    </div>
-
-    <div class="step__footer">
-      <p class="step__footer-line">
-        Vous ne trouvez pas votre code ?
-        <button class="step__footer-action" type="button" (click)="resendCode()">
-          Demander un nouveau code
-        </button>
-      </p>
-      <p class="step__footer-line">
-        Vous rencontrez des difficultés ?
-        <a routerLink="/login" class="step__footer-action">Contacter le support</a>
-      </p>
-    </div>
 
   </div>
 </div>

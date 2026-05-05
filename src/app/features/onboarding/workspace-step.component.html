@@ -101,7 +101,7 @@
           @if (stepError()) {
             <p class="modal__error">{{ stepError() }}</p>
           }
-          <button class="modal__btn-primary" type="button" (click)="nextStep()">Suivant</button>
+          <button class="modal__btn-primary" type="button" (click)="nextStep()" [disabled]="isModalLoading()">Suivant</button>
         </div>
       }
 
@@ -150,7 +150,13 @@
           @if (stepError()) {
             <p class="modal__error">{{ stepError() }}</p>
           }
-          <button class="modal__btn-primary" type="button" (click)="nextStep()">Suivant</button>
+          <button class="modal__btn-primary" type="button" (click)="nextStep()" [disabled]="isModalLoading()">
+            @if (isModalLoading()) {
+              <span class="step__spinner"></span>
+            } @else {
+              Suivant
+            }
+          </button>
         </div>
       }
 
@@ -210,8 +216,11 @@
           >
             @if (isModalLoading()) {
               <span class="step__spinner"></span>
+            } @else if (inviteStatus() === 'sent') {
+              Accéder au tableau de bord
+            } @else {
+              Passer cette étape
             }
-            Passer cette étape
           </button>
         </div>
       }

@@ -15,7 +15,11 @@
       "mcp__claude_ai_Supabase__get_publishable_keys",
       "Bash(git stash *)",
       "Bash(git checkout *)",
-      "Bash(npx jest *)"
+      "Bash(npx jest *)",
+      "Bash(awk -F\"|\" '$3+0 < 70 && $3 !~ /Branch/ && $3+0 > 0 {print}')",
+      "Bash(sort -t\"|\" -k3 -n)",
+      "Bash(npx ng *)",
+      "Bash(xargs grep *)"
     ]
   },
   "enabledPlugins": {

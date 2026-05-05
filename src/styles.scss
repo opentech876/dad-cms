@@ -126,6 +126,8 @@ input, textarea, select { font-family: inherit; }
 .btn-ghost:hover:not(:disabled) { background: var(--bg-surface-2); color: var(--fg-1); }
 .btn-danger { background: var(--danger); color: var(--accent-fg); border-color: var(--danger); }
 .btn-danger:hover:not(:disabled) { filter: brightness(0.92); }
+.btn-success { background: var(--success, #16a34a); color: #fff; border-color: var(--success, #16a34a); }
+.btn-success:hover:not(:disabled) { filter: brightness(0.92); }
 .btn-link { background: transparent; color: var(--accent); padding: 0; height: auto; border: none; }
 .btn-link:hover { text-decoration: underline; }
 

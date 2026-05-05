@@ -2,11 +2,26 @@ export type AppRole = 'owner' | 'chef_equipe' | 'editeur' | 'charge_communicatio
 export type EventPosition = 1 | 2;
 export type AdPosition = 'header' | 'footer';
 export type CalendarStatus = 'draft' | 'published' | 'archived';
+export type EventStatus = 'draft' | 'published';
+export type ManageUserAction = 'update_role' | 'block' | 'unblock' | 'remove';
+
+export interface UserListEntry {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+  role: AppRole | null;
+  expires_at: string | null;
+  banned: boolean;
+  created_at: string;
+}
 
 export interface Workspace {
   id: string;
   name: string;
   logo_url: string | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -43,24 +58,43 @@ export interface Calendar {
   year: number;
   name: string;
   status: CalendarStatus;
+  workspace_id: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  updated_by: string | null;
   deleted_at: string | null;
+  deleted_by: string | null;
+  published_at: string | null;
 }
 
+/** A historical event in the content library — not tied to any calendar. */
 export interface Event {
   id: string;
-  calendar_id: string;
-  event_date: string;
-  position: EventPosition;
+  event_date: string;        // YYYY-MM-DD — the actual historical date
   title: string;
   description: string | null;
   image_path: string | null;
+  status: EventStatus;
+  workspace_id: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  updated_by: string | null;
   deleted_at: string | null;
+  deleted_by: string | null;
+}
+
+/** Links one calendar day (identified by mmdd) to a library event at a given position. */
+export interface CalendarEntry {
+  id: string;
+  calendar_id: string;
+  mmdd: string;              // 'MM-DD', e.g. '08-15'
+  position: EventPosition;   // 1 = main, 2 = secondary
+  event_id: string;
+  workspace_id: string;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface AdCampaign {
@@ -73,10 +107,13 @@ export interface AdCampaign {
   image_path: string;
   link_url: string | null;
   active: boolean;
+  workspace_id: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  updated_by: string | null;
   deleted_at: string | null;
+  deleted_by: string | null;
 }
 
 export interface CampaignAssignment {
@@ -93,4 +130,35 @@ export interface ContentVersion {
   version_hash: string;
   published_at: string | null;
   updated_at: string;
+}
+
+/** DTO for creating a new ad campaign. */
+export interface CreateCampaignDto {
+  name: string;
+  advertiser: string;
+  start_date: string;   // YYYY-MM-DD
+  end_date: string;     // YYYY-MM-DD
+  position: AdPosition;
+  link_url?: string;
+  image_path?: string;
+  active?: boolean;
+}
+
+/** DTO for creating a new event in the library. */
+export interface CreateEventDto {
+  event_date: string;        // YYYY-MM-DD
+  title: string;
+  description?: string;
+  image_path?: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  table_name: string;
+  record_id: string;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  actor_id: string | null;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  changed_at: string;
 }

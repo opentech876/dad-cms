@@ -14,10 +14,9 @@
           </svg>
           <div>
             <div style="font-family:var(--font-serif); font-size:16px; font-weight:700; letter-spacing:-0.01em; color:var(--fg-1);">Day After Day</div>
-            <div style="font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--accent); font-weight:600;">Plateforme éditoriale</div>
+            <div style="font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--accent); font-weight:600;">Système de Gestion de Contenu</div>
           </div>
         </div>
-        <a routerLink="/connexion" class="btn btn-secondary btn-sm">Se connecter</a>
       </div>
     </header>
 
@@ -27,7 +26,6 @@
 
         <!-- Left: editorial copy -->
         <div class="landing-hero__copy">
-          <div class="eyebrow" style="color:var(--accent);">Numéro du jour · Brazzaville</div>
           <h1 class="landing-hero__headline">
             L'histoire de la Nation,<br>
             <em style="font-style:italic; color:var(--accent);">jour après jour.</em>
@@ -51,12 +49,11 @@
               <div style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--fg-3);">Rôles</div>
             </div>
           </div>
-          <div style="display:flex; gap:12px; flex-wrap:wrap;">
-            <a routerLink="/connexion" class="btn btn-primary" style="padding:0 28px; height:44px; font-size:14px;">Se connecter →</a>
-            @if (!isInitialized()) {
-              <a routerLink="/demarrer" class="btn btn-secondary" style="padding:0 28px; height:44px; font-size:14px;">Créer un espace</a>
-            }
-          </div>
+          @if (!isInitialized()) {
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+              <a routerLink="/demarrer" class="btn btn-primary" style="padding:0 28px; height:44px; font-size:14px;">Créer un espace →</a>
+            </div>
+          }
         </div>
 
         <!-- Right: decorative editorial panel -->
@@ -88,7 +85,6 @@
     <!-- ── Footer ── -->
     <footer class="landing-footer">
       <span>© 2026 OPEN-TECH · Brazzaville, République du Congo</span>
-      <span class="dateline" style="font-style:italic; color:var(--accent);">Vol. I — № 1</span>
     </footer>
 
   </div>

@@ -8,7 +8,7 @@ const MOCK_ROUTE = {
   snapshot: {
     queryParamMap: {
       get: (key: string) =>
-        ({ email: 'test@exemple.com', from: 'signup' } as Record<string, string>)[key] ?? null,
+        ({ email: 'test@exemple.com', from: 'login' } as Record<string, string>)[key] ?? null,
     },
   },
 };
@@ -61,7 +61,21 @@ describe('OtpStepComponent', () => {
     });
 
     it('charge la provenance (from) depuis les query params', () => {
-      expect(component.from()).toBe('signup');
+      expect(component.from()).toBe('login');
+    });
+  });
+
+  // ─── isSignupMode() ───────────────────────────────────────────────────────
+
+  describe('isSignupMode()', () => {
+    it('retourne true quand from vaut "signup"', () => {
+      component.from.set('signup');
+      expect(component.isSignupMode()).toBe(true);
+    });
+
+    it('retourne false quand from vaut "login"', () => {
+      component.from.set('login');
+      expect(component.isSignupMode()).toBe(false);
     });
   });
 

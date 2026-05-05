@@ -12,6 +12,18 @@ interface KpiStats {
 interface SparkPoints { pts: string; area: string; cx: number; cy: number; }
 interface AdRow { name: string; advertiser: string; position: 'header' | 'footer'; impressions: string; clicks: string; ctr: string; period: string; }
 
+interface FeaturedEvent {
+  title: string;
+  dropLetter: string;
+  excerpt: string;
+  day: string;
+  month: string;
+  year: string;
+  also: string;
+}
+
+const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -38,15 +50,10 @@ export class DashboardComponent implements OnInit {
     year: 'numeric',
   });
 
-  readonly featuredEvent = {
-    title: 'Indépendance de la République du Congo',
-    dropLetter: 'L',
-    excerpt: "e Congo accède à l'indépendance, mettant fin à la période coloniale française. Le pays devient officiellement la République du Congo, avec Fulbert Youlou comme premier président.",
-    day: '15',
-    month: 'Août',
-    year: '1960',
-    also: 'Premier Conseil des ministres (1960)',
-  };
+  readonly featuredEvent = signal<FeaturedEvent>({
+    title: '', dropLetter: '', excerpt: '', day: '--', month: '---', year: '----', also: '',
+  });
+  readonly featuredEventLoading = signal(true);
 
   readonly fillRate = computed(() => {
     const maxSlots = 365 * 2;
@@ -124,5 +131,48 @@ export class DashboardComponent implements OnInit {
       yearEvents: yearEventsRes.count ?? 0,
     });
     this.loading.set(false);
+
+    await this._loadFeaturedEvent(db, year);
+  }
+
+  private async _loadFeaturedEvent(db: any, year: number): Promise<void> {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const { data: cal } = await db
+      .from('calendars')
+      .select('id')
+      .eq('year', year)
+      .eq('status', 'published')
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (!cal) { this.featuredEventLoading.set(false); return; }  // no published calendar for this year
+
+    const { data: events } = await db
+      .from('events')
+      .select('title, description, event_date, position')
+      .eq('calendar_id', cal.id)
+      .eq('event_date', todayStr)
+      .is('deleted_at', null)
+      .order('position', { ascending: true });
+
+    const primary = (events as any[] | null)?.find((e: any) => e.position === 1);
+    if (!primary) { this.featuredEventLoading.set(false); return; }
+
+    const secondary = (events as any[]).find((e: any) => e.position === 2);
+    const desc: string = primary.description ?? '';
+    const dateParts = (primary.event_date as string).split('-');
+    const monthIndex = parseInt(dateParts[1], 10) - 1;
+
+    this.featuredEvent.set({
+      title: primary.title,
+      dropLetter: desc.charAt(0),
+      excerpt: desc.slice(1),
+      day: dateParts[2],
+      month: MONTHS_FR[monthIndex] ?? '',
+      year: dateParts[0],
+      also: secondary ? secondary.title : '',
+    });
+    this.featuredEventLoading.set(false);
   }
 }

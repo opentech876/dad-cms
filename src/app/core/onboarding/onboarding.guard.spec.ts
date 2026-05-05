@@ -6,12 +6,21 @@ import { SupabaseService } from '../supabase/supabase.service';
 describe('onboardingGuard', () => {
   let router: { createUrlTree: jest.Mock };
 
+  const FAKE_USER_ID = 'user-abc';
+
   function buildClient(roleData: any, workspaceCount: number) {
     return {
+      auth: {
+        getUser: () => Promise.resolve({ data: { user: { id: FAKE_USER_ID } } }),
+      },
       from: (table: string) => ({
         select: (_cols: string, _opts?: any) => {
           if (table === 'user_roles') {
-            return { single: () => Promise.resolve({ data: roleData }) };
+            return {
+              eq: (_col: string, _val: string) => ({
+                single: () => Promise.resolve({ data: roleData }),
+              }),
+            };
           }
           return Promise.resolve({ count: workspaceCount });
         },

@@ -67,17 +67,38 @@ export class WorkspaceStepComponent implements OnInit {
     this.stepError.set('');
   }
 
-  nextStep(): void {
+  async nextStep(): Promise<void> {
+    if (this.isModalLoading()) return;
     this.stepError.set('');
-    if (this.currentStep() === 1 && !this.workspaceName().trim()) {
-      this.stepError.set("Le nom de l'espace de travail est requis.");
+    if (this.currentStep() === 1) {
+      if (!this.workspaceName().trim()) {
+        this.stepError.set("Le nom de l'espace de travail est requis.");
+        return;
+      }
+      this.currentStep.update((s) => s + 1);
       return;
     }
-    if (this.currentStep() === 2 && !this.userName().trim()) {
-      this.stepError.set('Votre nom complet est requis.');
-      return;
+    if (this.currentStep() === 2) {
+      if (!this.userName().trim()) {
+        this.stepError.set('Votre nom complet est requis.');
+        return;
+      }
+      // Atomic: create workspace + profile + workspace_members before invite step
+      this.isModalLoading.set(true);
+      const result = await firstValueFrom(
+        this.onboardingService.completeOnboarding(
+          this.workspaceName(),
+          this.userName(),
+          this.userPhone(),
+        ),
+      );
+      this.isModalLoading.set(false);
+      if (!result?.success) {
+        this.stepError.set("Impossible de créer l'espace de travail. Veuillez réessayer.");
+        return;
+      }
+      this.currentStep.update((s) => s + 1);
     }
-    if (this.currentStep() < 3) this.currentStep.update((s) => s + 1);
   }
 
   onPhotoSelected(event: Event): void {
@@ -88,29 +109,7 @@ export class WorkspaceStepComponent implements OnInit {
     reader.readAsDataURL(file);
   }
 
-  async finish(): Promise<void> {
-    if (this.isModalLoading()) return;
-    this.isModalLoading.set(true);
-    this.stepError.set('');
-
-    const result = await firstValueFrom(
-      this.onboardingService.completeOnboarding(this.workspaceName()),
-    );
-
-    if (!result?.success) {
-      this.stepError.set("Impossible de créer l'espace de travail. Veuillez réessayer.");
-      this.isModalLoading.set(false);
-      return;
-    }
-
-    // Save personal info collected in Step 2
-    if (this.currentUserId) {
-      await firstValueFrom(
-        this.workspaceService.upsertProfile(this.currentUserId, this.userName(), this.userPhone()),
-      );
-    }
-
-    console.log('✅ Workspace créé, profil sauvegardé');
+  finish(): void {
     this.router.navigate(['/dashboard']);
   }
 

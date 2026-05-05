@@ -56,6 +56,13 @@ export const routes: Routes = [
           import('./features/calendar/calendar.component').then((m) => m.CalendarComponent),
       },
       {
+        path: 'calendrier/:calendarId/:date',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['owner', 'chef_equipe', 'editeur'] },
+        loadComponent: () =>
+          import('./features/calendar/day-detail/day-detail.component').then((m) => m.DayDetailComponent),
+      },
+      {
         path: 'evenements',
         canActivate: [roleGuard],
         data: { requiredRoles: ['owner', 'chef_equipe', 'editeur'] },
@@ -82,6 +89,21 @@ export const routes: Routes = [
         path: 'metriques',
         loadComponent: () =>
           import('./features/metriques/metriques.component').then((m) => m.MetriquesComponent),
+      },
+      {
+        path: 'profil',
+        loadComponent: () =>
+          import('./features/profile/profile.component').then((m) => m.ProfileComponent),
+      },
+      {
+        path: 'parametres',
+        loadComponent: () =>
+          import('./features/settings/settings.component').then((m) => m.SettingsComponent),
+      },
+      {
+        path: 'espace-de-travail',
+        loadComponent: () =>
+          import('./features/workspace/workspace-info.component').then((m) => m.WorkspaceInfoComponent),
       },
     ],
   },

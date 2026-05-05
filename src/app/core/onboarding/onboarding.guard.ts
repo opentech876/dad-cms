@@ -7,9 +7,13 @@ export const onboardingGuard: CanActivateFn = async () => {
   const router = inject(Router);
 
   // Direct DB calls — no dependency on BehaviorSubject timing
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return true;
+
   const { data: roleData } = await supabase
     .from('user_roles')
     .select('role, expires_at')
+    .eq('user_id', user.id)
     .single();
 
   if (!roleData || roleData.role !== 'owner') return true;

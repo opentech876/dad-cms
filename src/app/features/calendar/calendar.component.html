@@ -23,9 +23,11 @@
         <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
       </button>
 
-      <span class="badge" [class]="statusBadgeClass(selectedCalendar().status)" style="margin-left:4px;">
-        {{ statusLabel(selectedCalendar().status) }}
-      </span>
+      @if (selectedCalendar(); as cal) {
+        <span class="badge" [class]="statusBadgeClass(cal.status)" style="margin-left:4px;">
+          {{ statusLabel(cal.status) }}
+        </span>
+      }
     </div>
 
     <div style="flex:1;"></div>
@@ -44,6 +46,15 @@
       }
     </div>
 
+    @if (canPublish()) {
+      <button class="btn btn-success btn-sm" type="button"
+              [disabled]="publishing()"
+              (click)="publishCalendar()">
+        @if (publishing()) { <span class="spinner"></span> }
+        <tui-icon icon="@tui.send" style="font-size:14px;" />
+        Publier
+      </button>
+    }
     <button class="btn btn-flat btn-sm" type="button" (click)="openDupModal()">
       <tui-icon icon="@tui.copy" style="font-size:14px;" />
       Dupliquer
@@ -57,21 +68,23 @@
   <!-- ══ FILTER CHIPS ══ -->
   <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
     <span style="font-size:12px; color:var(--fg-3); font-weight:500;">Filtrer :</span>
-    @for (chip of filterChips; track $index; let i = $index) {
+    @for (chip of filterChips; track chip.id) {
       <span class="tag" style="cursor:pointer;"
-            (click)="activeFilter.set(i)"
-            [style.background]="activeFilter() === i ? 'var(--accent-soft)' : 'var(--bg-surface)'"
-            [style.color]="activeFilter() === i ? 'var(--accent)' : 'var(--fg-2)'"
-            [style.border-color]="activeFilter() === i ? 'var(--accent)' : 'var(--border-2)'"
-            [style.font-weight]="activeFilter() === i ? '600' : '500'">
-        {{ chip }}
+            (click)="setFilter(chip.id)"
+            [style.background]="activeFilter() === chip.id ? 'var(--accent-soft)' : 'var(--bg-surface)'"
+            [style.color]="activeFilter() === chip.id ? 'var(--accent)' : 'var(--fg-2)'"
+            [style.border-color]="activeFilter() === chip.id ? 'var(--accent)' : 'var(--border-2)'"
+            [style.font-weight]="activeFilter() === chip.id ? '600' : '500'">
+        {{ chip.label }}
       </span>
     }
-    <span style="font-size:12px; color:var(--fg-3); margin-left:auto;">
-      365 dates &middot;
-      <strong style="color:var(--fg-2);">{{ selectedCalendar().eventCount }}</strong> événements &middot;
-      <strong style="color:var(--fg-2);">{{ selectedCalendar().fillPct }}%</strong> rempli
-    </span>
+    @if (selectedCalendar(); as cal) {
+      <span style="font-size:12px; color:var(--fg-3); margin-left:auto;">
+        365 dates &middot;
+        <strong style="color:var(--fg-2);">{{ cal.eventCount }}</strong> événements &middot;
+        <strong style="color:var(--fg-2);">{{ cal.fillPct }}%</strong> rempli
+      </span>
+    }
   </div>
 
   <!-- ══ YEAR HEATMAP ══ -->
@@ -84,15 +97,24 @@
             {{ selectedCalendar().name }}
           </h3>
         </div>
-        <div style="display:flex; align-items:center; gap:14px; font-size:12px; color:var(--fg-3);">
-          <span>Densité :</span>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <div style="width:14px; height:14px; border-radius:3px; background:var(--bg-sunken); border:1px solid var(--border-1);"></div>
-            <div style="width:14px; height:14px; border-radius:3px; background:var(--accent-2-soft);"></div>
-            <div style="width:14px; height:14px; border-radius:3px; background:var(--accent-2); opacity:0.6;"></div>
-            <div style="width:14px; height:14px; border-radius:3px; background:var(--accent);"></div>
-          </div>
-          <span>0 → 2 évén.</span>
+        <div style="display:flex; align-items:center; gap:10px; font-size:11.5px; color:var(--fg-3); flex-wrap:wrap;">
+          <span style="font-weight:500;">Légende :</span>
+          <span style="display:flex; align-items:center; gap:5px;">
+            <span style="width:13px; height:13px; border-radius:3px; background:var(--bg-sunken); border:1px solid var(--border-1); flex-shrink:0;"></span>
+            Vide
+          </span>
+          <span style="display:flex; align-items:center; gap:5px;">
+            <span style="width:13px; height:13px; border-radius:3px; background:var(--accent-2-soft); flex-shrink:0;"></span>
+            1 événement
+          </span>
+          <span style="display:flex; align-items:center; gap:5px;">
+            <span style="width:13px; height:13px; border-radius:3px; background:var(--accent-2); opacity:0.6; flex-shrink:0;"></span>
+            2 événements
+          </span>
+          <span style="display:flex; align-items:center; gap:5px;">
+            <span style="width:13px; height:13px; border-radius:3px; background:var(--accent); flex-shrink:0;"></span>
+            Complet (2+)
+          </span>
         </div>
       </div>
       <div class="heatmap-grid">
@@ -192,7 +214,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (row of listRows; track row.date) {
+          @for (row of paginatedRows(); track row.date) {
             <tr style="cursor:pointer;">
               <td>
                 <div style="display:flex; flex-direction:column; line-height:1.2;">

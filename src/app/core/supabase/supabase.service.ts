@@ -19,6 +19,8 @@ export class SupabaseService {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
+        // Bypass navigator.locks to avoid LockAcquireTimeoutError in single-tab CMS usage
+        lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => fn(),
       },
     });
 
@@ -71,7 +73,16 @@ export class SupabaseService {
   }
 
   /** Appelle une Edge Function */
-  invoke<T = any>(functionName: string, body?: any): Promise<{ data: T | null; error: any }> {
-    return this.supabase.functions.invoke(functionName, { body });
+  async invoke<T = any>(functionName: string, body?: any): Promise<{ data: T | null; error: any }> {
+    const result = await this.supabase.functions.invoke<T>(functionName, { body });
+    if (result.error?.context) {
+      try {
+        const errorBody = await result.error.context.json();
+        if (errorBody?.error) result.error.message = errorBody.error;
+      } catch {
+        // response not JSON or body already consumed
+      }
+    }
+    return result;
   }
 }

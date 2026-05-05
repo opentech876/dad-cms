@@ -1,18 +1,19 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, HostListener, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, SlicePipe } from '@angular/common';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
-import { AppRole } from '../../models';
-import { SupabaseService } from '../../core/supabase/supabase.service';
+import { AppRole, ManageUserAction } from '../../models';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 
 interface UserRow {
   userId: string;
+  email: string | null;
   fullName: string | null;
   avatarUrl: string | null;
   role: AppRole;
   expiresAt: string | null;
   joinedAt: string;
+  banned: boolean;
 }
 
 const ROLE_LABELS: Record<AppRole, string> = {
@@ -30,7 +31,6 @@ const ROLE_LABELS: Record<AppRole, string> = {
   styleUrl: './users.component.scss',
 })
 export class UsersComponent implements OnInit {
-  private supabase = inject(SupabaseService);
   private workspaceService = inject(WorkspaceService);
 
   readonly loading = signal(true);
@@ -52,6 +52,18 @@ export class UsersComponent implements OnInit {
   readonly kpiComm     = computed(() => this.users().filter(u => u.role === 'charge_communication').length);
 
   readonly searchQuery = signal('');
+
+  readonly filteredUsers = computed(() => {
+    const q = this.searchQuery().trim().toLowerCase();
+    if (!q) return this.users();
+    return this.users().filter(
+      (u) =>
+        (u.fullName?.toLowerCase().includes(q) ?? false) ||
+        (u.email?.toLowerCase().includes(q) ?? false),
+    );
+  });
+
+  readonly activeMenuUserId = signal<string | null>(null);
 
   readonly permissionsMatrix: (string | number)[][] = [
     ["Créer / configurer l'espace",         1, 0, 0, 0],
@@ -91,31 +103,42 @@ export class UsersComponent implements OnInit {
 
   async loadUsers(): Promise<void> {
     this.loading.set(true);
-    const db = this.supabase.client;
-
-    const [rolesRes, profilesRes] = await Promise.all([
-      db
-        .from('user_roles')
-        .select('user_id, role, expires_at, created_at')
-        .order('created_at', { ascending: true }),
-      db.from('profiles').select('user_id, full_name, avatar_url'),
-    ]);
-
-    const profileMap = new Map(
-      (profilesRes.data ?? []).map((p) => [p.user_id, p]),
-    );
-
+    const entries = await firstValueFrom(this.workspaceService.listUsers());
     this.users.set(
-      (rolesRes.data ?? []).map((r) => ({
-        userId: r.user_id,
-        fullName: profileMap.get(r.user_id)?.full_name ?? null,
-        avatarUrl: profileMap.get(r.user_id)?.avatar_url ?? null,
-        role: r.role as AppRole,
-        expiresAt: r.expires_at,
-        joinedAt: r.created_at,
-      })),
+      entries
+        .filter((e) => e.role !== null)
+        .map((e) => ({
+          userId: e.id,
+          email: e.email,
+          fullName: e.full_name,
+          avatarUrl: e.avatar_url,
+          role: e.role as AppRole,
+          expiresAt: e.expires_at,
+          joinedAt: e.created_at,
+          banned: e.banned,
+        })),
     );
     this.loading.set(false);
+  }
+
+  async handleAction(userId: string, action: ManageUserAction, role?: AppRole): Promise<void> {
+    const result = await firstValueFrom(this.workspaceService.manageUser(userId, action, role));
+    if (result.success) {
+      await this.loadUsers();
+    }
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.closeActionsMenu();
+  }
+
+  openActionsMenu(userId: string): void {
+    this.activeMenuUserId.set(userId);
+  }
+
+  closeActionsMenu(): void {
+    this.activeMenuUserId.set(null);
   }
 
   openInviteModal(): void {

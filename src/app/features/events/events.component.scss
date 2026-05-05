@@ -55,96 +55,78 @@
   overflow: hidden;
 }
 
-// ── Mobile preview ─────────────────────────────────
+// ── Calendar assignment panel ──────────────────────
 
-.mobile-preview {
-  width: 220px;
-  height: 420px;
-  background: #1f1a14;
-  border-radius: 28px;
-  padding: 8px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+.assignment-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 18px;
+  border-top: 1px solid var(--border-1);
+
+  &--first { border-top: none; }
+}
+
+.assignment-cal-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assignment-slots {
+  display: flex;
+  gap: 6px;
   flex-shrink: 0;
+}
 
-  &__inner {
-    width: 100%;
-    height: 100%;
-    background: #f3eee4;
-    border-radius: 22px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+.assignment-slot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.slot-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1.5px solid var(--border-1);
+  background: transparent;
+  color: var(--fg-3);
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
-  &__ad {
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    flex-shrink: 0;
-
-    &--header { background: #ffc72c; color: #1f1a14; }
-    &--footer { background: #e60028; color: #fff;    }
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
-  &__content {
-    flex: 1;
-    padding: 14px 12px 10px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-height: 0;
+  &--ours {
+    background: var(--success-soft);
+    border-color: var(--success);
+    color: var(--success);
+
+    &:hover { filter: brightness(0.94); }
   }
 
-  &__date {
-    font-size: 8px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: #8a2a23;
-    font-weight: 700;
-  }
+  &--other {
+    background: var(--warning-soft);
+    border-color: var(--warning);
+    color: var(--fg-2);
 
-  &__title {
-    font-family: var(--font-serif);
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.2;
-    margin-top: 4px;
-    color: #1f1a14;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  &__image {
-    margin-top: 8px;
-    height: 72px;
-    border-radius: 4px;
-    background: linear-gradient(160deg, #8a2a23, #3a1a14);
-    flex-shrink: 0;
-  }
-
-  &__text {
-    font-size: 7.5px;
-    line-height: 1.45;
-    color: #4a4036;
-    margin-top: 6px;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
-  }
-
-  &__link {
-    margin-top: auto;
-    padding-top: 6px;
-    font-size: 7.5px;
-    color: #8a2a23;
-    text-decoration: underline;
+    &:hover { filter: brightness(0.94); }
   }
 }
 

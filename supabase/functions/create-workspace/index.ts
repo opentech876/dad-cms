@@ -27,13 +27,15 @@ serve(async (req: Request) => {
     } = await supabase.auth.getUser(token);
     if (!user) throw new Error('Token invalide');
 
-    const { name } = await req.json();
+    const { name, fullName, phone } = await req.json();
     if (!name?.trim()) throw new Error('Le nom du workspace est requis');
 
-    // Appel au RPC (tout est atomique)
+    // Appel au RPC — atomique : workspace + profil + workspace_members
     const { data: workspace, error } = await supabase.rpc('finalize_workspace_creation', {
       p_name: name.trim(),
       p_user_id: user.id,
+      p_full_name: fullName?.trim() || null,
+      p_phone: phone?.trim() || null,
     });
 
     if (error) throw error;

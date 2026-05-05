@@ -80,7 +80,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (user of users(); track user.userId) {
+            @for (user of filteredUsers(); track user.userId) {
               <tr>
                 <td>
                   <div style="display:flex; align-items:center; gap:12px;">
@@ -91,7 +91,7 @@
                     }
                     <div>
                       <div style="font-weight:500;">{{ user.fullName ?? 'Sans nom' }}</div>
-                      <div style="font-size:12px; color:var(--fg-3);">{{ user.userId | slice: 0 : 8 }}…</div>
+                      <div style="font-size:12px; color:var(--fg-3);">{{ user.email ?? (user.userId | slice: 0 : 8) + '…' }}</div>
                     </div>
                   </div>
                 </td>
@@ -102,7 +102,9 @@
                   @if (user.role === 'charge_communication') { <span class="badge badge-warning">Chargé comm.</span> }
                 </td>
                 <td>
-                  @if (isExpired(user)) {
+                  @if (user.banned) {
+                    <span class="badge badge-error badge-dot">Banni</span>
+                  } @else if (isExpired(user)) {
                     <span class="badge badge-warning badge-dot">Expiré</span>
                   } @else if (isTempOwner(user)) {
                     <span class="badge badge-accent badge-dot">Temp. (24h)</span>
@@ -111,11 +113,23 @@
                   }
                 </td>
                 <td style="font-size:13px; color:var(--fg-2);">{{ user.joinedAt | date: 'd MMM yyyy' : '' : 'fr' }}</td>
-                <td>
+                <td style="position:relative;">
                   @if (user.role !== 'owner') {
-                    <button class="btn btn-flat btn-icon btn-sm" title="Options" type="button">
+                    <button class="btn btn-flat btn-icon btn-sm" title="Options" type="button"
+                            (click)="activeMenuUserId() === user.userId ? closeActionsMenu() : openActionsMenu(user.userId)">
                       <tui-icon icon="@tui.ellipsis" style="font-size:16px;" />
                     </button>
+                    @if (activeMenuUserId() === user.userId) {
+                      <div class="actions-dropdown" (click)="$event.stopPropagation()">
+                        @if (user.banned) {
+                          <button class="actions-dropdown__item" type="button" (click)="handleAction(user.userId, 'unblock'); closeActionsMenu()">Débloquer</button>
+                        } @else {
+                          <button class="actions-dropdown__item" type="button" (click)="handleAction(user.userId, 'block'); closeActionsMenu()">Bloquer</button>
+                        }
+                        <button class="actions-dropdown__item actions-dropdown__item--danger" type="button"
+                                (click)="handleAction(user.userId, 'remove'); closeActionsMenu()">Retirer du workspace</button>
+                      </div>
+                    }
                   }
                 </td>
               </tr>

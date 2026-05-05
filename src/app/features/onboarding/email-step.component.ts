@@ -35,7 +35,7 @@ export class EmailStepComponent {
       return;
     }
 
-    this.router.navigate(['/verifier'], { queryParams: { email } });
+    this.router.navigate(['/verifier'], { queryParams: { email, from: 'signup' } });
   }
 
   loginWithGoogle(): void {}

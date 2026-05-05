@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideLocationMocks } from '@angular/common/testing';
 import { provideRouter, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { WorkspaceSummary } from '../../models';
 import { WorkspaceStepComponent } from './workspace-step.component';
 import { SupabaseService } from '../../core/supabase/supabase.service';
@@ -116,79 +116,87 @@ describe('WorkspaceStepComponent', () => {
   // ─── nextStep() ───────────────────────────────────────────────────────────
 
   describe('nextStep()', () => {
-    it("avance de l'étape 1 à 2 quand le nom du workspace est renseigné", () => {
+    it("avance de l'étape 1 à 2 quand le nom du workspace est renseigné", async () => {
       component.currentStep.set(1);
       component.workspaceName.set('Mon Workspace');
-      component.nextStep();
+      await component.nextStep();
       expect(component.currentStep()).toBe(2);
     });
 
-    it("reste à l'étape 1 et affiche une erreur si le nom du workspace est vide", () => {
+    it("reste à l'étape 1 et affiche une erreur si le nom du workspace est vide", async () => {
       component.currentStep.set(1);
       component.workspaceName.set('');
-      component.nextStep();
+      await component.nextStep();
       expect(component.currentStep()).toBe(1);
       expect(component.stepError()).toBeTruthy();
     });
 
-    it("avance de l'étape 2 à 3 quand le nom d'utilisateur est renseigné", () => {
+    it("avance de l'étape 2 à 3 et appelle completeOnboarding avec workspace + profil", async () => {
       component.currentStep.set(2);
+      component.workspaceName.set('OPEN-TECH Congo');
       component.userName.set('Elvis OLEMBE');
-      component.nextStep();
+      component.userPhone.set('+242 06 123 4567');
+      await component.nextStep();
+      expect(mockOnboardingService.completeOnboarding).toHaveBeenCalledWith(
+        'OPEN-TECH Congo',
+        'Elvis OLEMBE',
+        '+242 06 123 4567',
+      );
       expect(component.currentStep()).toBe(3);
     });
 
-    it("reste à l'étape 2 et affiche une erreur si le nom d'utilisateur est vide", () => {
+    it("reste à l'étape 2 et affiche une erreur si le nom d'utilisateur est vide", async () => {
       component.currentStep.set(2);
       component.userName.set('');
-      component.nextStep();
+      await component.nextStep();
       expect(component.currentStep()).toBe(2);
       expect(component.stepError()).toBeTruthy();
     });
 
-    it("ne dépasse pas l'étape 3", () => {
+    it("reste à l'étape 2 et affiche une erreur si completeOnboarding échoue", async () => {
+      mockOnboardingService.completeOnboarding.mockReturnValueOnce(
+        of({ success: false, error: 'Erreur serveur' }),
+      );
+      component.currentStep.set(2);
+      component.workspaceName.set('OPEN-TECH Congo');
+      component.userName.set('Elvis OLEMBE');
+      await component.nextStep();
+      expect(component.currentStep()).toBe(2);
+      expect(component.stepError()).toBeTruthy();
+    });
+
+    it("ne fait rien à l'étape 3", async () => {
       component.currentStep.set(3);
-      component.nextStep();
+      await component.nextStep();
       expect(component.currentStep()).toBe(3);
+    });
+
+    it('ignore les appels supplémentaires pendant le chargement — completeOnboarding ne doit être appelé qu\'une seule fois', async () => {
+      component.currentStep.set(2);
+      component.workspaceName.set('OPEN-TECH Congo');
+      component.userName.set('Elvis OLEMBE');
+
+      const subject = new Subject<{ success: boolean; workspaceId?: string }>();
+      mockOnboardingService.completeOnboarding.mockReturnValue(subject.asObservable());
+
+      // Two synchronous calls before the first await resolves
+      const p1 = component.nextStep();
+      const p2 = component.nextStep();
+
+      expect(mockOnboardingService.completeOnboarding).toHaveBeenCalledTimes(1);
+
+      subject.next({ success: true, workspaceId: 'ws-1' });
+      subject.complete();
+      await Promise.all([p1, p2]);
     });
   });
 
   // ─── finish() ─────────────────────────────────────────────────────────────
 
   describe('finish()', () => {
-    beforeEach(() => {
-      component.workspaceName.set('OPEN-TECH Congo');
-      component.userName.set('Elvis OLEMBE');
-      component.userPhone.set('+242 06 123 4567');
-    });
-
-    it('appelle completeOnboarding avec le nom du workspace', async () => {
-      await component.finish();
-      expect(mockOnboardingService.completeOnboarding).toHaveBeenCalledWith('OPEN-TECH Congo');
-    });
-
-    it('appelle upsertProfile avec userId, nom et téléphone si workspace créé avec succès', async () => {
-      await component.finish();
-      expect(mockWorkspaceService.upsertProfile).toHaveBeenCalledWith(
-        'user-123',
-        'Elvis OLEMBE',
-        '+242 06 123 4567',
-      );
-    });
-
-    it('navigue vers /dashboard après succès', async () => {
-      await component.finish();
+    it('navigue vers /dashboard', () => {
+      component.finish();
       expect(navigateSpy).toHaveBeenCalledWith(['/dashboard']);
-    });
-
-    it("affiche une erreur et ne navigue pas si completeOnboarding échoue", async () => {
-      mockOnboardingService.completeOnboarding.mockReturnValueOnce(
-        of({ success: false, error: 'Erreur serveur' }),
-      );
-      await component.finish();
-      expect(mockWorkspaceService.upsertProfile).not.toHaveBeenCalled();
-      expect(navigateSpy).not.toHaveBeenCalled();
-      expect(component.stepError()).toBeTruthy();
     });
   });
 

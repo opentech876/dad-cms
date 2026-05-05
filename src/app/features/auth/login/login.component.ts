@@ -30,8 +30,10 @@ export class LoginComponent {
     const { error } = await this.supabase.sendOtp(email, false);
 
     if (error) {
-      this.errorMessage =
-        "Cette adresse e-mail n'a pas été invitée. Contactez votre administrateur.";
+      const msg = (error.message ?? '').toLowerCase();
+      this.errorMessage = msg.includes('rate') || msg.includes('security purposes') || msg.includes('limit')
+        ? 'Trop de tentatives. Veuillez patienter quelques minutes avant de réessayer.'
+        : "Cette adresse e-mail n'a pas été invitée. Contactez votre administrateur.";
       this.loading = false;
       return;
     }

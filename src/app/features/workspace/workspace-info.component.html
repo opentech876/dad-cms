@@ -1,0 +1,92 @@
+<div class="workspace-page">
+
+  <!-- ══ Header ══ -->
+  <div class="workspace-header">
+    <div>
+      <div class="workspace-header-title">Espace de travail</div>
+      <div class="workspace-header-sub">Informations générales de votre organisation</div>
+    </div>
+  </div>
+
+  <!-- ══ Logo + nom ══ -->
+  <section class="workspace-section">
+    <div class="workspace-section-title">Identité</div>
+
+    <div class="workspace-identity-row">
+
+      <!-- Logo -->
+      <div class="workspace-logo-block">
+        <div class="workspace-logo-circle">
+          @if (logoPreview() || logoUrl()) {
+            <img class="workspace-logo-img" [src]="logoPreview() ?? logoUrl()!" alt="Logo" />
+          } @else {
+            <tui-icon icon="@tui.building" style="font-size:28px; color:var(--fg-3);" />
+          }
+        </div>
+        @if (isOwner()) {
+          <div class="workspace-logo-actions">
+            <label class="btn btn-sm btn-ghost" style="cursor:pointer;">
+              <tui-icon icon="@tui.upload" style="font-size:13px;" />
+              Changer
+              <input type="file" accept="image/*" style="display:none;" (change)="onLogoChange($event)" />
+            </label>
+            @if (logoFile()) {
+              <button class="btn btn-sm btn-primary" type="button"
+                      [disabled]="logoUploading()"
+                      (click)="uploadLogo()">
+                @if (logoUploading()) { <span class="spinner"></span> }
+                Enregistrer
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Nom -->
+      <div class="workspace-name-block">
+        <div class="workspace-field-label">Nom de l'espace de travail</div>
+        @if (isOwner()) {
+          <div class="workspace-inline-form">
+            <input class="input" type="text" placeholder="Day After Day"
+                   [value]="workspaceName()"
+                   (input)="workspaceName.set($any($event.target).value)" />
+            <button class="btn btn-primary btn-sm" type="button"
+                    [disabled]="saving() || !workspaceName().trim()"
+                    (click)="saveWorkspaceName()">
+              @if (saving()) { <span class="spinner"></span> }
+              Enregistrer
+            </button>
+          </div>
+        } @else {
+          <div class="workspace-field-value">{{ workspaceName() }}</div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ Informations ══ -->
+  <section class="workspace-section">
+    <div class="workspace-section-title">Informations</div>
+
+    <dl class="workspace-info-list">
+      <div class="workspace-info-row">
+        <dt>Identifiant</dt>
+        <dd class="workspace-id-badge">{{ workspaceId() ?? '—' }}</dd>
+      </div>
+      <div class="workspace-info-row">
+        <dt>Créé le</dt>
+        <dd>{{ formatDate(createdAt()) }}</dd>
+      </div>
+      @if (isOwner()) {
+        <div class="workspace-info-row">
+          <dt>Membres</dt>
+          <dd>
+            <tui-icon icon="@tui.users" style="font-size:13px; vertical-align:middle; margin-right:4px;" />
+            {{ memberCount() }} membre{{ memberCount() > 1 ? 's' : '' }}
+          </dd>
+        </div>
+      }
+    </dl>
+  </section>
+
+</div>

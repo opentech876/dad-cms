@@ -50,7 +50,9 @@ Deno.serve(async (req: Request) => {
     const profileMap = new Map((profiles ?? []).map((p) => [p.user_id, p]));
     const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r]));
 
-    const result = (authUsers ?? []).map((u) => {
+    const result = (authUsers ?? [])
+      .filter((u) => !!u.email_confirmed_at)
+      .map((u) => {
       const profile = profileMap.get(u.id);
       const role = roleMap.get(u.id);
       return {

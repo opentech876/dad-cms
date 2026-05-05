@@ -27,8 +27,12 @@ export class OnboardingService {
    * Finalise l'onboarding en créant le workspace.
    * Cela rend le rôle owner permanent via la Edge Function.
    */
-  completeOnboarding(workspaceName: string = 'Day After Day'): Observable<any> {
-    return this.workspaceService.createWorkspace(workspaceName).pipe(
+  completeOnboarding(
+    workspaceName: string = 'Day After Day',
+    fullName?: string,
+    phone?: string,
+  ): Observable<any> {
+    return this.workspaceService.createWorkspace(workspaceName, fullName, phone).pipe(
       tap((result) => {
         if (result?.success) {
           console.log('✅ Workspace créé avec succès. Rôle owner permanent assigné.');

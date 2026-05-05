@@ -65,9 +65,13 @@ describe('OnboardingService', () => {
   // ── completeOnboarding() ───────────────────────────────────────────────────
 
   describe('completeOnboarding()', () => {
-    it('appelle workspaceService.createWorkspace avec le nom fourni', async () => {
-      await firstValueFrom(service.completeOnboarding('Mon Workspace'));
-      expect(mockWorkspaceService.createWorkspace).toHaveBeenCalledWith('Mon Workspace');
+    it('appelle workspaceService.createWorkspace avec le nom, fullName et phone fournis', async () => {
+      await firstValueFrom(service.completeOnboarding('Mon Workspace', 'Elvis OLEMBE', '+242 06 123'));
+      expect(mockWorkspaceService.createWorkspace).toHaveBeenCalledWith(
+        'Mon Workspace',
+        'Elvis OLEMBE',
+        '+242 06 123',
+      );
     });
 
     it('retourne le résultat de createWorkspace', async () => {
@@ -78,7 +82,11 @@ describe('OnboardingService', () => {
 
     it("utilise 'Day After Day' comme nom par défaut si aucun nom n'est fourni", async () => {
       await firstValueFrom(service.completeOnboarding());
-      expect(mockWorkspaceService.createWorkspace).toHaveBeenCalledWith('Day After Day');
+      expect(mockWorkspaceService.createWorkspace).toHaveBeenCalledWith(
+        'Day After Day',
+        undefined,
+        undefined,
+      );
     });
   });
 });

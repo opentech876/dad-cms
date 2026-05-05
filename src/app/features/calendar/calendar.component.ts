@@ -1,16 +1,14 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
+import { firstValueFrom } from 'rxjs';
+import { CalendarService, CalendarSummary } from '../../core/calendar/calendar.service';
+import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
 
 type CalendarView = 'year' | 'month' | 'list';
+export type CalendarFilter = 'all' | 'full' | 'partial' | 'empty' | 'has_campaign';
 
-export interface Calendar {
-  id: string;
-  year: number;
-  name: string;
-  status: 'published' | 'draft' | 'archived';
-  eventCount: number;
-  campaignCount: number;
+export interface Calendar extends CalendarSummary {
   fillPct: number;
 }
 
@@ -75,35 +73,16 @@ const MONTHS_FR_SHORT = ['Jan','Fév','Mar','Avr','Mai','Jun','Juil','Aoû','Sep
 const DOW_SHORT       = ['L','M','M','J','V','S','D'];
 const DOW_LONG        = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const DAYS_FR         = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-const EVENT_TITLES    = [
-  'Indépendance de la République du Congo',
-  'Naissance de Marien Ngouabi',
-  'Conférence nationale souveraine',
-  "Création de l'AEF à Brazzaville",
-  'Festival panafricain de Brazzaville',
-  'Premier Conseil des ministres',
-  'Inauguration du chemin de fer Congo-Océan',
-  'Création du Parti Congolais du Travail',
-  "Sommet de l'OUA à Brazzaville",
-  'Discours de la réconciliation nationale',
-];
-const HIST_YEARS      = [1910, 1934, 1938, 1960, 1963, 1969, 1977, 1991, 1992, 1997, 2002, 2016];
-const DESCRIPTIONS    = [
-  'Le Congo accède à l\'indépendance, mettant fin à la période coloniale française. Le pays devient officiellement la République du Congo, avec Fulbert Youlou comme premier président.',
-  'Réunion inaugurale du gouvernement provisoire à Brazzaville. Le Conseil adopte les premières mesures administratives de la jeune République, dont la définition des emblèmes nationaux.',
-  'La conférence rassemble l\'ensemble des forces politiques et sociales du pays pour définir le cadre d\'une transition démocratique. Elle aboutira à l\'adoption d\'une nouvelle constitution.',
-];
-const SAMPLE_CAMPAIGNS: DayCampaign[] = [
-  { id: 'c1', name: 'MTN Forfait étudiant', advertiser: 'MTN Congo',     color: '#FFC72C', textColor: '#1f1a14', status: 'active'    },
-  { id: 'c2', name: 'Tontine+',             advertiser: 'SG Congo',      color: '#E60028', textColor: '#ffffff', status: 'active'    },
-  { id: 'c3', name: 'Stations Congo',       advertiser: 'TotalEnergies', color: '#D60000', textColor: '#ffffff', status: 'scheduled' },
-];
 
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 function dowMondayFirst(year: number, month: number, day: number): number {
   return (new Date(year, month, day).getDay() + 6) % 7;
+}
+function pad2(n: number): string { return String(n).padStart(2, '0'); }
+function isoDate(year: number, month: number, day: number): string {
+  return `${year}-${pad2(month + 1)}-${pad2(day)}`;
 }
 
 @Component({
@@ -113,8 +92,10 @@ function dowMondayFirst(year: number, month: number, day: number): number {
   templateUrl: './calendar.component.html',
   styleUrl: './calendar.component.scss',
 })
-export class CalendarComponent {
+export class CalendarComponent implements OnInit {
   private readonly router = inject(Router);
+  private readonly calendarService = inject(CalendarService);
+  private readonly calendarEntryService = inject(CalendarEntryService);
 
   readonly monthsFr      = MONTHS_FR;
   readonly monthsFrCap   = MONTHS_FR_CAP;
@@ -126,7 +107,13 @@ export class CalendarComponent {
     { id: 'month', label: 'Mois' },
     { id: 'list', label: 'Liste' },
   ];
-  readonly filterChips = ['Toutes les dates', '2 affichés', '1 affiché', 'Vide', 'Avec campagne'];
+  readonly filterChips: { id: CalendarFilter; label: string }[] = [
+    { id: 'all',          label: 'Toutes les dates' },
+    { id: 'full',         label: '2 affichés' },
+    { id: 'partial',      label: '1 affiché' },
+    { id: 'empty',        label: 'Vide' },
+    { id: 'has_campaign', label: 'Avec campagne' },
+  ];
 
   private readonly _today = new Date();
   readonly currentYear  = this._today.getFullYear();
@@ -134,42 +121,70 @@ export class CalendarComponent {
   readonly todayDate    = this._today.getDate();
 
   // ── Calendars ─────────────────────────────────────
-  readonly calendars = signal<Calendar[]>([
-    { id: '1', year: 2024, name: 'Calendrier 2024', status: 'archived',  eventCount: 412, campaignCount:  8, fillPct: 85 },
-    { id: '2', year: 2025, name: 'Calendrier 2025', status: 'published', eventCount: 487, campaignCount: 12, fillPct: 67 },
-    { id: '3', year: 2026, name: 'Calendrier 2026', status: 'draft',     eventCount: 124, campaignCount:  3, fillPct: 34 },
-  ]);
-
-  readonly selectedCalendarId = signal('2');
+  readonly calendars = signal<Calendar[]>([]);
+  readonly loading = signal(false);
+  readonly calendarError = signal<string | null>(null);
+  readonly selectedCalendarId = signal('');
 
   readonly sortedCalendars = computed(() =>
     [...this.calendars()].sort((a, b) => a.year - b.year)
   );
-
   readonly selectedCalendar = computed(() =>
     this.calendars().find(c => c.id === this.selectedCalendarId()) ?? this.calendars()[0]
   );
-
   readonly canPrevCalendar = computed(() =>
     this.sortedCalendars().findIndex(c => c.id === this.selectedCalendarId()) > 0
   );
-
   readonly canNextCalendar = computed(() => {
     const sorted = this.sortedCalendars();
     const idx = sorted.findIndex(c => c.id === this.selectedCalendarId());
     return idx < sorted.length - 1;
   });
-
   readonly availableYears = computed(() => {
     const taken = new Set(this.calendars().map(c => c.year));
     return Array.from({ length: 10 }, (_, i) => this.currentYear - 2 + i).filter(y => !taken.has(y));
+  });
+
+  async ngOnInit(): Promise<void> {
+    await this._reloadCalendars();
+  }
+
+  private async _reloadCalendars(): Promise<void> {
+    this.loading.set(true);
+    this.calendarError.set(null);
+    const summaries = await firstValueFrom(this.calendarService.listCalendars());
+    this.calendars.set(
+      summaries.map((s) => ({
+        ...s,
+        fillPct: Math.min(100, Math.round((s.eventCount / 730) * 100)),
+      })),
+    );
+    if (this.selectedCalendarId() === '' && summaries.length > 0) {
+      this.selectCalendar(summaries[summaries.length - 1].id);
+    }
+    this.loading.set(false);
+  }
+
+  // ── Calendar entries (assignments) ───────────────
+  readonly entries = signal<CalendarEntryWithEvent[]>([]);
+
+  /** Groups entries by mmdd ('MM-DD') for O(1) day lookup. */
+  readonly entriesByMmdd = computed(() => {
+    const map = new Map<string, CalendarEntryWithEvent[]>();
+    for (const entry of this.entries()) {
+      const existing = map.get(entry.mmdd) ?? [];
+      map.set(entry.mmdd, [...existing, entry]);
+    }
+    return map;
   });
 
   // ── View state ────────────────────────────────────
   readonly view          = signal<CalendarView>('month');
   readonly selectedYear  = signal(this.currentYear);
   readonly selectedMonth = signal(this.currentMonth);
-  readonly activeFilter  = signal(0);
+  readonly activeFilter  = signal<CalendarFilter>('all');
+  readonly currentPage   = signal(0);
+  readonly pageSize      = 30;
 
   // ── Calendar navigation ───────────────────────────
   selectCalendar(id: string): void {
@@ -177,6 +192,8 @@ export class CalendarComponent {
     const cal = this.calendars().find(c => c.id === id);
     if (cal) this.selectedYear.set(cal.year);
     this.selectedDay.set(null);
+    this.currentPage.set(0);
+    this.calendarEntryService.getEntriesForCalendar(id).subscribe(entries => this.entries.set(entries));
   }
 
   prevCalendar(): void {
@@ -195,17 +212,44 @@ export class CalendarComponent {
   nextMonth(): void { this.selectedMonth.update(m => Math.min(11, m + 1)); }
   pickMonth(mi: number): void { this.selectedMonth.set(mi); this.view.set('month'); }
 
+  setFilter(filter: CalendarFilter): void {
+    this.activeFilter.set(filter);
+    this.currentPage.set(0);
+  }
+
+  nextPage(): void {
+    const maxPage = Math.max(0, Math.ceil(this.filteredRows().length / this.pageSize) - 1);
+    this.currentPage.update(p => Math.min(p + 1, maxPage));
+  }
+
+  prevPage(): void {
+    this.currentPage.update(p => Math.max(0, p - 1));
+  }
+
   // ── Day detail ────────────────────────────────────
-  readonly selectedDay      = signal<{ day: number; month: number } | null>(null);
-  readonly dayDetailCache   = signal<Record<string, DayDetailData>>({});
+  readonly selectedDay = signal<{ day: number; month: number } | null>(null);
 
   readonly selectedDayDetail = computed((): DayDetailData | null => {
     const sel = this.selectedDay();
     if (!sel) return null;
-    const year  = this.selectedCalendar().year;
-    const calId = this.selectedCalendarId();
-    const key   = `${sel.day}-${sel.month}-${calId}`;
-    return this.dayDetailCache()[key] ?? this._generateDayDetail(sel.day, sel.month, year);
+    const cal = this.selectedCalendar();
+    if (!cal) return null;
+    const { year } = cal;
+    const mmdd = `${pad2(sel.month + 1)}-${pad2(sel.day)}`;
+    const dayEntries = this.entriesByMmdd().get(mmdd) ?? [];
+    const dayOfWeek = DAYS_FR[new Date(year, sel.month, sel.day).getDay()];
+    const events: DayEvent[] = dayEntries.map(entry => ({
+      id: entry.event.id,
+      historicalYear: entry.event.event_date ? +entry.event.event_date.slice(0, 4) : 0,
+      title: entry.event.title,
+      description: entry.event.description ?? '',
+      hasImage: !!entry.event.image_path,
+      imageSizeKb: 0,
+      charCount: (entry.event.description ?? '').length,
+      status: entry.event.status,
+      displayPosition: entry.position,
+    }));
+    return { day: sel.day, month: sel.month, year, dayOfWeek, events, campaigns: [] };
   });
 
   openDayDetail(day: number | null, month: number): void {
@@ -225,7 +269,7 @@ export class CalendarComponent {
       this.selectedDay.set({ day: day - 1, month });
     } else if (month > 0) {
       const prevMonth = month - 1;
-      const lastDay = daysInMonth(this.selectedCalendar().year, prevMonth);
+      const lastDay = daysInMonth(this.selectedYear(), prevMonth);
       this.selectedDay.set({ day: lastDay, month: prevMonth });
     }
   }
@@ -234,40 +278,12 @@ export class CalendarComponent {
     const sel = this.selectedDay();
     if (!sel) return;
     const { day, month } = sel;
-    const maxDay = daysInMonth(this.selectedCalendar().year, month);
+    const maxDay = daysInMonth(this.selectedYear(), month);
     if (day < maxDay) {
       this.selectedDay.set({ day: day + 1, month });
     } else if (month < 11) {
       this.selectedDay.set({ day: 1, month: month + 1 });
     }
-  }
-
-  // ── Pin / Unpin ───────────────────────────────────
-  pinEvent(eventId: string, position: 1 | 2): void {
-    const sel = this.selectedDay();
-    const detail = this.selectedDayDetail();
-    if (!sel || !detail) return;
-    const key = `${sel.day}-${sel.month}-${this.selectedCalendarId()}`;
-    const events = detail.events.map((ev): DayEvent => ({
-      ...ev,
-      displayPosition:
-        ev.id === eventId ? position :
-        ev.displayPosition === position ? null :
-        ev.displayPosition,
-    }));
-    this.dayDetailCache.update(c => ({ ...c, [key]: { ...detail, events } }));
-  }
-
-  unpinEvent(eventId: string): void {
-    const sel = this.selectedDay();
-    const detail = this.selectedDayDetail();
-    if (!sel || !detail) return;
-    const key = `${sel.day}-${sel.month}-${this.selectedCalendarId()}`;
-    const events = detail.events.map((ev): DayEvent => ({
-      ...ev,
-      displayPosition: ev.id === eventId ? null : ev.displayPosition,
-    }));
-    this.dayDetailCache.update(c => ({ ...c, [key]: { ...detail, events } }));
   }
 
   // ── Navigation shortcuts ──────────────────────────
@@ -312,31 +328,23 @@ export class CalendarComponent {
     return 'Une date, deux histoires';
   }
 
-  // ── Mock data generator ───────────────────────────
-  private _generateDayDetail(day: number, month: number, year: number): DayDetailData {
-    const seed = (year * 372 + month * 31 + day) % 100;
-    const dayOfWeek = DAYS_FR[new Date(year, month, day).getDay()];
-    const total = seed < 25 ? 0 : seed < 48 ? 1 : seed < 68 ? 2 : seed < 84 ? 3 : 4;
+  // ── Publish workflow ──────────────────────────────
+  readonly publishing = signal(false);
 
-    const events: DayEvent[] = Array.from({ length: total }, (_, i) => {
-      const es = (seed * 7 + i * 17) % 100;
-      return {
-        id: `${day}-${month}-${year}-${i}`,
-        historicalYear: HIST_YEARS[(seed + i * 3) % HIST_YEARS.length],
-        title: EVENT_TITLES[(seed + i * 7) % EVENT_TITLES.length],
-        description: DESCRIPTIONS[i % DESCRIPTIONS.length],
-        hasImage: i < 2,
-        imageSizeKb: 120 + es % 30,
-        charCount: 200 + es * 3,
-        status: i === 0 ? 'published' : 'draft',
-        displayPosition: i === 0 ? 1 : i === 1 ? 2 : null,
-      };
-    });
+  readonly canPublish = computed(() => this.selectedCalendar()?.status === 'draft');
 
-    const hasCampaign = seed % 4 === 0 || seed % 5 === 1;
-    const campaigns = hasCampaign ? [SAMPLE_CAMPAIGNS[seed % 3]] : [];
-
-    return { day, month, year, dayOfWeek, events, campaigns };
+  async publishCalendar(): Promise<void> {
+    if (this.publishing()) return;
+    const calId = this.selectedCalendarId();
+    if (!calId) return;
+    this.publishing.set(true);
+    const result = await firstValueFrom(
+      this.calendarService.updateCalendar(calId, { status: 'published' }),
+    );
+    this.publishing.set(false);
+    if (result.success) {
+      await this._reloadCalendars();
+    }
   }
 
   // ── Computed views ────────────────────────────────
@@ -350,32 +358,31 @@ export class CalendarComponent {
 
   readonly monthCells = computed<DayCell[]>(() => {
     const year = this.selectedYear(), month = this.selectedMonth();
+    const byMmdd = this.entriesByMmdd();
     const dim = daysInMonth(year, month), offset = dowMondayFirst(year, month, 1);
     return Array.from({ length: 42 }, (_, i) => {
       const d = i - offset + 1;
       if (d < 1 || d > dim) return { d: null, isToday: false, totalEvents: 0, pinnedCount: 0, title: null, ad: false };
       const isToday = d === this.todayDate && month === this.currentMonth && year === this.currentYear;
-      const seed = (year * 372 + month * 31 + d) % 100;
-      const totalEvents = seed < 25 ? 0 : seed < 48 ? 1 : seed < 68 ? 2 : seed < 84 ? 3 : 4;
-      const pinnedCount = Math.min(totalEvents, 2) as 0 | 1 | 2;
-      return {
-        d, isToday, totalEvents, pinnedCount,
-        title: totalEvents > 0 ? EVENT_TITLES[(seed * 7) % EVENT_TITLES.length] : null,
-        ad: seed % 5 === 0,
-      };
+      const mmdd = `${pad2(month + 1)}-${pad2(d)}`;
+      const dayEntries = byMmdd.get(mmdd) ?? [];
+      const pos1 = dayEntries.find(e => e.position === 1);
+      const pos2 = dayEntries.find(e => e.position === 2);
+      const pinnedCount = ((pos1 ? 1 : 0) + (pos2 ? 1 : 0)) as 0 | 1 | 2;
+      return { d, isToday, totalEvents: dayEntries.length, pinnedCount, title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null, ad: false };
     });
   });
 
   readonly yearHeatmap = computed<HeatmapMonth[]>(() => {
     const year = this.selectedYear();
+    const byMmdd = this.entriesByMmdd();
     return MONTHS_FR.map((label, mi) => {
       const dim = daysInMonth(year, mi), offset = dowMondayFirst(year, mi, 1);
       const blanks: HeatmapCell[] = Array.from({ length: offset }, () => ({ d: null, intensity: 0 as 0 }));
       const days: HeatmapCell[] = Array.from({ length: dim }, (_, i) => {
         const d = i + 1;
-        const seed = (year * 372 + mi * 31 + d) % 100;
-        const tot = seed < 25 ? 0 : seed < 48 ? 1 : seed < 68 ? 2 : seed < 84 ? 3 : 4;
-        const intensity = tot === 0 ? 0 : tot === 1 ? 1 : tot === 2 ? 2 : 3;
+        const cnt = (byMmdd.get(`${pad2(mi + 1)}-${pad2(d)}`) ?? []).length;
+        const intensity = cnt === 0 ? 0 : cnt === 1 ? 1 : cnt === 2 ? 2 : 3;
         return { d, intensity: intensity as 0 | 1 | 2 | 3 };
       });
       const filled = days.filter(c => c.intensity > 0).length;
@@ -383,47 +390,87 @@ export class CalendarComponent {
     });
   });
 
-  readonly listRows: DateRow[] = [
-    { day: 15, month: 7, date: '15 août',     dow: 'Vendredi', totalEvents: 3, pinnedCount: 2, title: 'Indépendance de la République du Congo', sub: '+ Premier Conseil des ministres', ad: 'MTN',        status: 'published' },
-    { day: 14, month: 7, date: '14 août',     dow: 'Jeudi',    totalEvents: 1, pinnedCount: 1, title: 'Visite officielle à Pointe-Noire',       sub: null,                              ad: 'MTN',        status: 'published' },
-    { day: 13, month: 7, date: '13 août',     dow: 'Mercredi', totalEvents: 0, pinnedCount: 0, title: null,                                     sub: null,                              ad: '—',          status: 'empty'     },
-    { day: 12, month: 7, date: '12 août',     dow: 'Mardi',    totalEvents: 4, pinnedCount: 2, title: "Création de l'AEF à Brazzaville",        sub: '+ Inauguration du chemin de fer', ad: 'MTN · SG',   status: 'published' },
-    { day: 11, month: 7, date: '11 août',     dow: 'Lundi',    totalEvents: 1, pinnedCount: 1, title: "Discours de Léon M'Ba à l'Assemblée",   sub: null,                              ad: '—',          status: 'draft'     },
-    { day: 10, month: 7, date: '10 août',     dow: 'Dimanche', totalEvents: 2, pinnedCount: 2, title: "Naissance de Tchicaya U Tam'si",         sub: '+ Festival panafricain',          ad: 'BraCongo',   status: 'published' },
-    { day:  9, month: 7, date: '09 août',     dow: 'Samedi',   totalEvents: 0, pinnedCount: 0, title: null,                                     sub: null,                              ad: '—',          status: 'empty'     },
-    { day:  8, month: 7, date: '08 août',     dow: 'Vendredi', totalEvents: 2, pinnedCount: 1, title: "Sommet de l'OUA à Brazzaville",          sub: null,                              ad: 'SG Congo',   status: 'draft'     },
-    { day: 28, month:10, date: '28 novembre', dow: 'Vendredi', totalEvents: 2, pinnedCount: 2, title: 'Adoption de la Constitution de 1958',   sub: '+ Serment de la République',      ad: '—',          status: 'published' },
-    { day: 10, month: 2, date: '10 mars',     dow: 'Lundi',    totalEvents: 3, pinnedCount: 2, title: 'Conférence nationale souveraine',        sub: "+ Discours d'André Milongo",       ad: '—',          status: 'draft'     },
-    { day: 28, month: 5, date: '28 juin',     dow: 'Samedi',   totalEvents: 1, pinnedCount: 1, title: 'Naissance de Marien Ngouabi',            sub: null,                              ad: '—',          status: 'published' },
-    { day: 18, month: 1, date: '18 février',  dow: 'Mardi',    totalEvents: 1, pinnedCount: 1, title: 'Création du Parti Congolais du Travail', sub: null,                             ad: '—',          status: 'published' },
-  ];
+  readonly listRows = computed<DateRow[]>(() => {
+    const year = this.selectedYear();
+    const byMmdd = this.entriesByMmdd();
+    const rows: DateRow[] = [];
+    for (let month = 0; month < 12; month++) {
+      const dim = daysInMonth(year, month);
+      for (let d = 1; d <= dim; d++) {
+        const mmdd = `${pad2(month + 1)}-${pad2(d)}`;
+        const dayEntries = byMmdd.get(mmdd) ?? [];
+        const pos1 = dayEntries.find(e => e.position === 1);
+        const pos2 = dayEntries.find(e => e.position === 2);
+        const pinnedCount = ((pos1 ? 1 : 0) + (pos2 ? 1 : 0)) as 0 | 1 | 2;
+        rows.push({
+          day: d,
+          month,
+          date: `${pad2(d)} ${MONTHS_FR_SHORT[month]}`,
+          dow: DOW_LONG[dowMondayFirst(year, month, d)],
+          totalEvents: dayEntries.length,
+          pinnedCount,
+          title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null,
+          sub: dayEntries.length > 1 ? `+ ${dayEntries[dayEntries.length - 1].event.title}` : null,
+          ad: '—',
+          status: dayEntries.length === 0 ? 'empty' : pinnedCount > 0 ? 'published' : 'draft',
+        });
+      }
+    }
+    return rows;
+  });
+
+  readonly filteredRows = computed<DateRow[]>(() => {
+    const filter = this.activeFilter();
+    const rows = this.listRows();
+    switch (filter) {
+      case 'full':    return rows.filter(r => r.pinnedCount === 2);
+      case 'partial': return rows.filter(r => r.pinnedCount === 1);
+      case 'empty':   return rows.filter(r => r.totalEvents === 0);
+      default:        return rows;
+    }
+  });
+
+  readonly paginatedRows = computed<DateRow[]>(() => {
+    const page = this.currentPage();
+    return this.filteredRows().slice(page * this.pageSize, (page + 1) * this.pageSize);
+  });
 
   // ── Nouveau calendrier modal ──────────────────────
   readonly showNewCalModal = signal(false);
   readonly newCalYear      = signal(0);
   readonly newCalName      = signal('');
   readonly newCalStatus    = signal<'draft' | 'published'>('draft');
+  readonly newCalSaving    = signal(false);
+  readonly newCalError     = signal<string | null>(null);
 
   openNewCalModal(): void {
     const avail = this.availableYears();
     this.newCalYear.set(avail[0] ?? this.currentYear + 1);
     this.newCalName.set('');
     this.newCalStatus.set('draft');
+    this.newCalError.set(null);
     this.showNewCalModal.set(true);
   }
 
   closeNewCalModal(): void { this.showNewCalModal.set(false); }
 
-  createCalendar(): void {
-    const year  = this.newCalYear();
-    const name  = this.newCalName().trim() || `Calendrier ${year}`;
-    const newId = `cal-${Date.now()}`;
-    this.calendars.update(cals => [
-      ...cals,
-      { id: newId, year, name, status: this.newCalStatus(), eventCount: 0, campaignCount: 0, fillPct: 0 },
-    ]);
-    this.closeNewCalModal();
-    this.selectCalendar(newId);
+  async createCalendar(): Promise<void> {
+    if (this.newCalSaving()) return;
+    const year = this.newCalYear();
+    const name = this.newCalName().trim() || `Calendrier ${year}`;
+    this.newCalSaving.set(true);
+    this.newCalError.set(null);
+    const result = await firstValueFrom(
+      this.calendarService.createCalendar(year, name, this.newCalStatus()),
+    );
+    this.newCalSaving.set(false);
+    if (result.success && result.id) {
+      this.closeNewCalModal();
+      await this._reloadCalendars();
+      this.selectCalendar(result.id);
+    } else {
+      this.newCalError.set(result.error ?? 'Erreur lors de la création');
+    }
   }
 
   // ── Dupliquer modal ───────────────────────────────
@@ -479,7 +526,8 @@ export class CalendarComponent {
       const year = this.dupNewYear(), name = this.dupNewName().trim() || `Calendrier ${year}`;
       const newId = `cal-${Date.now()}`;
       this.calendars.update(cals => [...cals, {
-        id: newId, year, name, status: 'draft',
+        id: newId, year, name, status: 'draft' as const,
+        createdBy: null, publishedAt: null,
         eventCount: evCount, campaignCount: campCount,
         fillPct: this.dupIncludeEvents() ? src.fillPct : 0,
       }]);

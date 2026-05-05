@@ -71,11 +71,11 @@ describe('EmailStepComponent', () => {
       expect(sendOtpSpy).toHaveBeenCalledWith('utilisateur@exemple.com', true);
     });
 
-    it("navigue vers /verifier avec l'email en query param après sendOtp réussi", async () => {
+    it("navigue vers /verifier avec l'email et from=signup en query params après sendOtp réussi", async () => {
       component.form.setValue({ email: 'utilisateur@exemple.com' });
       await component.submit();
       expect(navigateSpy).toHaveBeenCalledWith(['/verifier'], {
-        queryParams: { email: 'utilisateur@exemple.com' },
+        queryParams: { email: 'utilisateur@exemple.com', from: 'signup' },
       });
     });
 

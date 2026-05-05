@@ -1,0 +1,51 @@
+<div class="profile-page">
+  <header class="profile-header">
+    <button class="btn btn-flat btn-icon" type="button" (click)="goBack()">
+      <tui-icon icon="@tui.arrow-left" />
+    </button>
+    <h1>Mon profil</h1>
+  </header>
+
+  <section class="profile-body">
+    <div class="profile-avatar">
+      <div class="avatar avatar-lg">
+        {{ fullName() ? fullName()[0].toUpperCase() : userEmail()[0]?.toUpperCase() }}
+      </div>
+    </div>
+
+    <div class="profile-info">
+      <p class="profile-email">{{ userEmail() }}</p>
+      @if (role()) {
+        <span class="badge">{{ role() }}</span>
+      }
+    </div>
+
+    <div class="profile-form">
+      <div class="form-group">
+        <label for="fullName">Nom complet</label>
+        <input
+          id="fullName"
+          type="text"
+          class="input"
+          [value]="fullName()"
+          (input)="fullName.set($any($event.target).value)"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="phone">Téléphone</label>
+        <input
+          id="phone"
+          type="tel"
+          class="input"
+          [value]="phone()"
+          (input)="phone.set($any($event.target).value)"
+        />
+      </div>
+
+      <button class="btn btn-primary" type="button" [disabled]="saving()" (click)="saveProfile()">
+        @if (saving()) { Enregistrement… } @else { Enregistrer }
+      </button>
+    </div>
+  </section>
+</div>
