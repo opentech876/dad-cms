@@ -1,11 +1,548 @@
-import { Component } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import { TuiIcon } from '@taiga-ui/core';
+import { firstValueFrom } from 'rxjs';
+import { CalendarService, CalendarSummary } from '../../core/calendar/calendar.service';
+import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
+
+type CalendarView = 'year' | 'month' | 'list';
+export type CalendarFilter = 'all' | 'full' | 'partial' | 'empty' | 'has_campaign';
+
+export interface Calendar extends CalendarSummary {
+  fillPct: number;
+}
+
+interface DayCell {
+  d: number | null;
+  isToday: boolean;
+  totalEvents: number;
+  pinnedCount: 0 | 1 | 2;
+  title: string | null;
+  ad: boolean;
+}
+
+interface HeatmapCell { d: number | null; intensity: 0 | 1 | 2 | 3; }
+interface HeatmapMonth { label: string; mi: number; cells: HeatmapCell[]; pct: number; dow: string[]; }
+
+interface DateRow {
+  day: number;
+  month: number;
+  date: string;
+  dow: string;
+  totalEvents: number;
+  pinnedCount: 0 | 1 | 2;
+  title: string | null;
+  sub: string | null;
+  ad: string;
+  status: 'published' | 'draft' | 'empty';
+}
+
+export interface DayEvent {
+  id: string;
+  historicalYear: number;
+  title: string;
+  description: string;
+  hasImage: boolean;
+  imageSizeKb: number;
+  charCount: number;
+  status: 'published' | 'draft';
+  displayPosition: 1 | 2 | null;
+}
+
+export interface DayCampaign {
+  id: string;
+  name: string;
+  advertiser: string;
+  color: string;
+  textColor: string;
+  status: 'active' | 'scheduled';
+}
+
+export interface DayDetailData {
+  day: number;
+  month: number;
+  year: number;
+  dayOfWeek: string;
+  events: DayEvent[];
+  campaigns: DayCampaign[];
+}
+
+const MONTHS_FR       = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const MONTHS_FR_CAP   = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const MONTHS_FR_SHORT = ['Jan','Fév','Mar','Avr','Mai','Jun','Juil','Aoû','Sep','Oct','Nov','Déc'];
+const DOW_SHORT       = ['L','M','M','J','V','S','D'];
+const DOW_LONG        = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+const DAYS_FR         = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+function dowMondayFirst(year: number, month: number, day: number): number {
+  return (new Date(year, month, day).getDay() + 6) % 7;
+}
+function pad2(n: number): string { return String(n).padStart(2, '0'); }
+function isoDate(year: number, month: number, day: number): string {
+  return `${year}-${pad2(month + 1)}-${pad2(day)}`;
+}
 
 @Component({
   selector: 'app-calendar',
-  imports: [],
+  standalone: true,
+  imports: [TuiIcon],
   templateUrl: './calendar.component.html',
   styleUrl: './calendar.component.scss',
 })
-export class CalendarComponent {
+export class CalendarComponent implements OnInit {
+  private readonly router = inject(Router);
+  private readonly calendarService = inject(CalendarService);
+  private readonly calendarEntryService = inject(CalendarEntryService);
 
+  readonly monthsFr      = MONTHS_FR;
+  readonly monthsFrCap   = MONTHS_FR_CAP;
+  readonly monthsFrShort = MONTHS_FR_SHORT;
+  readonly dowShort      = DOW_SHORT;
+  readonly dowLong       = DOW_LONG;
+  readonly viewOptions: { id: CalendarView; label: string }[] = [
+    { id: 'year', label: 'Année' },
+    { id: 'month', label: 'Mois' },
+    { id: 'list', label: 'Liste' },
+  ];
+  readonly filterChips: { id: CalendarFilter; label: string }[] = [
+    { id: 'all',          label: 'Toutes les dates' },
+    { id: 'full',         label: '2 affichés' },
+    { id: 'partial',      label: '1 affiché' },
+    { id: 'empty',        label: 'Vide' },
+    { id: 'has_campaign', label: 'Avec campagne' },
+  ];
+
+  private readonly _today = new Date();
+  readonly currentYear  = this._today.getFullYear();
+  readonly currentMonth = this._today.getMonth();
+  readonly todayDate    = this._today.getDate();
+
+  // ── Calendars ─────────────────────────────────────
+  readonly calendars = signal<Calendar[]>([]);
+  readonly loading = signal(false);
+  readonly calendarError = signal<string | null>(null);
+  readonly selectedCalendarId = signal('');
+
+  readonly sortedCalendars = computed(() =>
+    [...this.calendars()].sort((a, b) => a.year - b.year)
+  );
+  readonly selectedCalendar = computed(() =>
+    this.calendars().find(c => c.id === this.selectedCalendarId()) ?? this.calendars()[0]
+  );
+  readonly canPrevCalendar = computed(() =>
+    this.sortedCalendars().findIndex(c => c.id === this.selectedCalendarId()) > 0
+  );
+  readonly canNextCalendar = computed(() => {
+    const sorted = this.sortedCalendars();
+    const idx = sorted.findIndex(c => c.id === this.selectedCalendarId());
+    return idx < sorted.length - 1;
+  });
+  readonly availableYears = computed(() => {
+    const taken = new Set(this.calendars().map(c => c.year));
+    return Array.from({ length: 10 }, (_, i) => this.currentYear - 2 + i).filter(y => !taken.has(y));
+  });
+
+  async ngOnInit(): Promise<void> {
+    await this._reloadCalendars();
+  }
+
+  private async _reloadCalendars(): Promise<void> {
+    this.loading.set(true);
+    this.calendarError.set(null);
+    const summaries = await firstValueFrom(this.calendarService.listCalendars());
+    this.calendars.set(
+      summaries.map((s) => ({
+        ...s,
+        fillPct: Math.min(100, Math.round((s.eventCount / 730) * 100)),
+      })),
+    );
+    if (this.selectedCalendarId() === '' && summaries.length > 0) {
+      this.selectCalendar(summaries[summaries.length - 1].id);
+    }
+    this.loading.set(false);
+  }
+
+  // ── Calendar entries (assignments) ───────────────
+  readonly entries = signal<CalendarEntryWithEvent[]>([]);
+
+  /** Groups entries by mmdd ('MM-DD') for O(1) day lookup. */
+  readonly entriesByMmdd = computed(() => {
+    const map = new Map<string, CalendarEntryWithEvent[]>();
+    for (const entry of this.entries()) {
+      const existing = map.get(entry.mmdd) ?? [];
+      map.set(entry.mmdd, [...existing, entry]);
+    }
+    return map;
+  });
+
+  // ── View state ────────────────────────────────────
+  readonly view          = signal<CalendarView>('month');
+  readonly selectedYear  = signal(this.currentYear);
+  readonly selectedMonth = signal(this.currentMonth);
+  readonly activeFilter  = signal<CalendarFilter>('all');
+  readonly currentPage   = signal(0);
+  readonly pageSize      = 30;
+
+  // ── Calendar navigation ───────────────────────────
+  selectCalendar(id: string): void {
+    this.selectedCalendarId.set(id);
+    const cal = this.calendars().find(c => c.id === id);
+    if (cal) this.selectedYear.set(cal.year);
+    this.selectedDay.set(null);
+    this.currentPage.set(0);
+    this.calendarEntryService.getEntriesForCalendar(id).subscribe(entries => this.entries.set(entries));
+  }
+
+  prevCalendar(): void {
+    const sorted = this.sortedCalendars();
+    const idx = sorted.findIndex(c => c.id === this.selectedCalendarId());
+    if (idx > 0) this.selectCalendar(sorted[idx - 1].id);
+  }
+
+  nextCalendar(): void {
+    const sorted = this.sortedCalendars();
+    const idx = sorted.findIndex(c => c.id === this.selectedCalendarId());
+    if (idx < sorted.length - 1) this.selectCalendar(sorted[idx + 1].id);
+  }
+
+  prevMonth(): void { this.selectedMonth.update(m => Math.max(0, m - 1)); }
+  nextMonth(): void { this.selectedMonth.update(m => Math.min(11, m + 1)); }
+  pickMonth(mi: number): void { this.selectedMonth.set(mi); this.view.set('month'); }
+
+  setFilter(filter: CalendarFilter): void {
+    this.activeFilter.set(filter);
+    this.currentPage.set(0);
+  }
+
+  nextPage(): void {
+    const maxPage = Math.max(0, Math.ceil(this.filteredRows().length / this.pageSize) - 1);
+    this.currentPage.update(p => Math.min(p + 1, maxPage));
+  }
+
+  prevPage(): void {
+    this.currentPage.update(p => Math.max(0, p - 1));
+  }
+
+  // ── Day detail ────────────────────────────────────
+  readonly selectedDay = signal<{ day: number; month: number } | null>(null);
+
+  readonly selectedDayDetail = computed((): DayDetailData | null => {
+    const sel = this.selectedDay();
+    if (!sel) return null;
+    const cal = this.selectedCalendar();
+    if (!cal) return null;
+    const { year } = cal;
+    const mmdd = `${pad2(sel.month + 1)}-${pad2(sel.day)}`;
+    const dayEntries = this.entriesByMmdd().get(mmdd) ?? [];
+    const dayOfWeek = DAYS_FR[new Date(year, sel.month, sel.day).getDay()];
+    const events: DayEvent[] = dayEntries.map(entry => ({
+      id: entry.event.id,
+      historicalYear: entry.event.event_date ? +entry.event.event_date.slice(0, 4) : 0,
+      title: entry.event.title,
+      description: entry.event.description ?? '',
+      hasImage: !!entry.event.image_path,
+      imageSizeKb: 0,
+      charCount: (entry.event.description ?? '').length,
+      status: entry.event.status,
+      displayPosition: entry.position,
+    }));
+    return { day: sel.day, month: sel.month, year, dayOfWeek, events, campaigns: [] };
+  });
+
+  openDayDetail(day: number | null, month: number): void {
+    if (day === null) return;
+    this.selectedDay.set({ day, month });
+  }
+
+  closeDayDetail(): void {
+    this.selectedDay.set(null);
+  }
+
+  navigateToPrevDay(): void {
+    const sel = this.selectedDay();
+    if (!sel) return;
+    const { day, month } = sel;
+    if (day > 1) {
+      this.selectedDay.set({ day: day - 1, month });
+    } else if (month > 0) {
+      const prevMonth = month - 1;
+      const lastDay = daysInMonth(this.selectedYear(), prevMonth);
+      this.selectedDay.set({ day: lastDay, month: prevMonth });
+    }
+  }
+
+  navigateToNextDay(): void {
+    const sel = this.selectedDay();
+    if (!sel) return;
+    const { day, month } = sel;
+    const maxDay = daysInMonth(this.selectedYear(), month);
+    if (day < maxDay) {
+      this.selectedDay.set({ day: day + 1, month });
+    } else if (month < 11) {
+      this.selectedDay.set({ day: 1, month: month + 1 });
+    }
+  }
+
+  // ── Navigation shortcuts ──────────────────────────
+  editEvent(_eventId: string): void {
+    this.router.navigate(['/evenements']);
+  }
+
+  addEventForDay(): void {
+    this.router.navigate(['/evenements']);
+  }
+
+  editCampaign(_campaignId: string): void {
+    this.router.navigate(['/campagnes']);
+  }
+
+  // ── Helpers ───────────────────────────────────────
+  statusBadgeClass(status: Calendar['status']): string {
+    return { published: 'badge-success', draft: 'badge-warning', archived: '' }[status];
+  }
+
+  statusLabel(status: Calendar['status']): string {
+    return { published: 'Publié', draft: 'Brouillon', archived: 'Archivé' }[status];
+  }
+
+  calLabel(cal: Calendar): string {
+    return `${cal.year} — ${cal.name}`;
+  }
+
+  intensityBg(intensity: 0 | 1 | 2 | 3): string {
+    return ['var(--bg-sunken)', 'var(--accent-2-soft)', 'var(--accent-2)', 'var(--accent)'][intensity];
+  }
+
+  pinnedCount(events: DayEvent[]): number {
+    return events.filter(e => e.displayPosition !== null).length;
+  }
+
+  dayDetailHeadline(events: DayEvent[]): string {
+    const pinned = events.filter(e => e.displayPosition !== null);
+    if (pinned.length === 0 && events.length === 0) return 'Aucun événement pour cette date';
+    if (pinned.length === 0) return `${events.length} événement(s) — aucun sélectionné pour l'affichage`;
+    if (pinned.length === 1) return `« ${pinned[0].title} »`;
+    return 'Une date, deux histoires';
+  }
+
+  // ── Publish workflow ──────────────────────────────
+  readonly publishing = signal(false);
+
+  readonly canPublish = computed(() => this.selectedCalendar()?.status === 'draft');
+
+  async publishCalendar(): Promise<void> {
+    if (this.publishing()) return;
+    const calId = this.selectedCalendarId();
+    if (!calId) return;
+    this.publishing.set(true);
+    const result = await firstValueFrom(
+      this.calendarService.updateCalendar(calId, { status: 'published' }),
+    );
+    this.publishing.set(false);
+    if (result.success) {
+      await this._reloadCalendars();
+    }
+  }
+
+  // ── Computed views ────────────────────────────────
+  readonly monthLabel = computed(() =>
+    MONTHS_FR[this.selectedMonth()] + ' ' + this.selectedYear()
+  );
+
+  readonly monthDayCount = computed(() =>
+    daysInMonth(this.selectedYear(), this.selectedMonth())
+  );
+
+  readonly monthCells = computed<DayCell[]>(() => {
+    const year = this.selectedYear(), month = this.selectedMonth();
+    const byMmdd = this.entriesByMmdd();
+    const dim = daysInMonth(year, month), offset = dowMondayFirst(year, month, 1);
+    return Array.from({ length: 42 }, (_, i) => {
+      const d = i - offset + 1;
+      if (d < 1 || d > dim) return { d: null, isToday: false, totalEvents: 0, pinnedCount: 0, title: null, ad: false };
+      const isToday = d === this.todayDate && month === this.currentMonth && year === this.currentYear;
+      const mmdd = `${pad2(month + 1)}-${pad2(d)}`;
+      const dayEntries = byMmdd.get(mmdd) ?? [];
+      const pos1 = dayEntries.find(e => e.position === 1);
+      const pos2 = dayEntries.find(e => e.position === 2);
+      const pinnedCount = ((pos1 ? 1 : 0) + (pos2 ? 1 : 0)) as 0 | 1 | 2;
+      return { d, isToday, totalEvents: dayEntries.length, pinnedCount, title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null, ad: false };
+    });
+  });
+
+  readonly yearHeatmap = computed<HeatmapMonth[]>(() => {
+    const year = this.selectedYear();
+    const byMmdd = this.entriesByMmdd();
+    return MONTHS_FR.map((label, mi) => {
+      const dim = daysInMonth(year, mi), offset = dowMondayFirst(year, mi, 1);
+      const blanks: HeatmapCell[] = Array.from({ length: offset }, () => ({ d: null, intensity: 0 as 0 }));
+      const days: HeatmapCell[] = Array.from({ length: dim }, (_, i) => {
+        const d = i + 1;
+        const cnt = (byMmdd.get(`${pad2(mi + 1)}-${pad2(d)}`) ?? []).length;
+        const intensity = cnt === 0 ? 0 : cnt === 1 ? 1 : cnt === 2 ? 2 : 3;
+        return { d, intensity: intensity as 0 | 1 | 2 | 3 };
+      });
+      const filled = days.filter(c => c.intensity > 0).length;
+      return { label, mi, cells: [...blanks, ...days], pct: Math.round((filled / dim) * 100), dow: DOW_SHORT };
+    });
+  });
+
+  readonly listRows = computed<DateRow[]>(() => {
+    const year = this.selectedYear();
+    const byMmdd = this.entriesByMmdd();
+    const rows: DateRow[] = [];
+    for (let month = 0; month < 12; month++) {
+      const dim = daysInMonth(year, month);
+      for (let d = 1; d <= dim; d++) {
+        const mmdd = `${pad2(month + 1)}-${pad2(d)}`;
+        const dayEntries = byMmdd.get(mmdd) ?? [];
+        const pos1 = dayEntries.find(e => e.position === 1);
+        const pos2 = dayEntries.find(e => e.position === 2);
+        const pinnedCount = ((pos1 ? 1 : 0) + (pos2 ? 1 : 0)) as 0 | 1 | 2;
+        rows.push({
+          day: d,
+          month,
+          date: `${pad2(d)} ${MONTHS_FR_SHORT[month]}`,
+          dow: DOW_LONG[dowMondayFirst(year, month, d)],
+          totalEvents: dayEntries.length,
+          pinnedCount,
+          title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null,
+          sub: dayEntries.length > 1 ? `+ ${dayEntries[dayEntries.length - 1].event.title}` : null,
+          ad: '—',
+          status: dayEntries.length === 0 ? 'empty' : pinnedCount > 0 ? 'published' : 'draft',
+        });
+      }
+    }
+    return rows;
+  });
+
+  readonly filteredRows = computed<DateRow[]>(() => {
+    const filter = this.activeFilter();
+    const rows = this.listRows();
+    switch (filter) {
+      case 'full':    return rows.filter(r => r.pinnedCount === 2);
+      case 'partial': return rows.filter(r => r.pinnedCount === 1);
+      case 'empty':   return rows.filter(r => r.totalEvents === 0);
+      default:        return rows;
+    }
+  });
+
+  readonly paginatedRows = computed<DateRow[]>(() => {
+    const page = this.currentPage();
+    return this.filteredRows().slice(page * this.pageSize, (page + 1) * this.pageSize);
+  });
+
+  // ── Nouveau calendrier modal ──────────────────────
+  readonly showNewCalModal = signal(false);
+  readonly newCalYear      = signal(0);
+  readonly newCalName      = signal('');
+  readonly newCalStatus    = signal<'draft' | 'published'>('draft');
+  readonly newCalSaving    = signal(false);
+  readonly newCalError     = signal<string | null>(null);
+
+  openNewCalModal(): void {
+    const avail = this.availableYears();
+    this.newCalYear.set(avail[0] ?? this.currentYear + 1);
+    this.newCalName.set('');
+    this.newCalStatus.set('draft');
+    this.newCalError.set(null);
+    this.showNewCalModal.set(true);
+  }
+
+  closeNewCalModal(): void { this.showNewCalModal.set(false); }
+
+  async createCalendar(): Promise<void> {
+    if (this.newCalSaving()) return;
+    const year = this.newCalYear();
+    const name = this.newCalName().trim() || `Calendrier ${year}`;
+    this.newCalSaving.set(true);
+    this.newCalError.set(null);
+    const result = await firstValueFrom(
+      this.calendarService.createCalendar(year, name, this.newCalStatus()),
+    );
+    this.newCalSaving.set(false);
+    if (result.success && result.id) {
+      this.closeNewCalModal();
+      await this._reloadCalendars();
+      this.selectCalendar(result.id);
+    } else {
+      this.newCalError.set(result.error ?? 'Erreur lors de la création');
+    }
+  }
+
+  // ── Dupliquer modal ───────────────────────────────
+  readonly showDupModal        = signal(false);
+  readonly dupSourceId         = signal('');
+  readonly dupIncludeEvents    = signal(true);
+  readonly dupIncludeCampaigns = signal(true);
+  readonly dupTargetType       = signal<'existing' | 'new'>('existing');
+  readonly dupTargetId         = signal('');
+  readonly dupNewYear          = signal(0);
+  readonly dupNewName          = signal('');
+  readonly dupResultCalId      = signal('');
+  readonly dupStatus           = signal<'idle' | 'done'>('idle');
+
+  readonly dupSourceCalendar = computed(() =>
+    this.calendars().find(c => c.id === this.dupSourceId())
+  );
+
+  readonly dupTargetCalendars = computed(() =>
+    this.sortedCalendars().filter(c => c.id !== this.dupSourceId() && c.status !== 'archived')
+  );
+
+  openDupModal(): void {
+    const selId = this.selectedCalendarId();
+    this.dupSourceId.set(selId);
+    this.dupIncludeEvents.set(true);
+    this.dupIncludeCampaigns.set(true);
+    this.dupTargetType.set('existing');
+    const targets = this.sortedCalendars().filter(c => c.id !== selId && c.status !== 'archived');
+    this.dupTargetId.set(targets[0]?.id ?? '');
+    const avail = this.availableYears();
+    this.dupNewYear.set(avail[0] ?? this.currentYear + 1);
+    this.dupNewName.set('');
+    this.dupResultCalId.set('');
+    this.dupStatus.set('idle');
+    this.showDupModal.set(true);
+  }
+
+  closeDupModal(): void { this.showDupModal.set(false); }
+
+  goToDupResult(): void {
+    const id = this.dupResultCalId();
+    this.closeDupModal();
+    if (id) this.selectCalendar(id);
+  }
+
+  confirmDuplicate(): void {
+    const src = this.dupSourceCalendar();
+    if (!src) return;
+    const evCount   = this.dupIncludeEvents()    ? src.eventCount    : 0;
+    const campCount = this.dupIncludeCampaigns() ? src.campaignCount : 0;
+    if (this.dupTargetType() === 'new') {
+      const year = this.dupNewYear(), name = this.dupNewName().trim() || `Calendrier ${year}`;
+      const newId = `cal-${Date.now()}`;
+      this.calendars.update(cals => [...cals, {
+        id: newId, year, name, status: 'draft' as const,
+        createdBy: null, publishedAt: null,
+        eventCount: evCount, campaignCount: campCount,
+        fillPct: this.dupIncludeEvents() ? src.fillPct : 0,
+      }]);
+      this.dupResultCalId.set(newId);
+    } else {
+      const targetId = this.dupTargetId();
+      this.calendars.update(cals => cals.map(c =>
+        c.id !== targetId ? c : {
+          ...c, eventCount: c.eventCount + evCount, campaignCount: c.campaignCount + campCount,
+          fillPct: this.dupIncludeEvents()
+            ? Math.min(100, Math.round((c.fillPct + src.fillPct) / 2)) : c.fillPct,
+        }
+      ));
+      this.dupResultCalId.set(targetId);
+    }
+    this.dupStatus.set('done');
+  }
 }

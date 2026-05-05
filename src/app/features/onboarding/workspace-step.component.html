@@ -1,6 +1,5 @@
 <div class="step">
   <div class="step__content">
-
     <div class="step__logo"></div>
 
     <h1 class="step__title">Ravi de vous voir&nbsp;!</h1>
@@ -17,8 +16,8 @@
       En continuant, vous acceptez nos
       <a href="#" class="step__legal-link">Conditions d'utilisation</a>
       et notre
-      <a href="#" class="step__legal-link">Politique de confidentialité</a>.
-      Ce site est protégé par reCAPTCHA et les
+      <a href="#" class="step__legal-link">Politique de confidentialité</a>. Ce site est protégé par
+      reCAPTCHA et les
       <a href="#" class="step__legal-link">règles de confidentialité</a>
       et les
       <a href="#" class="step__legal-link">conditions d'utilisation</a>
@@ -29,20 +28,20 @@
 
     <div class="step__section-header">
       <p class="step__section-label">Ou continuer vers les espaces de travail disponibles.</p>
-      <p class="step__user-email">{{ email }}</p>
+      <p class="step__user-email">{{ email() }}</p>
     </div>
 
-    @if (isLoading) {
+    @if (isLoading()) {
       <p class="step__state-text">Chargement des espaces de travail…</p>
-    } @else if (workspaces.length === 0) {
+    } @else if (workspaces().length === 0) {
       <p class="step__state-text">Aucun espace de travail disponible.</p>
     } @else {
       <div class="step__workspaces">
-        @for (ws of workspaces; track ws.id) {
+        @for (ws of workspaces(); track ws.id) {
           <button class="step__workspace-row" type="button" (click)="selectWorkspace(ws)">
             <div class="step__workspace-logo">
-              @if (ws.logo_path) {
-                <img [src]="ws.logo_path" [alt]="ws.name" class="step__workspace-logo-img" />
+              @if (ws.logo_url) {
+                <img [src]="ws.logo_url" [alt]="ws.name" class="step__workspace-logo-img" />
               } @else {
                 <span class="step__workspace-logo-initial">{{ ws.name[0].toUpperCase() }}</span>
               }
@@ -61,23 +60,30 @@
         }
       </div>
     }
-
   </div>
 </div>
 
-@if (showModal) {
+@if (showModal()) {
   <div class="modal-backdrop" (click)="closeModal()">
     <div class="modal" (click)="$event.stopPropagation()">
-
       <!-- Progress bar -->
       <div class="modal__progress">
-        <div class="modal__progress-step" [class.modal__progress-step--done]="currentStep >= 1"></div>
-        <div class="modal__progress-step" [class.modal__progress-step--done]="currentStep >= 2"></div>
-        <div class="modal__progress-step" [class.modal__progress-step--done]="currentStep >= 3"></div>
+        <div
+          class="modal__progress-step"
+          [class.modal__progress-step--done]="currentStep() >= 1"
+        ></div>
+        <div
+          class="modal__progress-step"
+          [class.modal__progress-step--done]="currentStep() >= 2"
+        ></div>
+        <div
+          class="modal__progress-step"
+          [class.modal__progress-step--done]="currentStep() >= 3"
+        ></div>
       </div>
 
       <!-- Step 1 — Workspace name -->
-      @if (currentStep === 1) {
+      @if (currentStep() === 1) {
         <div class="modal__body">
           <h2 class="modal__title">Nommez votre espace de travail</h2>
           <p class="modal__subtitle">
@@ -88,16 +94,19 @@
             class="modal__input"
             type="text"
             placeholder="Ex : OPEN-TECH Congo"
-            [value]="workspaceName"
-            (input)="workspaceName = $any($event.target).value"
+            [value]="workspaceName()"
+            (input)="workspaceName.set($any($event.target).value)"
             autocomplete="off"
           />
-          <button class="modal__btn-primary" type="button" (click)="nextStep()">Suivant</button>
+          @if (stepError()) {
+            <p class="modal__error">{{ stepError() }}</p>
+          }
+          <button class="modal__btn-primary" type="button" (click)="nextStep()" [disabled]="isModalLoading()">Suivant</button>
         </div>
       }
 
       <!-- Step 2 — Personal info -->
-      @if (currentStep === 2) {
+      @if (currentStep() === 2) {
         <div class="modal__body">
           <h2 class="modal__title">Parlez-nous de vous</h2>
           <p class="modal__subtitle">
@@ -106,8 +115,8 @@
 
           <div class="modal__avatar-wrap">
             <label class="modal__avatar" for="photoInput">
-              @if (userPhotoUrl) {
-                <img [src]="userPhotoUrl" alt="Photo de profil" class="modal__avatar-img" />
+              @if (userPhotoUrl()) {
+                <img [src]="userPhotoUrl()" alt="Photo de profil" class="modal__avatar-img" />
               } @else {
                 <tui-icon icon="@tui.camera" class="modal__avatar-icon" />
               }
@@ -126,29 +135,38 @@
             class="modal__input"
             type="text"
             placeholder="Nom complet"
-            [value]="userName"
-            (input)="userName = $any($event.target).value"
+            [value]="userName()"
+            (input)="userName.set($any($event.target).value)"
             autocomplete="name"
           />
           <input
             class="modal__input"
             type="tel"
             placeholder="Numéro de téléphone"
-            [value]="userPhone"
-            (input)="userPhone = $any($event.target).value"
+            [value]="userPhone()"
+            (input)="userPhone.set($any($event.target).value)"
             autocomplete="tel"
           />
-          <button class="modal__btn-primary" type="button" (click)="nextStep()">Suivant</button>
+          @if (stepError()) {
+            <p class="modal__error">{{ stepError() }}</p>
+          }
+          <button class="modal__btn-primary" type="button" (click)="nextStep()" [disabled]="isModalLoading()">
+            @if (isModalLoading()) {
+              <span class="step__spinner"></span>
+            } @else {
+              Suivant
+            }
+          </button>
         </div>
       }
 
       <!-- Step 3 — Invite members -->
-      @if (currentStep === 3) {
+      @if (currentStep() === 3) {
         <div class="modal__body">
           <h2 class="modal__title">Invitez votre équipe</h2>
           <p class="modal__subtitle">
-            Ajoutez des collaborateurs à votre espace de travail. Ils recevront une invitation
-            par e-mail pour rejoindre Day After Day.
+            Ajoutez des collaborateurs à votre espace de travail. Ils recevront une invitation par
+            e-mail pour rejoindre Day After Day.
           </p>
 
           <div class="modal__invite-row">
@@ -156,24 +174,56 @@
               class="modal__input modal__input--flex"
               type="email"
               placeholder="collaborateur@exemple.com"
-              [value]="inviteEmail"
-              (input)="inviteEmail = $any($event.target).value"
+              [value]="inviteEmail()"
+              (input)="inviteEmail.set($any($event.target).value)"
               autocomplete="email"
             />
-            <button class="modal__btn-secondary" type="button">Inviter</button>
+            <select
+              class="modal__select"
+              [value]="inviteRole()"
+              (change)="inviteRole.set($any($event.target).value)"
+            >
+              <option value="chef_equipe">Chef d'équipe</option>
+              <option value="editeur">Éditeur</option>
+              <option value="charge_communication">Chargé de communication</option>
+            </select>
+            <button
+              class="modal__btn-secondary"
+              type="button"
+              (click)="sendInvite()"
+              [disabled]="inviteStatus() === 'loading'"
+            >
+              @if (inviteStatus() === 'loading') {
+                <span class="step__spinner"></span>
+              } @else {
+                Inviter
+              }
+            </button>
           </div>
 
-          <button class="modal__btn-outline" type="button">
-            <tui-icon icon="@tui.link" class="modal__btn-icon" />
-            Copier le lien d'invitation
-          </button>
+          @if (inviteStatus() === 'sent') {
+            <p class="modal__success">Invitation envoyée avec succès.</p>
+          }
+          @if (inviteStatus() === 'error') {
+            <p class="modal__error">{{ inviteError() }}</p>
+          }
 
-          <button class="modal__btn-skip" type="button" (click)="finish()">
-            Passer cette étape
+          <button
+            class="modal__btn-skip"
+            type="button"
+            (click)="finish()"
+            [disabled]="isModalLoading()"
+          >
+            @if (isModalLoading()) {
+              <span class="step__spinner"></span>
+            } @else if (inviteStatus() === 'sent') {
+              Accéder au tableau de bord
+            } @else {
+              Passer cette étape
+            }
           </button>
         </div>
       }
-
     </div>
   </div>
 }

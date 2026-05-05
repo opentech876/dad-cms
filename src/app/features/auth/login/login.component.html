@@ -1,56 +1,104 @@
-<div class="step">
-  <div class="step__content">
+<div class="login-layout">
 
-    <div class="step__logo"></div>
+  <!-- ── Left — editorial pane ── -->
+  <div class="login-left">
+    <div class="login-left-deco-lines"></div>
+    <div class="login-left-deco-circle login-left-deco-circle--1"></div>
+    <div class="login-left-deco-circle login-left-deco-circle--2"></div>
 
-    <h1 class="step__title">Saisissez votre adresse mail<br>pour vous connecter</h1>
-    <p class="step__subtitle">Ou choisissez une autre méthode de connexion</p>
-
-    <form [formGroup]="form" (ngSubmit)="submit()" class="step__form" novalidate>
-      <input
-        class="step__input"
-        type="email"
-        formControlName="email"
-        placeholder="vous@exemple.com"
-        autocomplete="email"
-      />
-
-      @if (errorMessage) {
-        <p class="step__error">{{ errorMessage }}</p>
-      }
-
-      <button class="step__submit" type="submit" [disabled]="loading">
-        @if (loading) {
-          <span class="step__spinner"></span>
-        }
-        Continuer
-      </button>
-    </form>
-
-    <div class="step__oauth">
-      <button class="step__oauth-btn" type="button">
-        <svg class="step__oauth-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
-          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-        </svg>
-        Continuer avec Google
-      </button>
-      <button class="step__oauth-btn" type="button">
-        <svg class="step__oauth-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-          <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
-        </svg>
-        Continuer avec Apple
-      </button>
+    <div class="login-left-header">
+      <svg width="42" height="42" viewBox="0 0 40 40" fill="none" style="flex:none;">
+        <rect x="3.5" y="6" width="33" height="29" rx="2.5" fill="#d8a155"/>
+        <rect x="3.5" y="6" width="33" height="6.5" fill="rgba(0,0,0,0.18)"/>
+        <circle cx="11" cy="4.5" r="1.5" fill="#d8a155" stroke="#1f1a14" stroke-width="1"/>
+        <circle cx="20" cy="4.5" r="1.5" fill="#d8a155" stroke="#1f1a14" stroke-width="1"/>
+        <circle cx="29" cy="4.5" r="1.5" fill="#d8a155" stroke="#1f1a14" stroke-width="1"/>
+        <text x="20" y="28" text-anchor="middle" font-family="serif" font-weight="700" font-size="12" fill="#1f1a14" letter-spacing="0.5">DAD</text>
+      </svg>
+      <div>
+        <div class="login-left-brand-name">Day After Day</div>
+        <div class="login-left-brand-sub">Système de Gestion de Contenu</div>
+      </div>
     </div>
 
-    <div class="step__divider">—</div>
+    <div class="login-left-hero">
+      <h1 class="login-left-headline">
+        L'histoire de la Nation,<br>
+        <em style="color: #d8a155; font-style: italic;">jour après jour.</em>
+      </h1>
+      <p class="login-left-desc">
+        La plateforme éditoriale qui alimente l'éphéméride mobile de la République du Congo.
+        Calendriers, événements, campagnes — tout depuis un seul espace.
+      </p>
+      <hr class="login-left-rule">
+      <div class="login-left-stats">
+        <div>
+          <div class="login-stat-value">365</div>
+          <div class="login-stat-label">Dates / an</div>
+        </div>
+        <div>
+          <div class="login-stat-value">×2</div>
+          <div class="login-stat-label">Événements / jour</div>
+        </div>
+        <div>
+          <div class="login-stat-value">4</div>
+          <div class="login-stat-label">Rôles</div>
+        </div>
+      </div>
+    </div>
 
-    <p class="step__footer">
-      Vous rencontrez des difficultés ?
-      <a href="#" class="step__footer-link">Veuillez contacter notre support technique</a>
-    </p>
+    <div class="login-left-footer">
+      <span>OPEN-TECH · Poto-Poto, Brazzaville</span>
+    </div>
+  </div>
 
+  <!-- ── Right — form pane ── -->
+  <div class="login-right">
+    <div class="login-form-wrap">
+      <div class="eyebrow">Système de Gestion de Contenu</div>
+      <h2 class="login-form-title">Connexion</h2>
+      <p class="login-form-subtitle">Accès réservé aux membres invités de l'équipe Day After Day.</p>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="login-form">
+        <div class="field required">
+          <label class="field-label">Adresse e-mail professionnelle</label>
+          <div class="input-group">
+            <span class="input-icon">✉</span>
+            <input
+              class="input has-icon"
+              type="email"
+              formControlName="email"
+              placeholder="prenom.nom@open-tech.cg"
+              autocomplete="email"
+            />
+          </div>
+        </div>
+
+        @if (errorMessage) {
+          <div class="login-error">{{ errorMessage }}</div>
+        }
+
+        <button class="btn btn-primary btn-lg" type="submit" [disabled]="loading" style="width:100%; margin-top:8px;">
+          @if (loading) { <span class="spinner"></span> }
+          Recevoir le lien de connexion →
+        </button>
+      </form>
+
+      <hr class="rule" style="margin: 28px 0;">
+
+      <p class="login-form-note">
+        Pas encore membre ? Demandez une invitation à votre
+        <a href="mailto:lamine@open-tech.cg" class="btn-link">propriétaire d'espace</a>.
+      </p>
+    </div>
+
+    <div class="login-right-footer">
+      <span>© 2026 OPEN-TECH · Tous droits réservés</span>
+      <div style="display:flex; gap:14px;">
+        <a href="#" class="btn-link" style="font-size:11.5px;">Mentions légales</a>
+        <a href="#" class="btn-link" style="font-size:11.5px;">Confidentialité</a>
+        <a href="#" class="btn-link" style="font-size:11.5px;">Aide</a>
+      </div>
+    </div>
   </div>
 </div>

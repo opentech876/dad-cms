@@ -1,0 +1,122 @@
+<div class="settings-page">
+
+  <!-- ══ Apparence ══ -->
+  <section class="settings-section">
+    <div class="settings-section-header">
+      <div class="settings-section-icon">
+        <tui-icon icon="@tui.palette" style="font-size:18px;" />
+      </div>
+      <div>
+        <div class="settings-section-title">Apparence</div>
+        <div class="settings-section-sub">Thème visuel et mode de couleur de l'interface</div>
+      </div>
+    </div>
+
+    <!-- Theme picker -->
+    <div class="settings-group">
+      <div class="settings-group-label">Thème</div>
+      <div class="settings-theme-grid">
+        @for (t of themes; track t.id) {
+          <button class="settings-theme-card"
+                  [class.settings-theme-card--active]="themeService.theme() === t.id"
+                  type="button"
+                  (click)="selectTheme(t.id)">
+            <div class="settings-theme-preview settings-theme-preview--{{ t.id }}">
+              <div class="settings-theme-preview__sidebar"></div>
+              <div class="settings-theme-preview__content">
+                <div class="settings-theme-preview__bar"></div>
+                <div class="settings-theme-preview__bar settings-theme-preview__bar--short"></div>
+                <div class="settings-theme-preview__bar settings-theme-preview__bar--medium"></div>
+              </div>
+            </div>
+            <div class="settings-theme-card-label">
+              <span class="settings-theme-card-name">{{ t.label }}</span>
+              @if (themeService.theme() === t.id) {
+                <tui-icon icon="@tui.check" style="font-size:12px; color:var(--accent);" />
+              }
+            </div>
+            <div class="settings-theme-card-desc">{{ t.desc }}</div>
+          </button>
+        }
+      </div>
+    </div>
+
+    <!-- Color mode -->
+    <div class="settings-group">
+      <div class="settings-group-label">Mode de couleur</div>
+      <div class="settings-mode-group">
+        @for (mode of colorModes; track mode.id) {
+          <button class="settings-mode-btn"
+                  [class.settings-mode-btn--active]="themeService.colorMode() === mode.id"
+                  type="button"
+                  (click)="selectColorMode(mode.id)">
+            <tui-icon [icon]="mode.icon" style="font-size:15px;" />
+            {{ mode.label }}
+          </button>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ Espace de travail (owner only) ══ -->
+  @if (isOwner()) {
+    <section class="settings-section">
+      <div class="settings-section-header">
+        <div class="settings-section-icon">
+          <tui-icon icon="@tui.building" style="font-size:18px;" />
+        </div>
+        <div>
+          <div class="settings-section-title">Espace de travail</div>
+          <div class="settings-section-sub">Informations générales de votre organisation</div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-label">Nom de l'espace de travail</div>
+        <div class="settings-inline-form">
+          <input class="input" type="text" placeholder="Day After Day"
+                 [value]="workspaceName()" (input)="workspaceName.set($any($event.target).value)" />
+          <button class="btn btn-primary btn-sm" type="button"
+                  [disabled]="wsSaving() || !workspaceName().trim()"
+                  (click)="saveWorkspaceName()">
+            @if (wsSaving()) { <span class="spinner"></span> }
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </section>
+  }
+
+  <!-- ══ À propos ══ -->
+  <section class="settings-section settings-section--about">
+    <div class="settings-section-header">
+      <div class="settings-section-icon">
+        <tui-icon icon="@tui.info" style="font-size:18px;" />
+      </div>
+      <div>
+        <div class="settings-section-title">À propos</div>
+        <div class="settings-section-sub">Informations sur l'application</div>
+      </div>
+    </div>
+
+    <dl class="settings-about-list">
+      <div class="settings-about-row">
+        <dt>Application</dt>
+        <dd>Day After Day CMS</dd>
+      </div>
+      <div class="settings-about-row">
+        <dt>Version</dt>
+        <dd>1.0.0 — Sprint 3</dd>
+      </div>
+      <div class="settings-about-row">
+        <dt>Plateforme</dt>
+        <dd>Angular 21 · Supabase · Taiga UI 5</dd>
+      </div>
+      <div class="settings-about-row">
+        <dt>Client</dt>
+        <dd>DIOUGA-DIOP Lamine</dd>
+      </div>
+    </dl>
+  </section>
+
+</div>

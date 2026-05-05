@@ -1,1 +1,497 @@
-<p>calendar works!</p>
+<div class="calendar-page">
+
+  <!-- ══ TOOLBAR ══ -->
+  <div class="card" style="padding:12px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+
+    <!-- Calendar selector with prev / next -->
+    <div style="display:flex; align-items:center; gap:6px;">
+      <button class="btn btn-flat btn-icon btn-sm" type="button"
+              (click)="prevCalendar()" [disabled]="!canPrevCalendar()" title="Calendrier précédent">
+        <tui-icon icon="@tui.chevron-left" style="font-size:14px;" />
+      </button>
+
+      <select class="select" style="min-width:200px; height:36px; font-size:13px; font-weight:500;"
+              [value]="selectedCalendarId()"
+              (change)="selectCalendar($any($event.target).value)">
+        @for (cal of sortedCalendars(); track cal.id) {
+          <option [value]="cal.id">{{ calLabel(cal) }}</option>
+        }
+      </select>
+
+      <button class="btn btn-flat btn-icon btn-sm" type="button"
+              (click)="nextCalendar()" [disabled]="!canNextCalendar()" title="Calendrier suivant">
+        <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+      </button>
+
+      @if (selectedCalendar(); as cal) {
+        <span class="badge" [class]="statusBadgeClass(cal.status)" style="margin-left:4px;">
+          {{ statusLabel(cal.status) }}
+        </span>
+      }
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <!-- View toggle -->
+    <div style="display:flex; gap:4px; padding:3px; background:var(--bg-surface-2); border-radius:8px; border:1px solid var(--border-1);">
+      @for (opt of viewOptions; track opt.id) {
+        <button type="button" (click)="view.set(opt.id)"
+                [style.background]="view() === opt.id ? 'var(--bg-surface)' : 'transparent'"
+                [style.box-shadow]="view() === opt.id ? 'var(--shadow-sm)' : 'none'"
+                [style.font-weight]="view() === opt.id ? '600' : '500'"
+                [style.color]="view() === opt.id ? 'var(--fg-1)' : 'var(--fg-2)'"
+                style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-family:var(--font-sans); transition:all 0.1s;">
+          {{ opt.label }}
+        </button>
+      }
+    </div>
+
+    @if (canPublish()) {
+      <button class="btn btn-success btn-sm" type="button"
+              [disabled]="publishing()"
+              (click)="publishCalendar()">
+        @if (publishing()) { <span class="spinner"></span> }
+        <tui-icon icon="@tui.send" style="font-size:14px;" />
+        Publier
+      </button>
+    }
+    <button class="btn btn-flat btn-sm" type="button" (click)="openDupModal()">
+      <tui-icon icon="@tui.copy" style="font-size:14px;" />
+      Dupliquer
+    </button>
+    <button class="btn btn-primary btn-sm" type="button" (click)="openNewCalModal()">
+      <tui-icon icon="@tui.plus" style="font-size:14px;" />
+      Nouveau calendrier
+    </button>
+  </div>
+
+  <!-- ══ FILTER CHIPS ══ -->
+  <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
+    <span style="font-size:12px; color:var(--fg-3); font-weight:500;">Filtrer :</span>
+    @for (chip of filterChips; track chip.id) {
+      <span class="tag" style="cursor:pointer;"
+            (click)="setFilter(chip.id)"
+            [style.background]="activeFilter() === chip.id ? 'var(--accent-soft)' : 'var(--bg-surface)'"
+            [style.color]="activeFilter() === chip.id ? 'var(--accent)' : 'var(--fg-2)'"
+            [style.border-color]="activeFilter() === chip.id ? 'var(--accent)' : 'var(--border-2)'"
+            [style.font-weight]="activeFilter() === chip.id ? '600' : '500'">
+        {{ chip.label }}
+      </span>
+    }
+    @if (selectedCalendar(); as cal) {
+      <span style="font-size:12px; color:var(--fg-3); margin-left:auto;">
+        365 dates &middot;
+        <strong style="color:var(--fg-2);">{{ cal.eventCount }}</strong> événements &middot;
+        <strong style="color:var(--fg-2);">{{ cal.fillPct }}%</strong> rempli
+      </span>
+    }
+  </div>
+
+  <!-- ══ YEAR HEATMAP ══ -->
+  @if (view() === 'year') {
+    <div class="card" style="padding:24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div>
+          <div class="eyebrow">Vue annuelle</div>
+          <h3 style="font-family:var(--font-serif); font-size:24px; font-weight:600; margin-top:4px;">
+            {{ selectedCalendar().name }}
+          </h3>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; font-size:11.5px; color:var(--fg-3); flex-wrap:wrap;">
+          <span style="font-weight:500;">Légende :</span>
+          <span style="display:flex; align-items:center; gap:5px;">
+            <span style="width:13px; height:13px; border-radius:3px; background:var(--bg-sunken); border:1px solid var(--border-1); flex-shrink:0;"></span>
+            Vide
+          </span>
+          <span style="display:flex; align-items:center; gap:5px;">
+            <span style="width:13px; height:13px; border-radius:3px; background:var(--accent-2-soft); flex-shrink:0;"></span>
+            1 événement
+          </span>
+          <span style="display:flex; align-items:center; gap:5px;">
+            <span style="width:13px; height:13px; border-radius:3px; background:var(--accent-2); opacity:0.6; flex-shrink:0;"></span>
+            2 événements
+          </span>
+          <span style="display:flex; align-items:center; gap:5px;">
+            <span style="width:13px; height:13px; border-radius:3px; background:var(--accent); flex-shrink:0;"></span>
+            Complet (2+)
+          </span>
+        </div>
+      </div>
+      <div class="heatmap-grid">
+        @for (mon of yearHeatmap(); track mon.mi) {
+          <div class="heatmap-month" (click)="pickMonth(mon.mi)">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+              <span style="font-family:var(--font-serif); font-size:15px; font-weight:600; text-transform:capitalize;">{{ mon.label }}</span>
+              <span style="font-size:11px; color:var(--fg-3);">{{ mon.pct }}%</span>
+            </div>
+            <div class="mini-cal">
+              @for (d of mon.dow; track $index) {
+                <div style="font-size:9px; color:var(--fg-3); text-align:center; margin-bottom:2px;">{{ d }}</div>
+              }
+              @for (cell of mon.cells; track $index) {
+                @if (cell.d === null) {
+                  <div></div>
+                } @else {
+                  <div class="mini-day" [style.background]="intensityBg(cell.intensity)" [title]="cell.d + ' ' + mon.label"></div>
+                }
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ══ MONTH GRID ══ -->
+  @if (view() === 'month') {
+    <div class="card" style="padding:0;">
+      <div style="padding:16px 20px; display:flex; align-items:center; border-bottom:1px solid var(--border-1);">
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="prevMonth()">
+          <tui-icon icon="@tui.chevron-left" style="font-size:14px;" />
+        </button>
+        <h3 style="font-family:var(--font-serif); font-size:22px; font-weight:600; margin:0 12px; text-transform:capitalize; letter-spacing:-0.01em;">
+          {{ monthLabel() }}
+        </h3>
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="nextMonth()">
+          <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+        </button>
+        <div style="flex:1;"></div>
+        <span style="font-size:12px; color:var(--fg-3);">{{ monthDayCount() }} jours</span>
+      </div>
+      <div class="month-dow-header">
+        @for (d of dowLong; track $index) {
+          <div [style.border-right]="$index < 6 ? '1px solid var(--border-1)' : 'none'"
+               style="padding:10px 12px; font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--fg-3);">{{ d }}</div>
+        }
+      </div>
+      <div class="month-grid">
+        @for (cell of monthCells(); track $index; let i = $index) {
+          <div class="month-cell"
+               [class.month-cell--empty]="cell.d === null"
+               [class.month-cell--today]="cell.isToday"
+               [style.border-right]="(i % 7) < 6 ? '1px solid var(--border-1)' : 'none'"
+               [style.border-bottom]="i < 35 ? '1px solid var(--border-1)' : 'none'">
+            @if (cell.d !== null) {
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <span class="month-cell__day" [class.month-cell__day--today]="cell.isToday">{{ cell.d }}</span>
+                <div style="display:flex; gap:3px;">
+                  @for (_ of [].constructor(cell.totalEvents); track $index) {
+                    <span class="event-dot"></span>
+                  }
+                  @if (cell.ad) {
+                    <span class="ad-dot" title="Pub. active"></span>
+                  }
+                </div>
+              </div>
+              @if (cell.title) {
+                <div class="month-cell__title">{{ cell.title }}</div>
+              }
+              @if (cell.pinnedCount === 2) {
+                <div style="margin-top:4px; font-size:10.5px; color:var(--fg-3);">+ 1 événement</div>
+              }
+              @if (cell.pinnedCount === 0) {
+                <div style="margin-top:8px; font-size:11px; color:var(--fg-3); font-style:italic;">+ Ajouter</div>
+              }
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ══ LIST VIEW ══ -->
+  @if (view() === 'list') {
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:160px;">Date</th>
+            <th>Événements</th>
+            <th style="width:80px; text-align:center;">Nb.</th>
+            <th style="width:200px;">Publicités</th>
+            <th style="width:110px;">Statut</th>
+            <th style="width:60px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of paginatedRows(); track row.date) {
+            <tr style="cursor:pointer;">
+              <td>
+                <div style="display:flex; flex-direction:column; line-height:1.2;">
+                  <span style="font-family:var(--font-serif); font-size:15px; font-weight:600;">
+                    {{ row.date }} {{ selectedCalendar().year }}
+                  </span>
+                  <span style="font-size:11.5px; color:var(--fg-3);">{{ row.dow }}</span>
+                </div>
+              </td>
+              <td>
+                @if (row.title) {
+                  <div>
+                    <div style="font-family:var(--font-serif); font-style:italic; color:var(--fg-1);">« {{ row.title }} »</div>
+                    @if (row.sub) {
+                      <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ row.sub }}</div>
+                    }
+                  </div>
+                } @else {
+                  <span style="color:var(--fg-3); font-style:italic;">Aucun événement</span>
+                }
+              </td>
+              <td style="text-align:center;">
+                <span class="badge"
+                      [style.background]="row.pinnedCount === 2 ? 'var(--success-soft)' : row.pinnedCount === 1 ? 'var(--warning-soft)' : 'var(--bg-sunken)'"
+                      [style.color]="row.pinnedCount === 2 ? 'var(--success)' : row.pinnedCount === 1 ? 'var(--warning)' : 'var(--fg-3)'">
+                  {{ row.pinnedCount }} / 2
+                </span>
+              </td>
+              <td style="color:var(--fg-2); font-size:12.5px;">{{ row.ad }}</td>
+              <td>
+                @if (row.status === 'published') { <span class="badge badge-success badge-dot">Publié</span> }
+                @if (row.status === 'draft')     { <span class="badge badge-warning badge-dot">Brouillon</span> }
+                @if (row.status === 'empty')     { <span class="badge badge-dot">Vide</span> }
+              </td>
+              <td>
+                <button class="btn btn-flat btn-icon btn-sm" type="button">
+                  <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+</div>
+
+<!-- ══ NOUVEAU CALENDRIER MODAL ══ -->
+@if (showNewCalModal()) {
+  <div class="modal-backdrop" (click)="closeNewCalModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Nouveau calendrier</span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeNewCalModal()">
+          <tui-icon icon="@tui.x" style="font-size:18px;" />
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Year -->
+        <div class="field" style="margin-bottom:16px;">
+          <label class="field-label">Année</label>
+          @if (availableYears().length > 0) {
+            <select class="select" [value]="newCalYear()" (change)="newCalYear.set(+$any($event.target).value)">
+              @for (y of availableYears(); track y) {
+                <option [value]="y">{{ y }}</option>
+              }
+            </select>
+          } @else {
+            <p style="font-size:13px; color:var(--fg-3); margin:0;">
+              Toutes les années de la plage disponible ont déjà un calendrier.
+            </p>
+          }
+        </div>
+
+        <!-- Name -->
+        <div class="field" style="margin-bottom:16px;">
+          <label class="field-label">Nom (optionnel)</label>
+          <input class="input" [value]="newCalName()" (input)="newCalName.set($any($event.target).value)"
+                 [placeholder]="'Calendrier ' + newCalYear()" />
+          <span class="field-hint">Laissez vide pour utiliser « Calendrier {{ newCalYear() }} »</span>
+        </div>
+
+        <!-- Status -->
+        <div class="field">
+          <label class="field-label">Statut initial</label>
+          <div class="cal-options-group">
+            <label class="cal-option" [class.cal-option--active]="newCalStatus() === 'draft'">
+              <input type="radio" name="newCalStatus" (change)="newCalStatus.set('draft')" [checked]="newCalStatus() === 'draft'" />
+              <div>
+                <div style="font-size:13px; font-weight:600;">Brouillon</div>
+                <div style="font-size:11.5px; color:var(--fg-3); margin-top:2px;">Visible uniquement par l'équipe éditoriale</div>
+              </div>
+            </label>
+            <label class="cal-option" [class.cal-option--active]="newCalStatus() === 'published'">
+              <input type="radio" name="newCalStatus" (change)="newCalStatus.set('published')" [checked]="newCalStatus() === 'published'" />
+              <div>
+                <div style="font-size:13px; font-weight:600;">Publié</div>
+                <div style="font-size:11.5px; color:var(--fg-3); margin-top:2px;">Accessible sur l'application mobile</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeNewCalModal()">Annuler</button>
+        <button class="btn btn-primary btn-sm" type="button" (click)="createCalendar()"
+                [disabled]="availableYears().length === 0">
+          <tui-icon icon="@tui.calendar-plus" style="font-size:14px;" />
+          Créer le calendrier
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══ DUPLIQUER MODAL ══ -->
+@if (showDupModal()) {
+  <div class="modal-backdrop" (click)="closeDupModal()">
+    <div class="modal modal--wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Dupliquer un calendrier</span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeDupModal()">
+          <tui-icon icon="@tui.x" style="font-size:18px;" />
+        </button>
+      </div>
+
+      @if (dupStatus() === 'done') {
+        <!-- Success -->
+        <div class="modal-body">
+          <div class="invite-success">
+            <tui-icon icon="@tui.circle-check" class="invite-success__icon" />
+            <p class="invite-success__title">Duplication réussie !</p>
+            <p class="invite-success__sub">
+              @if (dupTargetType() === 'new') {
+                Un nouveau calendrier a été créé avec le contenu copié.
+              } @else {
+                Le contenu a été ajouté au calendrier sélectionné.
+              }
+            </p>
+            <button class="btn btn-primary btn-sm" type="button" (click)="goToDupResult()">
+              <tui-icon icon="@tui.calendar" style="font-size:14px;" />
+              Voir le calendrier
+            </button>
+          </div>
+        </div>
+      } @else {
+        <div class="modal-body">
+
+          <!-- Source -->
+          <div class="field" style="margin-bottom:18px;">
+            <label class="field-label">Calendrier source</label>
+            <select class="select" [value]="dupSourceId()" (change)="dupSourceId.set($any($event.target).value)">
+              @for (cal of sortedCalendars(); track cal.id) {
+                <option [value]="cal.id">{{ calLabel(cal) }}</option>
+              }
+            </select>
+            @if (dupSourceCalendar(); as src) {
+              <span class="field-hint">
+                {{ src.eventCount }} événements &middot; {{ src.campaignCount }} campagnes &middot; {{ src.fillPct }}% rempli
+              </span>
+            }
+          </div>
+
+          <!-- What to copy -->
+          <div class="field" style="margin-bottom:18px;">
+            <label class="field-label">Contenu à copier</label>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:4px;">
+              <label class="cal-checkbox-option">
+                <input type="checkbox" [checked]="dupIncludeEvents()"
+                       (change)="dupIncludeEvents.set($any($event.target).checked)" />
+                <span style="flex:1;">Événements historiques</span>
+                @if (dupSourceCalendar(); as src) {
+                  <span class="badge">{{ src.eventCount }}</span>
+                }
+              </label>
+              <label class="cal-checkbox-option">
+                <input type="checkbox" [checked]="dupIncludeCampaigns()"
+                       (change)="dupIncludeCampaigns.set($any($event.target).checked)" />
+                <span style="flex:1;">Campagnes publicitaires</span>
+                @if (dupSourceCalendar(); as src) {
+                  <span class="badge">{{ src.campaignCount }}</span>
+                }
+              </label>
+            </div>
+            @if (!dupIncludeEvents() && !dupIncludeCampaigns()) {
+              <span class="field-hint" style="color:var(--danger);">Sélectionnez au moins un type de contenu.</span>
+            }
+          </div>
+
+          <!-- Destination -->
+          <div class="field">
+            <label class="field-label">Destination</label>
+            <div style="display:flex; flex-direction:column; gap:12px; margin-top:4px;">
+
+              <!-- → Existing -->
+              <label class="cal-option" [class.cal-option--active]="dupTargetType() === 'existing'">
+                <input type="radio" name="dupTarget" (change)="dupTargetType.set('existing')"
+                       [checked]="dupTargetType() === 'existing'" />
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:13px; font-weight:600;">Coller dans un calendrier existant</div>
+                  <div style="font-size:11.5px; color:var(--fg-3); margin-top:2px;">
+                    Les données existantes seront conservées et complétées.
+                  </div>
+                  @if (dupTargetType() === 'existing') {
+                    @if (dupTargetCalendars().length > 0) {
+                      <select class="select" style="margin-top:10px; width:100%;"
+                              [value]="dupTargetId()"
+                              (change)="dupTargetId.set($any($event.target).value)"
+                              (click)="$event.stopPropagation()">
+                        @for (cal of dupTargetCalendars(); track cal.id) {
+                          <option [value]="cal.id">{{ calLabel(cal) }}</option>
+                        }
+                      </select>
+                    } @else {
+                      <div style="margin-top:8px; font-size:12px; color:var(--warning);">
+                        Aucun autre calendrier non-archivé disponible.
+                      </div>
+                    }
+                  }
+                </div>
+              </label>
+
+              <!-- → New -->
+              <label class="cal-option" [class.cal-option--active]="dupTargetType() === 'new'">
+                <input type="radio" name="dupTarget" (change)="dupTargetType.set('new')"
+                       [checked]="dupTargetType() === 'new'" />
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:13px; font-weight:600;">Créer un nouveau calendrier</div>
+                  <div style="font-size:11.5px; color:var(--fg-3); margin-top:2px;">
+                    Un calendrier vide est créé, puis le contenu y est copié.
+                  </div>
+                  @if (dupTargetType() === 'new') {
+                    <div style="display:grid; grid-template-columns:140px 1fr; gap:10px; margin-top:10px;"
+                         (click)="$event.stopPropagation()">
+                      <div class="field" style="margin:0;">
+                        <label class="field-label">Année</label>
+                        @if (availableYears().length > 0) {
+                          <select class="select" [value]="dupNewYear()"
+                                  (change)="dupNewYear.set(+$any($event.target).value)">
+                            @for (y of availableYears(); track y) {
+                              <option [value]="y">{{ y }}</option>
+                            }
+                          </select>
+                        } @else {
+                          <input class="input" type="number" min="2020" max="2040"
+                                 [value]="dupNewYear()" (input)="dupNewYear.set(+$any($event.target).value)" />
+                        }
+                      </div>
+                      <div class="field" style="margin:0;">
+                        <label class="field-label">Nom (optionnel)</label>
+                        <input class="input" [value]="dupNewName()"
+                               (input)="dupNewName.set($any($event.target).value)"
+                               [placeholder]="'Calendrier ' + dupNewYear()" />
+                      </div>
+                    </div>
+                  }
+                </div>
+              </label>
+
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary btn-sm" type="button" (click)="closeDupModal()">Annuler</button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="confirmDuplicate()"
+                  [disabled]="!dupIncludeEvents() && !dupIncludeCampaigns()">
+            <tui-icon icon="@tui.copy" style="font-size:14px;" />
+            Dupliquer
+          </button>
+        </div>
+      }
+
+    </div>
+  </div>
+}

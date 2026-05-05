@@ -5,7 +5,21 @@
       "Bash(git -C '/c/Users/Elvis Destin O/Desktop/OPEN-TECH/Projets/Projet-05-Day-After-Day/dad-cms' log --oneline)",
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Supabase__list_tables",
-      "mcp__claude_ai_Supabase__execute_sql"
+      "mcp__claude_ai_Supabase__execute_sql",
+      "WebFetch(domain:supabase.com)",
+      "Bash(bun run *)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(ng build *)",
+      "mcp__claude_ai_Supabase__deploy_edge_function",
+      "Bash(ng test *)",
+      "mcp__claude_ai_Supabase__get_publishable_keys",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(npx jest *)",
+      "Bash(awk -F\"|\" '$3+0 < 70 && $3 !~ /Branch/ && $3+0 > 0 {print}')",
+      "Bash(sort -t\"|\" -k3 -n)",
+      "Bash(npx ng *)",
+      "Bash(xargs grep *)"
     ]
   },
   "enabledPlugins": {

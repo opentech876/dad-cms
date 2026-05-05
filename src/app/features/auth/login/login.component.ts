@@ -1,30 +1,43 @@
-import { Component } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, inject } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { SupabaseService } from '../../../core/supabase/supabase.service';
 
 @Component({
   selector: 'app-login',
+  standalone: true,
   imports: [ReactiveFormsModule],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
 export class LoginComponent {
-  form;
+  private router = inject(Router);
+  private supabase = inject(SupabaseService);
+
+  form = new FormGroup({
+    email: new FormControl('', [Validators.required, Validators.email]),
+  });
+
   loading = false;
   errorMessage = '';
 
-  constructor(
-    private fb: FormBuilder,
-    private router: Router,
-  ) {
-    this.form = this.fb.group({
-      email: ['', [Validators.required, Validators.email]],
-    });
-  }
-
-  submit() {
+  async submit(): Promise<void> {
     if (this.form.invalid || this.loading) return;
-    const { email } = this.form.value;
+    this.loading = true;
+    this.errorMessage = '';
+
+    const email = this.form.value.email!;
+    const { error } = await this.supabase.sendOtp(email, false);
+
+    if (error) {
+      const msg = (error.message ?? '').toLowerCase();
+      this.errorMessage = msg.includes('rate') || msg.includes('security purposes') || msg.includes('limit')
+        ? 'Trop de tentatives. Veuillez patienter quelques minutes avant de réessayer.'
+        : "Cette adresse e-mail n'a pas été invitée. Contactez votre administrateur.";
+      this.loading = false;
+      return;
+    }
+
     this.router.navigate(['/verifier'], { queryParams: { email, from: 'login' } });
   }
 }
