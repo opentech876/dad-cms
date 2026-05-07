@@ -4,6 +4,8 @@ import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { CalendarService, CalendarSummary } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
+import { CampaignService } from '../../core/campaigns/campaign.service';
+import { AdCampaign } from '../../models';
 
 type CalendarView = 'year' | 'month' | 'list';
 export type CalendarFilter = 'all' | 'full' | 'partial' | 'empty' | 'has_campaign';
@@ -96,6 +98,7 @@ export class CalendarComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly calendarService = inject(CalendarService);
   private readonly calendarEntryService = inject(CalendarEntryService);
+  private readonly campaignService = inject(CampaignService);
 
   readonly monthsFr      = MONTHS_FR;
   readonly monthsFrCap   = MONTHS_FR_CAP;
@@ -165,6 +168,31 @@ export class CalendarComponent implements OnInit {
     this.loading.set(false);
   }
 
+  // ── Campaigns ─────────────────────────────────────
+  readonly activeCampaigns = signal<AdCampaign[]>([]);
+
+  /** Maps each MM-DD (for the selected year) to the first active campaign name covering it. */
+  readonly campaignByMmdd = computed<Map<string, string>>(() => {
+    const year = this.selectedYear();
+    const map = new Map<string, string>();
+    for (const c of this.activeCampaigns()) {
+      if (!c.active) continue;
+      for (let month = 0; month < 12; month++) {
+        const dim = daysInMonth(year, month);
+        for (let d = 1; d <= dim; d++) {
+          const mmdd = `${pad2(month + 1)}-${pad2(d)}`;
+          if (!map.has(mmdd)) {
+            const fullDate = `${year}-${mmdd}`;
+            if (c.start_date <= fullDate && c.end_date >= fullDate) {
+              map.set(mmdd, c.name);
+            }
+          }
+        }
+      }
+    }
+    return map;
+  });
+
   // ── Calendar entries (assignments) ───────────────
   readonly entries = signal<CalendarEntryWithEvent[]>([]);
 
@@ -194,6 +222,7 @@ export class CalendarComponent implements OnInit {
     this.selectedDay.set(null);
     this.currentPage.set(0);
     this.calendarEntryService.getEntriesForCalendar(id).subscribe(entries => this.entries.set(entries));
+    this.campaignService.listCampaigns().subscribe(campaigns => this.activeCampaigns.set(campaigns));
   }
 
   prevCalendar(): void {
@@ -359,6 +388,7 @@ export class CalendarComponent implements OnInit {
   readonly monthCells = computed<DayCell[]>(() => {
     const year = this.selectedYear(), month = this.selectedMonth();
     const byMmdd = this.entriesByMmdd();
+    const campByMmdd = this.campaignByMmdd();
     const dim = daysInMonth(year, month), offset = dowMondayFirst(year, month, 1);
     return Array.from({ length: 42 }, (_, i) => {
       const d = i - offset + 1;
@@ -369,7 +399,7 @@ export class CalendarComponent implements OnInit {
       const pos1 = dayEntries.find(e => e.position === 1);
       const pos2 = dayEntries.find(e => e.position === 2);
       const pinnedCount = ((pos1 ? 1 : 0) + (pos2 ? 1 : 0)) as 0 | 1 | 2;
-      return { d, isToday, totalEvents: dayEntries.length, pinnedCount, title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null, ad: false };
+      return { d, isToday, totalEvents: dayEntries.length, pinnedCount, title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null, ad: campByMmdd.has(mmdd) };
     });
   });
 
@@ -393,6 +423,7 @@ export class CalendarComponent implements OnInit {
   readonly listRows = computed<DateRow[]>(() => {
     const year = this.selectedYear();
     const byMmdd = this.entriesByMmdd();
+    const campByMmdd = this.campaignByMmdd();
     const rows: DateRow[] = [];
     for (let month = 0; month < 12; month++) {
       const dim = daysInMonth(year, month);
@@ -411,7 +442,7 @@ export class CalendarComponent implements OnInit {
           pinnedCount,
           title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null,
           sub: dayEntries.length > 1 ? `+ ${dayEntries[dayEntries.length - 1].event.title}` : null,
-          ad: '—',
+          ad: campByMmdd.get(mmdd) ?? '—',
           status: dayEntries.length === 0 ? 'empty' : pinnedCount > 0 ? 'published' : 'draft',
         });
       }
@@ -423,10 +454,11 @@ export class CalendarComponent implements OnInit {
     const filter = this.activeFilter();
     const rows = this.listRows();
     switch (filter) {
-      case 'full':    return rows.filter(r => r.pinnedCount === 2);
-      case 'partial': return rows.filter(r => r.pinnedCount === 1);
-      case 'empty':   return rows.filter(r => r.totalEvents === 0);
-      default:        return rows;
+      case 'full':         return rows.filter(r => r.pinnedCount === 2);
+      case 'partial':      return rows.filter(r => r.pinnedCount === 1);
+      case 'empty':        return rows.filter(r => r.totalEvents === 0);
+      case 'has_campaign': return rows.filter(r => r.ad !== '—');
+      default:             return rows;
     }
   });
 

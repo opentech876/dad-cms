@@ -6,7 +6,8 @@ import { firstValueFrom } from 'rxjs';
 import { EventService } from '../../../core/events/event.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../../core/calendar/calendar-entry.service';
-import { Event, EventPosition } from '../../../models';
+import { CampaignService } from '../../../core/campaigns/campaign.service';
+import { AdCampaign, Event, EventPosition } from '../../../models';
 
 const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 
@@ -21,6 +22,7 @@ export class DayDetailComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly eventService = inject(EventService);
   private readonly calendarEntryService = inject(CalendarEntryService);
+  private readonly campaignService = inject(CampaignService);
   private readonly toast = inject(ToastService);
 
   calendarId = '';
@@ -40,6 +42,17 @@ export class DayDetailComponent implements OnInit {
 
   readonly saveLoading = signal(false);
 
+  /** Active campaigns whose date range covers this calendar date. */
+  readonly availableCampaigns = signal<AdCampaign[]>([]);
+
+  /** Campaign ID currently assigned to this date (null = none). */
+  readonly assignedCampaignId = signal<string | null>(null);
+
+  /** DB id of the existing campaign_assignment row (needed for deletion). */
+  readonly assignmentId = signal<string | null>(null);
+
+  readonly campaignSaving = signal(false);
+
   readonly event1 = computed(() => this.libraryEvents().find(e => e.id === this.selectedPos1()) ?? null);
   readonly event2 = computed(() => this.libraryEvents().find(e => e.id === this.selectedPos2()) ?? null);
 
@@ -57,18 +70,27 @@ export class DayDetailComponent implements OnInit {
     this.date       = this.route.snapshot.paramMap.get('date') ?? '';
     this.mmdd       = this.date.slice(5); // 'MM-DD'
 
-    const [libEvents, allEntries] = await Promise.all([
+    const [libEvents, allEntries, allCampaigns, assignments] = await Promise.all([
       firstValueFrom(this.eventService.listEventsByMmdd(this.mmdd)),
       firstValueFrom(this.calendarEntryService.getEntriesForCalendar(this.calendarId)),
+      firstValueFrom(this.campaignService.listCampaigns()),
+      firstValueFrom(this.campaignService.listCampaignAssignments(this.calendarId)),
     ]);
 
     this.libraryEvents.set(libEvents);
 
     const dayEntries = allEntries.filter(e => e.mmdd === this.mmdd);
     this.entries.set(dayEntries);
-
     this.selectedPos1.set(dayEntries.find(e => e.position === 1)?.event_id ?? null);
     this.selectedPos2.set(dayEntries.find(e => e.position === 2)?.event_id ?? null);
+
+    this.availableCampaigns.set(
+      allCampaigns.filter(c => c.active && c.start_date <= this.date && c.end_date >= this.date),
+    );
+
+    const todayAssignment = assignments.find(a => a.event_date === this.date);
+    this.assignedCampaignId.set(todayAssignment?.campaign_id ?? null);
+    this.assignmentId.set(todayAssignment?.id ?? null);
   }
 
   assign(eventId: string | null, position: EventPosition): void {
@@ -104,6 +126,44 @@ export class DayDetailComponent implements OnInit {
     } else {
       this.toast.success('Affectations sauvegardées.');
     }
+  }
+
+  async assignCampaign(campaignId: string | null): Promise<void> {
+    if (this.campaignSaving()) return;
+    this.campaignSaving.set(true);
+
+    const existingAssignmentId = this.assignmentId();
+
+    if (existingAssignmentId) {
+      const res = await firstValueFrom(this.campaignService.deleteCampaignAssignment(existingAssignmentId));
+      if (!res.success) {
+        this.toast.error(res.error ?? 'Erreur lors du retrait de la campagne.');
+        this.campaignSaving.set(false);
+        return;
+      }
+      this.assignmentId.set(null);
+      this.assignedCampaignId.set(null);
+    }
+
+    if (campaignId) {
+      const res = await firstValueFrom(this.campaignService.createCampaignAssignment({
+        campaign_id: campaignId,
+        calendar_id: this.calendarId,
+        event_date: this.date,
+      }));
+      if (!res.success) {
+        this.toast.error(res.error ?? 'Erreur lors de l\'assignation de la campagne.');
+        this.campaignSaving.set(false);
+        return;
+      }
+      this.assignmentId.set(res.id ?? null);
+      this.assignedCampaignId.set(campaignId);
+      this.toast.success('Campagne assignée.');
+    } else if (existingAssignmentId) {
+      this.toast.success('Campagne retirée.');
+    }
+
+    this.campaignSaving.set(false);
   }
 
   goBack(): void {

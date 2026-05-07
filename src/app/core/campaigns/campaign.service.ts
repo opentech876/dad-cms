@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, from } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { AdCampaign, CreateCampaignDto } from '../../models';
+import { AdCampaign, CampaignAssignment, CreateCampaignDto } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
 import { WorkspaceContextService } from '../workspace/workspace-context.service';
 
@@ -104,5 +104,55 @@ export class CampaignService {
     return this.supabase.client.storage
       .from('ads-banners')
       .getPublicUrl(storagePath).data.publicUrl;
+  }
+
+  listCampaignAssignments(calendarId: string): Observable<CampaignAssignment[]> {
+    return from(
+      this.supabase.client
+        .from('campaign_assignments')
+        .select('*')
+        .eq('calendar_id', calendarId)
+        .order('event_date', { ascending: true }),
+    ).pipe(
+      map(({ data, error }: any) => (error || !data ? [] : (data as CampaignAssignment[]))),
+    );
+  }
+
+  createCampaignAssignment(dto: {
+    campaign_id: string;
+    calendar_id: string;
+    event_date: string;
+  }): Observable<{ success: boolean; id?: string; error?: string }> {
+    return from(
+      this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
+        this.supabase.client
+          .from('campaign_assignments')
+          .insert({
+            campaign_id: dto.campaign_id,
+            calendar_id: dto.calendar_id,
+            event_date: dto.event_date,
+            created_by: user?.id ?? null,
+          })
+          .select('id')
+          .single(),
+      ) as Promise<{ data: { id: string } | null; error: any }>,
+    ).pipe(
+      map(({ data, error }) =>
+        error ? { success: false, error: error.message } : { success: true, id: data?.id },
+      ),
+    );
+  }
+
+  deleteCampaignAssignment(id: string): Observable<{ success: boolean; error?: string }> {
+    return from(
+      this.supabase.client
+        .from('campaign_assignments')
+        .delete()
+        .eq('id', id),
+    ).pipe(
+      map(({ error }: any) =>
+        error ? { success: false, error: error.message } : { success: true },
+      ),
+    );
   }
 }

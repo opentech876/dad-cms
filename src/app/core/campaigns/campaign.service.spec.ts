@@ -11,6 +11,7 @@ describe('CampaignService', () => {
 
   let insertSpy: jest.Mock;
   let updateSpy: jest.Mock;
+  let deleteSpy: jest.Mock;
   let eqCalls: Array<[string, unknown]>;
 
   const fakeCampaigns = [
@@ -242,6 +243,125 @@ describe('CampaignService', () => {
     it('retourne l\'URL publique depuis le bucket ads-banners', () => {
       const url = service.getBannerUrl('camp-1/banner.jpg');
       expect(url).toBe('https://example.com/banner.jpg');
+    });
+  });
+
+  // ── campaign_assignments helpers ────────────────────────────────────────────
+
+  const fakeAssignments = [
+    { id: 'a1', campaign_id: 'c1', calendar_id: 'cal-1', event_date: '2026-08-15', created_by: 'u1', created_at: '2026-01-01T00:00:00Z' },
+  ];
+
+  function buildAssignmentClient(options: { assignments?: any[]; simulateError?: string } = {}) {
+    const { assignments = fakeAssignments, simulateError } = options;
+    eqCalls = [];
+    const err = simulateError ? { message: simulateError } : null;
+
+    function makeQuery(data: any): any {
+      const q: any = {
+        then: (fn: any) => Promise.resolve({ data, error: err }).then(fn),
+        select: () => makeQuery(data),
+        eq: (col: string, val: unknown) => { eqCalls.push([col, val]); return makeQuery(data); },
+        is: () => makeQuery(data),
+        order: () => makeQuery(data),
+        single: () =>
+          Promise.resolve({
+            data: err ? null : (Array.isArray(data) ? data[0] ?? null : data),
+            error: err,
+          }),
+      };
+      return q;
+    }
+
+    insertSpy = jest.fn().mockImplementation(() => makeQuery([{ id: 'assign-new' }]));
+    deleteSpy = jest.fn().mockImplementation(() => ({
+      eq: (col: string, val: unknown) => {
+        eqCalls.push([col, val]);
+        return Promise.resolve({ error: err });
+      },
+    }));
+
+    return {
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+      from: (table: string) => {
+        if (table === 'campaign_assignments') {
+          return { select: () => makeQuery(assignments), insert: insertSpy, delete: deleteSpy };
+        }
+        return makeQuery([]);
+      },
+      storage: { from: () => ({ upload: jest.fn(), getPublicUrl: jest.fn().mockReturnValue({ data: { publicUrl: '' } }) }) },
+    };
+  }
+
+  // ── listCampaignAssignments() ───────────────────────────────────────────────
+
+  describe('listCampaignAssignments()', () => {
+    beforeEach(() => { mockSupabase.client = buildAssignmentClient(); });
+
+    it('retourne les assignments pour le calendrier donné', async () => {
+      const result = await firstValueFrom(service.listCampaignAssignments('cal-1'));
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe('a1');
+    });
+
+    it('filtre par calendar_id', async () => {
+      await firstValueFrom(service.listCampaignAssignments('cal-1'));
+      expect(eqCalls).toContainEqual(['calendar_id', 'cal-1']);
+    });
+
+    it("retourne [] en cas d'erreur DB", async () => {
+      mockSupabase.client = buildAssignmentClient({ simulateError: 'DB error' });
+      const result = await firstValueFrom(service.listCampaignAssignments('cal-1'));
+      expect(result).toEqual([]);
+    });
+  });
+
+  // ── createCampaignAssignment() ──────────────────────────────────────────────
+
+  describe('createCampaignAssignment()', () => {
+    beforeEach(() => { mockSupabase.client = buildAssignmentClient(); });
+
+    it('insère avec created_by dans le payload', async () => {
+      await firstValueFrom(service.createCampaignAssignment({ campaign_id: 'c1', calendar_id: 'cal-1', event_date: '2026-08-15' }));
+      expect(insertSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ created_by: 'user-1', campaign_id: 'c1', calendar_id: 'cal-1', event_date: '2026-08-15' }),
+      );
+    });
+
+    it("retourne success: true avec l'id inséré", async () => {
+      const result = await firstValueFrom(service.createCampaignAssignment({ campaign_id: 'c1', calendar_id: 'cal-1', event_date: '2026-08-15' }));
+      expect(result.success).toBe(true);
+      expect(result.id).toBe('assign-new');
+    });
+
+    it("retourne success: false en cas d'erreur", async () => {
+      mockSupabase.client = buildAssignmentClient({ simulateError: 'Conflit' });
+      const result = await firstValueFrom(service.createCampaignAssignment({ campaign_id: 'c1', calendar_id: 'cal-1', event_date: '2026-08-15' }));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Conflit');
+    });
+  });
+
+  // ── deleteCampaignAssignment() ──────────────────────────────────────────────
+
+  describe('deleteCampaignAssignment()', () => {
+    beforeEach(() => { mockSupabase.client = buildAssignmentClient(); });
+
+    it('hard-delete par id', async () => {
+      await firstValueFrom(service.deleteCampaignAssignment('a1'));
+      expect(eqCalls).toContainEqual(['id', 'a1']);
+    });
+
+    it('retourne success: true quand la suppression réussit', async () => {
+      const result = await firstValueFrom(service.deleteCampaignAssignment('a1'));
+      expect(result.success).toBe(true);
+    });
+
+    it("retourne success: false en cas d'erreur", async () => {
+      mockSupabase.client = buildAssignmentClient({ simulateError: 'Interdit' });
+      const result = await firstValueFrom(service.deleteCampaignAssignment('a1'));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Interdit');
     });
   });
 });

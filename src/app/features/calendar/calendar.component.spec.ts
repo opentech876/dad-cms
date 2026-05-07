@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { CalendarComponent } from './calendar.component';
 import { CalendarService } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
+import { CampaignService } from '../../core/campaigns/campaign.service';
 
 const fakeCalendars = [
   { id: 'cal-1', year: 2024, name: 'Calendrier 2024', status: 'archived'  as const, createdBy: null, publishedAt: null, eventCount: 412, campaignCount: 8,  fillPct: 56 },
@@ -41,6 +42,7 @@ describe('CalendarComponent', () => {
     deleteCalendar: jest.Mock;
   };
   let mockCalendarEntryService: { getEntriesForCalendar: jest.Mock };
+  let mockCampaignService: { listCampaigns: jest.Mock };
 
   beforeEach(async () => {
     mockCalendarService = {
@@ -54,12 +56,17 @@ describe('CalendarComponent', () => {
       getEntriesForCalendar: jest.fn().mockReturnValue(of([])),
     };
 
+    mockCampaignService = {
+      listCampaigns: jest.fn().mockReturnValue(of([])),
+    };
+
     TestBed.configureTestingModule({
       imports: [CalendarComponent],
       providers: [
         { provide: Router, useValue: { navigate: jest.fn() } },
         { provide: CalendarService, useValue: mockCalendarService },
         { provide: CalendarEntryService, useValue: mockCalendarEntryService },
+        { provide: CampaignService, useValue: mockCampaignService },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     });

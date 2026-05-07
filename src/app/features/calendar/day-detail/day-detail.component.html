@@ -59,6 +59,38 @@
       </div>
     </div>
 
+    <!-- ── Campagne publicitaire ── -->
+    <div class="campaign-slot">
+      <h2 style="font-size:14px; font-weight:600; color:var(--fg-2); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+        <tui-icon icon="@tui.megaphone" style="font-size:16px; color:var(--fg-3);" />
+        Campagne publicitaire
+      </h2>
+
+      @if (availableCampaigns().length === 0) {
+        <div style="font-size:13px; color:var(--fg-3); font-style:italic;">
+          Aucune campagne active ne couvre cette date.
+        </div>
+      } @else {
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <select class="select" style="min-width:220px;"
+                  [value]="assignedCampaignId() ?? ''"
+                  [disabled]="campaignSaving()"
+                  (change)="assignCampaign($any($event.target).value || null)">
+            <option value="">— Aucune campagne —</option>
+            @for (c of availableCampaigns(); track c.id) {
+              <option [value]="c.id">{{ c.name }} ({{ c.advertiser }})</option>
+            }
+          </select>
+          @if (campaignSaving()) {
+            <span class="spinner"></span>
+          }
+          @if (assignedCampaignId()) {
+            <span class="badge badge-success badge-dot" style="font-size:11px;">Assignée</span>
+          }
+        </div>
+      }
+    </div>
+
     <!-- ── Library pool ── -->
     <div class="event-pool">
       <h2 style="font-size:14px; font-weight:600; color:var(--fg-2); margin-bottom:12px;">

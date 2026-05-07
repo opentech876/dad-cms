@@ -315,7 +315,7 @@
                 <td>
                   <div style="display:flex; align-items:center; gap:12px;">
                     @if (row.imagePath) {
-                      <img [src]="campaignService.getBannerUrl(row.imagePath)" alt=""
+                      <img [src]="campaignService.getBannerUrl(row.imagePath!)" alt=""
                            style="width:48px; height:28px; object-fit:cover; border-radius:4px; flex:none;" />
                     } @else {
                       <div style="width:48px; height:28px; border-radius:4px; background:var(--bg-sunken); display:flex; align-items:center; justify-content:center; flex:none;">

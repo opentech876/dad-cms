@@ -16,7 +16,7 @@ interface CampaignRow {
   startDate: string;
   endDate: string;
   status: CampaignStatus;
-  imagePath: string;
+  imagePath: string | null;
 }
 
 function campaignStatus(c: AdCampaign): CampaignStatus {
@@ -105,7 +105,7 @@ export class AdCampaignsComponent implements OnInit {
         startDate: c.start_date,
         endDate: c.end_date,
         status: campaignStatus(c),
-        imagePath: c.image_path,
+        imagePath: c.image_path || null,
       }));
   });
 
