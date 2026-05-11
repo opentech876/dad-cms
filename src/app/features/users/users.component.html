@@ -76,7 +76,7 @@
               <th>Rôle</th>
               <th>Statut</th>
               <th>Rejoint le</th>
-              <th style="width:60px;"></th>
+              <th style="width:100px;"></th>
             </tr>
           </thead>
           <tbody>
@@ -113,23 +113,32 @@
                   }
                 </td>
                 <td style="font-size:13px; color:var(--fg-2);">{{ user.joinedAt | date: 'd MMM yyyy' : '' : 'fr' }}</td>
-                <td style="position:relative;">
+                <td>
                   @if (user.role !== 'owner') {
-                    <button class="btn btn-flat btn-icon btn-sm" title="Options" type="button"
-                            (click)="activeMenuUserId() === user.userId ? closeActionsMenu() : openActionsMenu(user.userId)">
-                      <tui-icon icon="@tui.ellipsis" style="font-size:16px;" />
-                    </button>
-                    @if (activeMenuUserId() === user.userId) {
-                      <div class="actions-dropdown" (click)="$event.stopPropagation()">
-                        @if (user.banned) {
-                          <button class="actions-dropdown__item" type="button" (click)="handleAction(user.userId, 'unblock'); closeActionsMenu()">Débloquer</button>
-                        } @else {
-                          <button class="actions-dropdown__item" type="button" (click)="handleAction(user.userId, 'block'); closeActionsMenu()">Bloquer</button>
-                        }
-                        <button class="actions-dropdown__item actions-dropdown__item--danger" type="button"
-                                (click)="handleAction(user.userId, 'remove'); closeActionsMenu()">Retirer du workspace</button>
-                      </div>
-                    }
+                    <div style="display:flex; gap:2px; align-items:center;">
+                      <button class="btn btn-flat btn-icon btn-sm" title="Changer le rôle" type="button"
+                              (click)="openRoleModal(user.userId)">
+                        <tui-icon icon="@tui.shield" style="font-size:14px;" />
+                      </button>
+                      @if (user.banned) {
+                        <button class="btn btn-flat btn-icon btn-sm" title="Débloquer l'accès" type="button"
+                                style="color:var(--success);"
+                                (click)="openConfirmModal(user.userId, 'unblock')">
+                          <tui-icon icon="@tui.lock-open" style="font-size:14px;" />
+                        </button>
+                      } @else {
+                        <button class="btn btn-flat btn-icon btn-sm" title="Bloquer l'accès" type="button"
+                                style="color:var(--warning);"
+                                (click)="openConfirmModal(user.userId, 'block')">
+                          <tui-icon icon="@tui.ban" style="font-size:14px;" />
+                        </button>
+                      }
+                      <button class="btn btn-flat btn-icon btn-sm" title="Retirer du workspace" type="button"
+                              style="color:var(--error);"
+                              (click)="openConfirmModal(user.userId, 'remove')">
+                        <tui-icon icon="@tui.user-x" style="font-size:14px;" />
+                      </button>
+                    </div>
                   }
                 </td>
               </tr>
@@ -180,6 +189,111 @@
   </div>
 
 </div>
+
+<!-- Role change modal -->
+@if (showRoleModal()) {
+  <div class="modal-backdrop" (click)="closeRoleModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Changer le rôle</span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeRoleModal()">
+          <tui-icon icon="@tui.x" style="font-size:18px;" />
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:var(--fg-2); margin-bottom:16px;">
+          Sélectionnez le nouveau rôle à attribuer à ce membre.
+        </p>
+        <div class="field">
+          <label class="field-label">Nouveau rôle</label>
+          <select class="select" [value]="roleModalTargetRole()"
+                  (change)="roleModalTargetRole.set($any($event.target).value)">
+            <option value="chef_equipe">Chef d'équipe</option>
+            <option value="editeur">Éditeur</option>
+            <option value="charge_communication">Chargé de communication</option>
+          </select>
+          <span class="field-hint">
+            @if (roleModalTargetRole() === 'chef_equipe') { Accès complet sauf gestion des utilisateurs. }
+            @if (roleModalTargetRole() === 'editeur') { Calendriers et événements historiques uniquement. }
+            @if (roleModalTargetRole() === 'charge_communication') { Campagnes publicitaires et tableaux de bord. }
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeRoleModal()">Annuler</button>
+        <button class="btn btn-primary btn-sm" type="button" (click)="submitRoleChange()">
+          <tui-icon icon="@tui.check" style="font-size:13px;" />
+          Confirmer
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Confirm action modal -->
+@if (showConfirmModal()) {
+  <div class="modal-backdrop" (click)="closeConfirmModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        @if (confirmModalAction() === 'block') {
+          <span class="modal-title" style="color:var(--warning);">Bloquer l'accès</span>
+        }
+        @if (confirmModalAction() === 'unblock') {
+          <span class="modal-title" style="color:var(--success);">Débloquer l'accès</span>
+        }
+        @if (confirmModalAction() === 'remove') {
+          <span class="modal-title" style="color:var(--error);">Retirer du workspace</span>
+        }
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeConfirmModal()">
+          <tui-icon icon="@tui.x" style="font-size:18px;" />
+        </button>
+      </div>
+      <div class="modal-body">
+        @if (confirmModalUser(); as u) {
+          <p style="font-size:13.5px; color:var(--fg-1); margin-bottom:12px;">
+            <strong>{{ u.fullName ?? u.email }}</strong>
+          </p>
+        }
+        @if (confirmModalAction() === 'block') {
+          <p style="font-size:13px; color:var(--fg-2);">
+            Cet utilisateur ne pourra plus se connecter à l'application. Vous pouvez débloquer son accès à tout moment.
+          </p>
+        }
+        @if (confirmModalAction() === 'unblock') {
+          <p style="font-size:13px; color:var(--fg-2);">
+            Cet utilisateur pourra à nouveau se connecter avec son adresse e-mail habituelle.
+          </p>
+        }
+        @if (confirmModalAction() === 'remove') {
+          <p style="font-size:13px; color:var(--fg-2);">
+            Ce membre perdra tout accès à cet espace de travail. Cette action est irréversible.
+          </p>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeConfirmModal()">Annuler</button>
+        @if (confirmModalAction() === 'block') {
+          <button class="btn btn-sm" style="background:var(--warning); color:#fff;" type="button" (click)="confirmAction()">
+            <tui-icon icon="@tui.ban" style="font-size:13px;" />
+            Bloquer
+          </button>
+        }
+        @if (confirmModalAction() === 'unblock') {
+          <button class="btn btn-success btn-sm" type="button" (click)="confirmAction()">
+            <tui-icon icon="@tui.lock-open" style="font-size:13px;" />
+            Débloquer
+          </button>
+        }
+        @if (confirmModalAction() === 'remove') {
+          <button class="btn btn-danger btn-sm" type="button" (click)="confirmAction()">
+            <tui-icon icon="@tui.user-x" style="font-size:13px;" />
+            Retirer définitivement
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
 
 <!-- Invite modal -->
 @if (showInviteModal()) {

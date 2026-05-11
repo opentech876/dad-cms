@@ -19,10 +19,14 @@ describe('OtpStepComponent', () => {
   let navigateSpy: jest.Mock;
   let verifyOtpSpy: jest.Mock;
   let sendOtpSpy: jest.Mock;
+  let hasWorkspaceRoleSpy: jest.Mock;
+  let signOutSpy: jest.Mock;
 
   beforeEach(async () => {
     verifyOtpSpy = jest.fn().mockResolvedValue({ error: null });
     sendOtpSpy = jest.fn().mockResolvedValue({ error: null });
+    hasWorkspaceRoleSpy = jest.fn().mockResolvedValue(true);
+    signOutSpy = jest.fn().mockResolvedValue({});
 
     await TestBed.configureTestingModule({
       imports: [OtpStepComponent],
@@ -32,7 +36,7 @@ describe('OtpStepComponent', () => {
         { provide: ActivatedRoute, useValue: MOCK_ROUTE },
         {
           provide: SupabaseService,
-          useValue: { verifyOtp: verifyOtpSpy, sendOtp: sendOtpSpy },
+          useValue: { verifyOtp: verifyOtpSpy, sendOtp: sendOtpSpy, hasWorkspaceRole: hasWorkspaceRoleSpy, signOut: signOutSpy },
         },
       ],
     }).compileComponents();
@@ -116,6 +120,35 @@ describe('OtpStepComponent', () => {
       paste('123456');
       await fixture.whenStable();
       expect(verifyOtpSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── verify() — compte banni ──────────────────────────────────────────────
+
+  describe('verify() — compte banni', () => {
+    function paste(code: string): void {
+      const event = {
+        preventDefault: jest.fn(),
+        clipboardData: { getData: () => code },
+      } as unknown as ClipboardEvent;
+      component.onPaste(event);
+    }
+
+    it('affiche un message de suspension quand Supabase retourne "User is banned"', async () => {
+      verifyOtpSpy.mockResolvedValueOnce({ error: { message: 'User is banned' } });
+      paste('123456');
+      await fixture.whenStable();
+      expect(component.errorMessage()).toContain('suspendu');
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+
+    it('déconnecte et affiche un message si l\'utilisateur n\'a plus de rôle', async () => {
+      hasWorkspaceRoleSpy.mockResolvedValueOnce(false);
+      paste('123456');
+      await fixture.whenStable();
+      expect(signOutSpy).toHaveBeenCalled();
+      expect(component.errorMessage()).toContain('révoqué');
+      expect(navigateSpy).not.toHaveBeenCalled();
     });
   });
 

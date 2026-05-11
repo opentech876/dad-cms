@@ -338,6 +338,11 @@
         <option value="draft">Brouillons</option>
       </select>
       <div style="flex:1;"></div>
+      <button class="btn btn-flat btn-sm" type="button" (click)="openImportModal()"
+              title="Importer depuis un fichier Excel">
+        <tui-icon icon="@tui.upload" style="font-size:14px;" />
+        Importer Excel
+      </button>
       <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
         <tui-icon icon="@tui.plus" style="font-size:14px;" />
         Nouvel événement
@@ -415,4 +420,164 @@
 
   </div>
 
+}
+
+<!-- ══ EXCEL IMPORT MODAL ══ -->
+@if (showImportModal()) {
+  <div class="modal-backdrop" (click)="importStatus() !== 'importing' && closeImportModal()">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()" style="max-height:90vh; display:flex; flex-direction:column;">
+
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Importer depuis Excel</div>
+          <div class="card-subtitle" style="margin-top:4px;">
+            Format attendu : colonnes Date (JJ/MM/AAAA), Événement, Source
+          </div>
+        </div>
+        @if (importStatus() !== 'importing') {
+          <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeImportModal()">
+            <tui-icon icon="@tui.x" style="font-size:16px;" />
+          </button>
+        }
+      </div>
+
+      <div class="modal-body" style="overflow-y:auto; flex:1;">
+
+        <!-- IDLE: file picker -->
+        @if (importStatus() === 'idle') {
+          <div style="display:flex; flex-direction:column; align-items:center; gap:16px; padding:24px 0;">
+            <div class="empty-icon" style="width:64px; height:64px; font-size:28px;">
+              <tui-icon icon="@tui.file-spreadsheet" style="font-size:28px;" />
+            </div>
+            <div style="text-align:center;">
+              <div style="font-weight:600; color:var(--fg-1); margin-bottom:4px;">Sélectionner un fichier Excel</div>
+              <div style="font-size:12px; color:var(--fg-3);">Formats acceptés : .xlsx, .xlsm — feuille « Tableau_evenements »</div>
+            </div>
+            <label class="btn btn-primary" style="cursor:pointer;">
+              <tui-icon icon="@tui.upload" style="font-size:14px;" />
+              Parcourir…
+              <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none;"
+                     (change)="onImportFileChange($event)" />
+            </label>
+            @if (importError()) {
+              <div style="color:var(--danger); font-size:13px; text-align:center;">{{ importError() }}</div>
+            }
+          </div>
+        }
+
+        <!-- PREVIEW: show first 5 rows + summary -->
+        @if (importStatus() === 'preview') {
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--success-soft); border-radius:var(--r-md); border:1px solid var(--success);">
+              <tui-icon icon="@tui.check-circle" style="font-size:18px; color:var(--success);" />
+              <div>
+                <div style="font-weight:600; color:var(--success); font-size:13px;">
+                  {{ importPreview().length }} événement(s) prêts à être importés
+                </div>
+                @if (importSkipped()) {
+                  <div style="font-size:12px; color:var(--fg-3);">{{ importSkipped() }} ligne(s) ignorée(s) (date invalide ou vide)</div>
+                }
+              </div>
+            </div>
+
+            <!-- Preview table — first 5 rows -->
+            <div>
+              <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--fg-3); margin-bottom:8px;">
+                Aperçu (5 premières lignes)
+              </div>
+              <div class="table-wrap">
+                <table class="table" style="font-size:12px;">
+                  <thead>
+                    <tr>
+                      <th style="width:100px;">Date</th>
+                      <th>Titre généré</th>
+                      <th style="width:140px;">Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of importPreview().slice(0, 5); track row.date + row.title) {
+                      <tr>
+                        <td style="font-family:var(--font-mono); color:var(--fg-2);">{{ row.rawDate }}</td>
+                        <td style="color:var(--fg-1);">{{ row.title }}</td>
+                        <td style="color:var(--fg-3); font-size:11px;">{{ row.source || '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              @if (importPreview().length > 5) {
+                <div style="font-size:12px; color:var(--fg-3); margin-top:6px; text-align:center;">
+                  … et {{ importPreview().length - 5 }} autre(s) ligne(s)
+                </div>
+              }
+            </div>
+
+            <!-- Re-pick file -->
+            <label style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--fg-3);">
+              <tui-icon icon="@tui.refresh-cw" style="font-size:13px;" />
+              Choisir un autre fichier
+              <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none;"
+                     (change)="onImportFileChange($event)" />
+            </label>
+          </div>
+        }
+
+        <!-- IMPORTING: progress -->
+        @if (importStatus() === 'importing') {
+          <div style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:32px 0;">
+            <div class="spinner" style="width:32px; height:32px; border-width:3px; border-color:rgba(0,0,0,0.1); border-top-color:var(--accent);"></div>
+            <div style="text-align:center;">
+              <div style="font-weight:600; color:var(--fg-1); margin-bottom:4px;">Import en cours…</div>
+              <div style="font-size:12px; color:var(--fg-3);">{{ importProgress() }}% — Veuillez patienter</div>
+            </div>
+            <div style="width:100%; max-width:320px; height:6px; background:var(--bg-surface-2); border-radius:3px; overflow:hidden;">
+              <div style="height:100%; background:var(--accent); border-radius:3px; transition:width 0.3s;"
+                   [style.width]="importProgress() + '%'"></div>
+            </div>
+          </div>
+        }
+
+        <!-- DONE: summary -->
+        @if (importStatus() === 'done') {
+          <div style="display:flex; flex-direction:column; align-items:center; gap:16px; padding:24px 0;">
+            @if (importError()) {
+              <tui-icon icon="@tui.triangle-alert" style="font-size:40px; color:var(--warning);" />
+              <div style="text-align:center;">
+                <div style="font-weight:600; color:var(--fg-1);">Import terminé avec des erreurs</div>
+                <div style="font-size:13px; color:var(--fg-3); margin-top:4px;">{{ importInserted() }} événement(s) importé(s)</div>
+                <div style="font-size:12px; color:var(--danger); margin-top:8px;">{{ importError() }}</div>
+              </div>
+            } @else {
+              <tui-icon icon="@tui.check-circle" style="font-size:40px; color:var(--success);" />
+              <div style="text-align:center;">
+                <div style="font-weight:600; font-size:16px; color:var(--fg-1);">Import réussi !</div>
+                <div style="font-size:13px; color:var(--fg-3); margin-top:4px;">
+                  {{ importInserted() }} événement(s) ajouté(s) à la bibliothèque en statut <em>Brouillon</em>.
+                </div>
+                @if (importSkipped()) {
+                  <div style="font-size:12px; color:var(--fg-3); margin-top:4px;">{{ importSkipped() }} ligne(s) ignorée(s)</div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+      </div>
+
+      <div class="modal-footer">
+        @if (importStatus() === 'preview') {
+          <button class="btn btn-flat btn-sm" type="button" (click)="closeImportModal()">Annuler</button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="runImport()">
+            <tui-icon icon="@tui.download" style="font-size:14px;" />
+            Importer {{ importPreview().length }} événement(s)
+          </button>
+        } @else if (importStatus() === 'done') {
+          <button class="btn btn-primary btn-sm" type="button" (click)="closeImportModal()">Fermer</button>
+        } @else if (importStatus() === 'idle') {
+          <button class="btn btn-flat btn-sm" type="button" (click)="closeImportModal()">Annuler</button>
+        }
+      </div>
+
+    </div>
+  </div>
 }

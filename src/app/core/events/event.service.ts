@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Observable, from } from 'rxjs';
+import { Observable, from, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { CreateEventDto, Event } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -96,6 +96,34 @@ export class EventService {
     return this.supabase.client.storage
       .from('historical-images')
       .getPublicUrl(storagePath).data.publicUrl;
+  }
+
+  /**
+   * Inserts a batch of events in a single PostgREST call.
+   * Caller should chunk large arrays (≤200 per call) to stay within limits.
+   */
+  batchCreateEvents(dtos: CreateEventDto[]): Observable<{ inserted: number; error?: string }> {
+    if (!dtos.length) return of({ inserted: 0 });
+    const wsId = this.workspaceContext.activeWorkspaceId();
+    return from(
+      this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
+        this.supabase.client
+          .from('events')
+          .insert(dtos.map(dto => ({
+            event_date:  dto.event_date,
+            title:       dto.title,
+            description: dto.description ?? null,
+            image_path:  null,
+            status:      'draft' as const,
+            workspace_id: wsId,
+            created_by:  user?.id ?? null,
+          }))),
+      ),
+    ).pipe(
+      map(({ error }: any) =>
+        error ? { inserted: 0, error: error.message } : { inserted: dtos.length },
+      ),
+    );
   }
 
   deleteEvent(id: string): Observable<{ success: boolean; error?: string }> {

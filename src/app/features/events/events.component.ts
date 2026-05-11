@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import * as XLSX from 'xlsx';
 import { FormsModule } from '@angular/forms';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
 import { TuiIcon } from '@taiga-ui/core';
@@ -21,6 +22,14 @@ interface EventRow {
 }
 
 type SlotState = 'empty' | 'ours' | 'other' | 'confirming' | 'busy';
+
+interface ImportPreviewRow {
+  date:        string;
+  title:       string;
+  description: string;
+  rawDate:     string;
+  source:      string;
+}
 
 const MONTHS_FR_SHORT = ['Jan','Fév','Mar','Avr','Mai','Jun','Juil','Aoû','Sep','Oct','Nov','Déc'];
 const MONTHS_FR_LONG  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
@@ -460,6 +469,113 @@ export class EventsComponent implements OnInit {
       }
     }
     return true;
+  }
+
+  // ── Excel import ─────────────────────────────────────────────────────────────
+
+  readonly showImportModal = signal(false);
+  readonly importPreview   = signal<ImportPreviewRow[]>([]);
+  readonly importStatus    = signal<'idle' | 'preview' | 'importing' | 'done'>('idle');
+  readonly importInserted  = signal(0);
+  readonly importSkipped   = signal(0);
+  readonly importError     = signal<string | null>(null);
+  readonly importProgress  = signal(0);
+
+  openImportModal(): void {
+    this.importStatus.set('idle');
+    this.importPreview.set([]);
+    this.importInserted.set(0);
+    this.importSkipped.set(0);
+    this.importError.set(null);
+    this.importProgress.set(0);
+    this.showImportModal.set(true);
+  }
+
+  closeImportModal(): void { this.showImportModal.set(false); }
+
+  onImportFileChange(ev: any): void {
+    const file = ev?.target?.files?.[0] as File | undefined;
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target!.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array' });
+        const sheetName = wb.SheetNames.includes('Tableau_evenements')
+          ? 'Tableau_evenements'
+          : wb.SheetNames[0];
+        const rows = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[sheetName], { header: 1, defval: '' }) as string[][];
+        const { valid, skipped } = this._parseImportRows(rows.slice(1));
+        this.importPreview.set(valid);
+        this.importSkipped.set(skipped);
+        this.importStatus.set('preview');
+        this.importError.set(null);
+      } catch {
+        this.importError.set('Impossible de lire le fichier. Vérifiez qu\'il s\'agit d\'un fichier Excel valide.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    if (ev?.target) ev.target.value = '';
+  }
+
+  private _parseImportRows(rows: string[][]): { valid: ImportPreviewRow[]; skipped: number } {
+    let skipped = 0;
+    const valid: ImportPreviewRow[] = [];
+    for (const row of rows) {
+      const rawDate  = String(row[0] ?? '').trim();
+      const rawEvent = String(row[1] ?? '').trim().replace(/\r\n|\r/g, '\n');
+      if (!rawDate || !rawEvent) { skipped++; continue; }
+      const date = this._parseDDMMYYYY(rawDate);
+      if (!date) { skipped++; continue; }
+      const source      = String(row[2] ?? '').trim();
+      const title       = this._extractTitle(rawEvent);
+      const description = source ? `${rawEvent}\n\nSource : ${source}` : rawEvent;
+      valid.push({ date, title, description, rawDate, source });
+    }
+    return { valid, skipped };
+  }
+
+  private _parseDDMMYYYY(raw: string): string | null {
+    const parts = raw.split('/');
+    if (parts.length !== 3) return null;
+    const day   = parts[0].padStart(2, '0');
+    const month = parts[1].padStart(2, '0');
+    const year  = parts[2];
+    const m = parseInt(month, 10);
+    const d = parseInt(day, 10);
+    if (m < 1 || m > 12 || d < 1 || d > 31 || year.length < 4) return null;
+    return `${year}-${month}-${day}`;
+  }
+
+  private _extractTitle(text: string): string {
+    let cleaned = text.replace(/\.?P\d+$/, '').trim();
+    if (cleaned.length <= 100) return cleaned;
+    const cut = cleaned.slice(0, 100);
+    const lastSpace = cut.lastIndexOf(' ');
+    return (lastSpace > 60 ? cut.slice(0, lastSpace) : cut).trimEnd() + '…';
+  }
+
+  async runImport(): Promise<void> {
+    const rows = this.importPreview();
+    if (!rows.length || this.importStatus() === 'importing') return;
+    this.importStatus.set('importing');
+    this.importProgress.set(0);
+    const CHUNK = 100;
+    let inserted = 0;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const result = await firstValueFrom(
+        this.eventService.batchCreateEvents(chunk.map(r => ({
+          event_date: r.date, title: r.title, description: r.description,
+        }))),
+      );
+      inserted += result.inserted;
+      this.importProgress.set(Math.round(((i + chunk.length) / rows.length) * 100));
+      if (result.error) { this.importError.set(result.error); break; }
+    }
+    this.importInserted.set(inserted);
+    this.importStatus.set('done');
+    await this._reload();
   }
 
   onImageChange(event: Event | globalThis.Event): void {

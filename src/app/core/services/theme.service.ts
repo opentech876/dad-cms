@@ -21,12 +21,31 @@ export class ThemeService {
     this.setColorMode(this.colorMode() === 'dark' ? 'system' : 'dark');
   }
 
+  loadFromProfile(theme: string | null, colorMode: string | null): void {
+    const validThemes: ThemeId[] = ['archive', 'broadsheet', 'field'];
+    const validModes: ColorMode[] = ['light', 'dark', 'system'];
+    if (theme && validThemes.includes(theme as ThemeId)) {
+      this.theme.set(theme as ThemeId);
+      localStorage.setItem(STORAGE_KEY_THEME, theme);
+    }
+    if (colorMode && validModes.includes(colorMode as ColorMode)) {
+      this.colorMode.set(colorMode as ColorMode);
+      localStorage.setItem(STORAGE_KEY_MODE, colorMode);
+    }
+  }
+
   private _apply(theme: ThemeId, mode: ColorMode): void {
     const root = document.documentElement;
-    root.setAttribute('data-theme', theme === 'archive' ? (mode === 'dark' ? 'dark' : 'light') : theme);
-    if (mode === 'dark' && theme === 'archive') root.setAttribute('data-theme', 'dark');
-    if (mode === 'light') root.removeAttribute('data-theme'); // light = CSS :root default
-    if (mode === 'system') root.removeAttribute('data-theme'); // let prefers-color-scheme take over
+    if (theme === 'archive') {
+      root.removeAttribute('data-theme');
+    } else {
+      root.setAttribute('data-theme', theme);
+    }
+    if (mode === 'system') {
+      root.removeAttribute('data-mode');
+    } else {
+      root.setAttribute('data-mode', mode);
+    }
   }
 
   private _load(key: string, fallback: string): string {

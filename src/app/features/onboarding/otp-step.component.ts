@@ -84,7 +84,23 @@ export class OtpStepComponent implements OnInit {
     const { error } = await this.supabase.verifyOtp(this.email(), token, 'email');
 
     if (error) {
-      this.errorMessage.set('Code invalide ou expiré.');
+      const msg = ((error as any).message ?? '').toLowerCase();
+      if (msg.includes('ban')) {
+        this.errorMessage.set('Votre compte a été suspendu. Contactez l\'administrateur.');
+      } else {
+        this.errorMessage.set('Code invalide ou expiré.');
+      }
+      this.isLoading.set(false);
+      this.digits.set(['', '', '', '', '', '']);
+      this.inputs.forEach(input => (input.value = ''));
+      this.inputs[0]?.focus();
+      return;
+    }
+
+    const hasRole = await this.supabase.hasWorkspaceRole();
+    if (!hasRole) {
+      await this.supabase.signOut();
+      this.errorMessage.set('Votre accès à cet espace de travail a été révoqué. Contactez l\'administrateur.');
       this.isLoading.set(false);
       this.digits.set(['', '', '', '', '', '']);
       this.inputs.forEach(input => (input.value = ''));

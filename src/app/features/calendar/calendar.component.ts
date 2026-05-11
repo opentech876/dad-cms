@@ -4,8 +4,10 @@ import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { CalendarService, CalendarSummary } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
+import { EventService } from '../../core/events/event.service';
 import { CampaignService } from '../../core/campaigns/campaign.service';
-import { AdCampaign } from '../../models';
+import { ToastService } from '../../core/services/toast.service';
+import { AdCampaign, Event as HistoricalEvent, EventPosition } from '../../models';
 
 type CalendarView = 'year' | 'month' | 'list';
 export type CalendarFilter = 'all' | 'full' | 'partial' | 'empty' | 'has_campaign';
@@ -98,13 +100,16 @@ export class CalendarComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly calendarService = inject(CalendarService);
   private readonly calendarEntryService = inject(CalendarEntryService);
+  private readonly eventService = inject(EventService);
   private readonly campaignService = inject(CampaignService);
+  private readonly toast = inject(ToastService);
 
   readonly monthsFr      = MONTHS_FR;
   readonly monthsFrCap   = MONTHS_FR_CAP;
   readonly monthsFrShort = MONTHS_FR_SHORT;
   readonly dowShort      = DOW_SHORT;
   readonly dowLong       = DOW_LONG;
+  readonly slotPositions: EventPosition[] = [1, 2];
   readonly viewOptions: { id: CalendarView; label: string }[] = [
     { id: 'year', label: 'Année' },
     { id: 'month', label: 'Mois' },
@@ -195,6 +200,9 @@ export class CalendarComponent implements OnInit {
 
   // ── Calendar entries (assignments) ───────────────
   readonly entries = signal<CalendarEntryWithEvent[]>([]);
+  readonly loadingEntries = signal(false);
+
+  private readonly _entriesCache = new Map<string, CalendarEntryWithEvent[]>();
 
   /** Groups entries by mmdd ('MM-DD') for O(1) day lookup. */
   readonly entriesByMmdd = computed(() => {
@@ -221,7 +229,18 @@ export class CalendarComponent implements OnInit {
     if (cal) this.selectedYear.set(cal.year);
     this.selectedDay.set(null);
     this.currentPage.set(0);
-    this.calendarEntryService.getEntriesForCalendar(id).subscribe(entries => this.entries.set(entries));
+
+    const cached = this._entriesCache.get(id);
+    if (cached) {
+      this.entries.set(cached);
+    } else {
+      this.loadingEntries.set(true);
+      this.calendarEntryService.getEntriesForCalendar(id).subscribe(entries => {
+        this._entriesCache.set(id, entries);
+        this.entries.set(entries);
+        this.loadingEntries.set(false);
+      });
+    }
     this.campaignService.listCampaigns().subscribe(campaigns => this.activeCampaigns.set(campaigns));
   }
 
@@ -281,26 +300,51 @@ export class CalendarComponent implements OnInit {
     return { day: sel.day, month: sel.month, year, dayOfWeek, events, campaigns: [] };
   });
 
-  openDayDetail(day: number | null, month: number): void {
+  // ── Day modal — library events ────────────────────
+  readonly dayModalEvents   = signal<HistoricalEvent[]>([]);
+  readonly dayModalLoading  = signal(false);
+  readonly dayModalSearch   = signal('');
+  readonly dayModalSaving   = signal(false);
+
+  readonly filteredDayEvents = computed(() => {
+    const q = this.dayModalSearch().toLowerCase().trim();
+    return q
+      ? this.dayModalEvents().filter(e =>
+          e.title.toLowerCase().includes(q) ||
+          e.event_date.slice(0, 4).includes(q),
+        )
+      : this.dayModalEvents();
+  });
+
+  async openDayDetail(day: number | null, month: number): Promise<void> {
     if (day === null) return;
     this.selectedDay.set({ day, month });
+    this.dayModalSearch.set('');
+    await this._loadDayModalEvents(`${pad2(month + 1)}-${pad2(day)}`);
   }
 
   closeDayDetail(): void {
     this.selectedDay.set(null);
+    this.dayModalEvents.set([]);
+    this.dayModalSearch.set('');
   }
 
   navigateToPrevDay(): void {
     const sel = this.selectedDay();
     if (!sel) return;
     const { day, month } = sel;
+    let newDay = day, newMonth = month;
     if (day > 1) {
-      this.selectedDay.set({ day: day - 1, month });
+      newDay = day - 1;
     } else if (month > 0) {
-      const prevMonth = month - 1;
-      const lastDay = daysInMonth(this.selectedYear(), prevMonth);
-      this.selectedDay.set({ day: lastDay, month: prevMonth });
+      newMonth = month - 1;
+      newDay = daysInMonth(this.selectedYear(), newMonth);
+    } else {
+      return;
     }
+    this.selectedDay.set({ day: newDay, month: newMonth });
+    this.dayModalSearch.set('');
+    this._loadDayModalEvents(`${pad2(newMonth + 1)}-${pad2(newDay)}`);
   }
 
   navigateToNextDay(): void {
@@ -308,25 +352,104 @@ export class CalendarComponent implements OnInit {
     if (!sel) return;
     const { day, month } = sel;
     const maxDay = daysInMonth(this.selectedYear(), month);
+    let newDay = day, newMonth = month;
     if (day < maxDay) {
-      this.selectedDay.set({ day: day + 1, month });
+      newDay = day + 1;
     } else if (month < 11) {
-      this.selectedDay.set({ day: 1, month: month + 1 });
+      newMonth = month + 1;
+      newDay = 1;
+    } else {
+      return;
+    }
+    this.selectedDay.set({ day: newDay, month: newMonth });
+    this.dayModalSearch.set('');
+    this._loadDayModalEvents(`${pad2(newMonth + 1)}-${pad2(newDay)}`);
+  }
+
+  private async _loadDayModalEvents(mmdd: string): Promise<void> {
+    this.dayModalLoading.set(true);
+    const events = await firstValueFrom(this.eventService.listEventsByMmdd(mmdd));
+    const sel = this.selectedDay();
+    if (sel && `${pad2(sel.month + 1)}-${pad2(sel.day)}` === mmdd) {
+      this.dayModalEvents.set(events);
+    }
+    this.dayModalLoading.set(false);
+  }
+
+  // ── Slot helpers ──────────────────────────────────
+  getSlotEvent(position: EventPosition): DayEvent | null {
+    return this.selectedDayDetail()?.events.find(e => e.displayPosition === position) ?? null;
+  }
+
+  isEventAtPosition(eventId: string, position: EventPosition): boolean {
+    return this.selectedDayDetail()?.events.some(e => e.id === eventId && e.displayPosition === position) ?? false;
+  }
+
+  isSlotFilled(position: EventPosition): boolean {
+    return this.getSlotEvent(position) !== null;
+  }
+
+  // ── Assign / unassign ─────────────────────────────
+  async toggleSlot(eventId: string, position: EventPosition): Promise<void> {
+    if (this.isEventAtPosition(eventId, position)) {
+      await this.unassignFromSlot(position);
+    } else {
+      await this.assignToSlot(eventId, position);
     }
   }
 
-  // ── Navigation shortcuts ──────────────────────────
-  editEvent(_eventId: string): void {
-    this.router.navigate(['/evenements']);
+  async assignToSlot(eventId: string, position: EventPosition): Promise<void> {
+    const calId = this.selectedCalendarId();
+    const sel   = this.selectedDay();
+    if (!calId || !sel || this.dayModalSaving()) return;
+    const mmdd = `${pad2(sel.month + 1)}-${pad2(sel.day)}`;
+    this.dayModalSaving.set(true);
+    const res = await firstValueFrom(
+      this.calendarEntryService.assignEvent(calId, mmdd, eventId, position),
+    );
+    if (res.success) {
+      const entries = await firstValueFrom(
+        this.calendarEntryService.getEntriesForCalendar(calId),
+      );
+      this._entriesCache.set(calId, entries);
+      this.entries.set(entries);
+    } else {
+      this.toast.error(
+        res.error === 'insufficient_privilege'
+          ? 'Votre rôle ne permet pas de modifier les affectations du calendrier.'
+          : (res.error ?? 'Erreur lors de l\'assignation.'),
+      );
+    }
+    this.dayModalSaving.set(false);
   }
 
-  addEventForDay(): void {
-    this.router.navigate(['/evenements']);
+  async unassignFromSlot(position: EventPosition): Promise<void> {
+    const calId = this.selectedCalendarId();
+    const sel   = this.selectedDay();
+    if (!calId || !sel || this.dayModalSaving()) return;
+    const mmdd = `${pad2(sel.month + 1)}-${pad2(sel.day)}`;
+    this.dayModalSaving.set(true);
+    const res = await firstValueFrom(
+      this.calendarEntryService.unassignSlot(calId, mmdd, position),
+    );
+    if (res.success) {
+      const entries = await firstValueFrom(
+        this.calendarEntryService.getEntriesForCalendar(calId),
+      );
+      this._entriesCache.set(calId, entries);
+      this.entries.set(entries);
+    } else {
+      this.toast.error(
+        res.error === 'insufficient_privilege'
+          ? 'Votre rôle ne permet pas de modifier les affectations du calendrier.'
+          : (res.error ?? 'Erreur lors du retrait.'),
+      );
+    }
+    this.dayModalSaving.set(false);
   }
 
-  editCampaign(_campaignId: string): void {
-    this.router.navigate(['/campagnes']);
-  }
+  goToEvents(): void { this.router.navigate(['/evenements']); }
+  goToCampaigns(): void { this.router.navigate(['/campagnes']); }
 
   // ── Helpers ───────────────────────────────────────
   statusBadgeClass(status: Calendar['status']): string {

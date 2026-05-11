@@ -93,23 +93,19 @@ describe('AdCampaignsComponent', () => {
     it('compte les campagnes planifiées (start_date > today)', async () => {
       mockService.listCampaigns.mockReturnValue(of([makeCampaign({ start_date: TOMORROW, end_date: TOMORROW })]));
       await component['_reload']();
-      expect(component.stats().scheduled).toBe(1);
+      expect(component.stats().planifiee).toBe(1);
     });
 
     it('compte les campagnes terminées (end_date < today)', async () => {
       mockService.listCampaigns.mockReturnValue(of([makeCampaign({ end_date: YESTERDAY, start_date: YESTERDAY })]));
       await component['_reload']();
-      expect(component.stats().ended).toBe(1);
+      expect(component.stats().terminee).toBe(1);
     });
 
-    it('décompose les actives par position header/footer', async () => {
-      mockService.listCampaigns.mockReturnValue(of([
-        makeCampaign({ id: 'h1', position: 'header' }),
-        makeCampaign({ id: 'f1', position: 'footer' }),
-      ]));
+    it('compte les campagnes désactivées comme terminées', async () => {
+      mockService.listCampaigns.mockReturnValue(of([makeCampaign({ active: false })]));
       await component['_reload']();
-      expect(component.stats().header).toBe(1);
-      expect(component.stats().footer).toBe(1);
+      expect(component.stats().terminee).toBe(1);
     });
   });
 
@@ -126,16 +122,6 @@ describe('AdCampaignsComponent', () => {
 
     it('retourne toutes les campagnes sans filtre', () => {
       expect(component.listRows().length).toBe(2);
-    });
-
-    it('filtre par position header', () => {
-      component.setSelectedPosition('header');
-      expect(component.listRows().every(r => r.position === 'header')).toBe(true);
-    });
-
-    it('filtre par position footer', () => {
-      component.setSelectedPosition('footer');
-      expect(component.listRows().every(r => r.position === 'footer')).toBe(true);
     });
 
     it('filtre par nom (insensible à la casse)', () => {
@@ -207,11 +193,11 @@ describe('AdCampaignsComponent', () => {
   // ── editorCurrentStatus computed ───────────────────────────────────────────
 
   describe('editorCurrentStatus()', () => {
-    it('retourne inactive quand active est false', () => {
+    it('retourne terminee quand active est false', () => {
       component.editorActive.set(false);
       component.editorStartDate.set(YESTERDAY);
       component.editorEndDate.set(TOMORROW);
-      expect(component.editorCurrentStatus()).toBe('inactive');
+      expect(component.editorCurrentStatus()).toBe('terminee');
     });
 
     it('retourne active quand active=true et dates encadrant aujourd\'hui', () => {
@@ -221,18 +207,18 @@ describe('AdCampaignsComponent', () => {
       expect(component.editorCurrentStatus()).toBe('active');
     });
 
-    it('retourne scheduled quand start_date > today', () => {
+    it('retourne planifiee quand start_date > today', () => {
       component.editorActive.set(true);
       component.editorStartDate.set(TOMORROW);
       component.editorEndDate.set(TOMORROW);
-      expect(component.editorCurrentStatus()).toBe('scheduled');
+      expect(component.editorCurrentStatus()).toBe('planifiee');
     });
 
-    it('retourne ended quand end_date < today', () => {
+    it('retourne terminee quand end_date < today', () => {
       component.editorActive.set(true);
       component.editorStartDate.set(YESTERDAY);
       component.editorEndDate.set(YESTERDAY);
-      expect(component.editorCurrentStatus()).toBe('ended');
+      expect(component.editorCurrentStatus()).toBe('terminee');
     });
   });
 

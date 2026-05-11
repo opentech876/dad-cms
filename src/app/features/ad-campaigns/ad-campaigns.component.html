@@ -15,13 +15,12 @@
           <div class="card-header">
             <div>
               <div class="card-title">Campagne publicitaire</div>
-              <div class="card-subtitle">Bannière · {{ editorPosition() === 'header' ? 'Entête' : 'Pied de page' }}</div>
+              <div class="card-subtitle">Bannière · Pied de page</div>
             </div>
             @switch (editorCurrentStatus()) {
-              @case ('active')    { <span class="badge badge-success badge-dot">Active</span> }
-              @case ('scheduled') { <span class="badge badge-info badge-dot">Planifiée</span> }
-              @case ('ended')     { <span class="badge badge-dot">Terminée</span> }
-              @default            { <span class="badge badge-warning">Inactive</span> }
+              @case ('active')    { <span class="badge badge-success badge-dot">Active</span>   }
+              @case ('planifiee') { <span class="badge badge-info badge-dot">Planifiée</span>   }
+              @case ('terminee')  { <span class="badge badge-dot">Terminée</span>               }
             }
           </div>
 
@@ -53,24 +52,13 @@
               </div>
             </div>
 
-            <!-- Position -->
-            <div class="field required">
+            <!-- Position (fixed: footer only) -->
+            <div class="field">
               <label class="field-label">Position de la bannière</label>
-              <div style="display:flex; gap:10px;">
-                <label class="campaign-position-option" [class.campaign-position-option--active]="editorPosition() === 'header'">
-                  <input type="radio" name="position" value="header"
-                         [checked]="editorPosition() === 'header'"
-                         (change)="editorPosition.set('header')" style="display:none;" />
-                  <tui-icon icon="@tui.arrow-up" style="font-size:14px;" />
-                  Entête
-                </label>
-                <label class="campaign-position-option" [class.campaign-position-option--active]="editorPosition() === 'footer'">
-                  <input type="radio" name="position" value="footer"
-                         [checked]="editorPosition() === 'footer'"
-                         (change)="editorPosition.set('footer')" style="display:none;" />
-                  <tui-icon icon="@tui.arrow-down" style="font-size:14px;" />
-                  Pied de page
-                </label>
+              <div style="display:inline-flex; align-items:center; gap:8px; padding:8px 14px; background:var(--bg-sunken); border-radius:var(--r-sm); border:1px solid var(--border-1); font-size:13px; color:var(--fg-2); width:fit-content;">
+                <tui-icon icon="@tui.arrow-down" style="font-size:14px;" />
+                Pied de page
+                <span style="font-size:11px; color:var(--fg-3);">(seule position disponible)</span>
               </div>
             </div>
 
@@ -114,11 +102,13 @@
             }
             <div style="flex:1;"></div>
             <button class="btn btn-flat btn-sm" type="button" (click)="closeEditor()">Annuler</button>
-            <button class="btn btn-secondary btn-sm" type="button" [disabled]="editorSaving()" (click)="save(false)">
+            <button class="btn btn-secondary btn-sm" type="button"
+                    [disabled]="editorSaving() || isDurationExceeded()" (click)="save(false)">
               @if (editorSaving()) { <span class="spinner"></span> }
               Enregistrer
             </button>
-            <button class="btn btn-primary btn-sm" type="button" [disabled]="editorSaving()" (click)="save(true)">
+            <button class="btn btn-primary btn-sm" type="button"
+                    [disabled]="editorSaving() || isDurationExceeded()" (click)="save(true)">
               Activer
               <tui-icon icon="@tui.check" style="font-size:14px;" />
             </button>
@@ -138,9 +128,7 @@
             @if (editorHasBanner()) {
               <div style="display:flex; flex-direction:column; gap:12px;">
                 <!-- Banner preview -->
-                <div class="campaign-banner-preview"
-                     [class.campaign-banner-preview--header]="editorPosition() === 'header'"
-                     [class.campaign-banner-preview--footer]="editorPosition() === 'footer'">
+                <div class="campaign-banner-preview campaign-banner-preview--footer">
                   @if (editorBannerUrl()) {
                     <img [src]="editorBannerUrl()" alt=""
                          style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />
@@ -183,25 +171,14 @@
           <div style="padding:16px; display:flex; justify-content:center;">
             <div class="mobile-preview">
               <div class="mobile-preview__inner">
-                @if (editorPosition() === 'header') {
-                  <div class="mobile-preview__banner mobile-preview__banner--header">
-                    @if (editorBannerUrl()) {
-                      <img [src]="editorBannerUrl()" alt="" style="width:100%; height:100%; object-fit:cover;" />
-                    } @else {
-                      <span style="font-size:8px; font-weight:700; letter-spacing:0.04em;">BANNIÈRE ENTÊTE</span>
-                    }
-                  </div>
-                }
                 <div class="mobile-preview__content"></div>
-                @if (editorPosition() === 'footer') {
-                  <div class="mobile-preview__banner mobile-preview__banner--footer">
-                    @if (editorBannerUrl()) {
-                      <img [src]="editorBannerUrl()" alt="" style="width:100%; height:100%; object-fit:cover;" />
-                    } @else {
-                      <span style="font-size:8px; font-weight:700; letter-spacing:0.04em;">BANNIÈRE PIED</span>
-                    }
-                  </div>
-                }
+                <div class="mobile-preview__banner mobile-preview__banner--footer">
+                  @if (editorBannerUrl()) {
+                    <img [src]="editorBannerUrl()" alt="" style="width:100%; height:100%; object-fit:cover;" />
+                  } @else {
+                    <span style="font-size:8px; font-weight:700; letter-spacing:0.04em;">BANNIÈRE PIED</span>
+                  }
+                </div>
               </div>
             </div>
           </div>
@@ -214,16 +191,20 @@
           </div>
           <div>
             @for (item of validationItems(); track item.label; let i = $index) {
-              @let isDurationWarn = !item.ok && item.label.startsWith('Durée');
               <div class="campaign-validation-row" [class.campaign-validation-row--first]="i === 0">
                 <span class="campaign-validation-dot"
-                      [class.campaign-validation-dot--ok]="item.ok"
-                      [class.campaign-validation-dot--warn]="!item.ok && !isDurationWarn"
-                      [class.campaign-validation-dot--duration]="isDurationWarn">
-                  @if (item.ok) { <tui-icon icon="@tui.check" style="font-size:11px;" /> }
-                  @else         { <tui-icon icon="@tui.clock" style="font-size:11px;" /> }
+                      [class.campaign-validation-dot--ok]="item.ok && !item.kind"
+                      [class.campaign-validation-dot--warn]="item.ok && item.kind === 'warn'"
+                      [class.campaign-validation-dot--pending]="!item.ok && item.kind !== 'error'"
+                      [class.campaign-validation-dot--error]="item.kind === 'error'">
+                  @if (item.ok && !item.kind)        { <tui-icon icon="@tui.check" style="font-size:11px;" /> }
+                  @else if (item.kind === 'warn')    { <tui-icon icon="@tui.alert-triangle" style="font-size:11px;" /> }
+                  @else if (item.kind === 'error')   { <tui-icon icon="@tui.x" style="font-size:11px;" /> }
+                  @else                              { <tui-icon icon="@tui.clock" style="font-size:11px;" /> }
                 </span>
-                <span [style.color]="item.ok ? 'var(--fg-1)' : isDurationWarn ? 'var(--warning)' : 'var(--fg-2)'">{{ item.label }}</span>
+                <span [style.color]="item.kind === 'error' ? 'var(--danger)' : item.kind === 'warn' ? 'var(--warning)' : item.ok ? 'var(--fg-1)' : 'var(--fg-2)'">
+                  {{ item.label }}
+                </span>
               </div>
             }
           </div>
@@ -241,18 +222,18 @@
     <!-- ── KPI strip ── -->
     <div class="kpi-grid" style="margin-bottom:16px;">
       <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Campagnes actives</div>
+        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Actives</div>
         <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--success);">{{ stats().active }}</div>
-        <div style="margin-top:10px; font-size:12px; color:var(--fg-3);">{{ stats().header }} entête · {{ stats().footer }} pied</div>
+        <div style="margin-top:10px;"><span class="badge badge-success badge-dot">en cours</span></div>
       </div>
       <div class="card" style="padding:18px 20px;">
         <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Planifiées</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--info);">{{ stats().scheduled }}</div>
+        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--info);">{{ stats().planifiee }}</div>
         <div style="margin-top:10px;"><span class="badge badge-info">à venir</span></div>
       </div>
       <div class="card" style="padding:18px 20px;">
         <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Terminées</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--fg-3);">{{ stats().ended }}</div>
+        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--fg-3);">{{ stats().terminee }}</div>
         <div style="margin-top:10px;"><span class="badge">archivées</span></div>
       </div>
       <div class="card" style="padding:18px 20px;">
@@ -263,32 +244,50 @@
     </div>
 
     <!-- ── Toolbar ── -->
-    <div class="card" style="padding:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-      <div class="input-group" style="width:300px;">
-        <span class="input-icon">&#128269;</span>
-        <input class="input has-icon" placeholder="Rechercher une campagne, un annonceur…"
-               [value]="searchQuery()" (input)="setSearchQuery($any($event.target).value)"
-               style="height:36px; font-size:13px;">
+    <div class="card" style="padding:14px; display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+      <!-- Row 1: search + status + add button -->
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div class="input-group" style="width:280px;">
+          <span class="input-icon">&#128269;</span>
+          <input class="input has-icon" placeholder="Campagne, annonceur…"
+                 [value]="searchQuery()" (input)="setSearchQuery($any($event.target).value)"
+                 style="height:36px; font-size:13px;">
+        </div>
+        <select class="select" style="width:150px; height:36px; font-size:13px;"
+                [value]="selectedStatus()" (change)="setSelectedStatus($any($event.target).value)">
+          <option value="all">Tous statuts</option>
+          <option value="active">Active</option>
+          <option value="planifiee">Planifiée</option>
+          <option value="terminee">Terminée</option>
+        </select>
+        <div style="flex:1;"></div>
+        <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
+          <tui-icon icon="@tui.plus" style="font-size:14px;" />
+          Nouvelle campagne
+        </button>
       </div>
-      <select class="select" style="width:160px; height:36px; font-size:13px;"
-              [value]="selectedPosition()" (change)="setSelectedPosition($any($event.target).value)">
-        <option value="all">Toutes positions</option>
-        <option value="header">Entête</option>
-        <option value="footer">Pied de page</option>
-      </select>
-      <select class="select" style="width:140px; height:36px; font-size:13px;"
-              [value]="selectedStatus()" (change)="setSelectedStatus($any($event.target).value)">
-        <option value="all">Tous statuts</option>
-        <option value="active">Active</option>
-        <option value="scheduled">Planifiée</option>
-        <option value="ended">Terminée</option>
-        <option value="inactive">Inactive</option>
-      </select>
-      <div style="flex:1;"></div>
-      <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
-        <tui-icon icon="@tui.plus" style="font-size:14px;" />
-        Nouvelle campagne
-      </button>
+      <!-- Row 2: date range filters -->
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <span style="font-size:12px; font-weight:600; color:var(--fg-3); white-space:nowrap;">Activation :</span>
+        <input class="input" type="date" style="height:32px; font-size:12px; width:140px;"
+               [value]="filterActivationFrom()" (change)="setActivationFrom($any($event.target).value)" />
+        <span style="font-size:12px; color:var(--fg-3);">→</span>
+        <input class="input" type="date" style="height:32px; font-size:12px; width:140px;"
+               [value]="filterActivationTo()" (change)="setActivationTo($any($event.target).value)" />
+        <span style="font-size:12px; font-weight:600; color:var(--fg-3); white-space:nowrap; margin-left:8px;">Création :</span>
+        <input class="input" type="date" style="height:32px; font-size:12px; width:140px;"
+               [value]="filterCreatedFrom()" (change)="setCreatedFrom($any($event.target).value)" />
+        <span style="font-size:12px; color:var(--fg-3);">→</span>
+        <input class="input" type="date" style="height:32px; font-size:12px; width:140px;"
+               [value]="filterCreatedTo()" (change)="setCreatedTo($any($event.target).value)" />
+        @if (hasDateFilters()) {
+          <button class="btn btn-flat btn-sm" type="button" (click)="clearDateFilters()"
+                  style="font-size:12px; color:var(--fg-3);">
+            <tui-icon icon="@tui.x" style="font-size:12px;" />
+            Effacer
+          </button>
+        }
+      </div>
     </div>
 
     <!-- ── Campaigns table ── -->
@@ -343,10 +342,9 @@
                 </td>
                 <td>
                   @switch (row.status) {
-                    @case ('active')    { <span class="badge badge-success badge-dot">Active</span> }
-                    @case ('scheduled') { <span class="badge badge-info badge-dot">Planifiée</span> }
-                    @case ('ended')     { <span class="badge badge-dot">Terminée</span> }
-                    @default            { <span class="badge badge-warning">Inactive</span> }
+                    @case ('active')    { <span class="badge badge-success badge-dot">Active</span>   }
+                    @case ('planifiee') { <span class="badge badge-info badge-dot">Planifiée</span>   }
+                    @case ('terminee')  { <span class="badge badge-dot">Terminée</span>               }
                   }
                 </td>
                 <td>

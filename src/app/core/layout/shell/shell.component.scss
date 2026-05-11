@@ -19,7 +19,7 @@
   position: relative;
   z-index: 5;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
 }
 
 .shell--collapsed .sidebar { width: 68px; }
@@ -188,6 +188,7 @@
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   box-shadow: var(--shadow-sm);
+  z-index: 6;
   &:hover { background: var(--bg-surface-2); }
 }
 

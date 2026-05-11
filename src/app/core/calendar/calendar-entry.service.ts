@@ -75,9 +75,12 @@ export class CalendarEntryService {
           ),
       ),
     ).pipe(
-      map(({ error }: any) =>
-        error ? { success: false, error: error.message } : { success: true },
-      ),
+      map(({ error }: any) => {
+        if (!error) return { success: true };
+        if (error.code === '42501')
+          return { success: false, error: 'insufficient_privilege' };
+        return { success: false, error: error.message };
+      }),
     );
   }
 
@@ -104,14 +107,16 @@ export class CalendarEntryService {
     return from(
       this.supabase.client
         .from('calendar_entries')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('calendar_id', calendarId)
         .eq('mmdd', mmdd)
         .eq('position', position),
     ).pipe(
-      map(({ error }: any) =>
-        error ? { success: false, error: error.message } : { success: true },
-      ),
+      map(({ error, count }: any) => {
+        if (error) return { success: false, error: error.message };
+        if (count === 0) return { success: false, error: 'insufficient_privilege' };
+        return { success: true };
+      }),
     );
   }
 }

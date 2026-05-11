@@ -8,6 +8,7 @@ import { AuthService } from '../../auth/auth.service';
 import { WorkspaceService } from '../../workspace/workspace.service';
 import { WorkspaceContextService } from '../../workspace/workspace-context.service';
 import { ToastService, ToastType } from '../../services/toast.service';
+import { ThemeService } from '../../services/theme.service';
 
 interface NavItem {
   id: string;
@@ -29,6 +30,7 @@ export class ShellComponent implements OnInit {
   private router = inject(Router);
   private workspaceService = inject(WorkspaceService);
   private workspaceContext = inject(WorkspaceContextService);
+  private themeService = inject(ThemeService);
   private currentRole = toSignal(this.auth.currentRole$);
 
   readonly toastService = inject(ToastService);

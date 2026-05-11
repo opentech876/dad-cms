@@ -280,7 +280,7 @@ describe('WorkspaceService', () => {
   // ── getMyProfile() ─────────────────────────────────────────────────────────
 
   describe('getMyProfile()', () => {
-    const fakeProfile = { full_name: 'Alice Martin', phone: '+242060000000', avatar_url: null };
+    const fakeProfile = { full_name: 'Alice Martin', phone: '+242060000000', avatar_url: null, theme: 'broadsheet', color_mode: 'dark' };
 
     it('retourne le profil quand il existe', async () => {
       mockSupabase.client = buildClient(0, [], fakeProfile);
@@ -290,12 +290,39 @@ describe('WorkspaceService', () => {
       expect(result?.full_name).toBe('Alice Martin');
     });
 
+    it('retourne les préférences d\'apparence avec le profil', async () => {
+      mockSupabase.client = buildClient(0, [], fakeProfile);
+
+      const result = await firstValueFrom(service.getMyProfile('u1'));
+
+      expect(result?.theme).toBe('broadsheet');
+      expect(result?.color_mode).toBe('dark');
+    });
+
     it('retourne null quand aucun profil n\'existe', async () => {
       mockSupabase.client = buildClient(0, [], null);
 
       const result = await firstValueFrom(service.getMyProfile('u1'));
 
       expect(result).toBeNull();
+    });
+  });
+
+  // ── saveAppearance() ────────────────────────────────────────────────────────
+
+  describe('saveAppearance()', () => {
+    it('appelle upsert sur profiles avec user_id, theme et color_mode', async () => {
+      const upsertSpy = jest.fn().mockResolvedValue({ error: null });
+      mockSupabase.client = {
+        from: () => ({ upsert: upsertSpy }),
+      } as any;
+
+      await firstValueFrom(service.saveAppearance('u1', 'field', 'dark'));
+
+      expect(upsertSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ user_id: 'u1', theme: 'field', color_mode: 'dark' }),
+        expect.objectContaining({ onConflict: 'user_id' }),
+      );
     });
   });
 });

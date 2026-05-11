@@ -6,7 +6,7 @@ import { AdCampaign, AdPosition } from '../../models';
 import { CampaignService } from '../../core/campaigns/campaign.service';
 import { ToastService } from '../../core/services/toast.service';
 
-type CampaignStatus = 'active' | 'scheduled' | 'ended' | 'inactive';
+type CampaignStatus = 'active' | 'planifiee' | 'terminee';
 
 interface CampaignRow {
   id: string;
@@ -15,15 +15,16 @@ interface CampaignRow {
   position: AdPosition;
   startDate: string;
   endDate: string;
+  createdAt: string;
   status: CampaignStatus;
   imagePath: string | null;
 }
 
 function campaignStatus(c: AdCampaign): CampaignStatus {
-  if (!c.active) return 'inactive';
+  if (!c.active) return 'terminee';
   const today = new Date().toISOString().slice(0, 10);
-  if (c.start_date > today) return 'scheduled';
-  if (c.end_date < today) return 'ended';
+  if (c.start_date > today) return 'planifiee';
+  if (c.end_date < today) return 'terminee';
   return 'active';
 }
 
@@ -66,35 +67,58 @@ export class AdCampaignsComponent implements OnInit {
     const totalDays = active.reduce((sum, c) => sum + daysBetween(c.start_date, c.end_date), 0);
     return {
       active: active.length,
-      scheduled: all.filter(c => c.active && c.start_date > today).length,
-      ended: all.filter(c => !c.active || c.end_date < today).length,
-      header: active.filter(c => c.position === 'header').length,
-      footer: active.filter(c => c.position === 'footer').length,
+      planifiee: all.filter(c => c.active && c.start_date > today).length,
+      terminee: all.filter(c => !c.active || c.end_date < today).length,
       totalDays,
     };
   });
 
   // ── Filters ───────────────────────────────────────────────────────────────
 
-  readonly searchQuery      = signal('');
-  readonly selectedPosition = signal('all');
-  readonly selectedStatus   = signal('all');
-  readonly currentPage      = signal(0);
-  readonly pageSize         = 20;
+  readonly searchQuery         = signal('');
+  readonly selectedStatus      = signal('all');
+  readonly filterActivationFrom = signal('');
+  readonly filterActivationTo   = signal('');
+  readonly filterCreatedFrom    = signal('');
+  readonly filterCreatedTo      = signal('');
+  readonly currentPage          = signal(0);
+  readonly pageSize             = 20;
 
-  setSearchQuery(q: string): void      { this.searchQuery.set(q);      this.currentPage.set(0); }
-  setSelectedPosition(p: string): void { this.selectedPosition.set(p); this.currentPage.set(0); }
-  setSelectedStatus(s: string): void   { this.selectedStatus.set(s);   this.currentPage.set(0); }
+  setSearchQuery(q: string): void          { this.searchQuery.set(q);          this.currentPage.set(0); }
+  setSelectedStatus(s: string): void       { this.selectedStatus.set(s);       this.currentPage.set(0); }
+  setActivationFrom(d: string): void       { this.filterActivationFrom.set(d); this.currentPage.set(0); }
+  setActivationTo(d: string): void         { this.filterActivationTo.set(d);   this.currentPage.set(0); }
+  setCreatedFrom(d: string): void          { this.filterCreatedFrom.set(d);    this.currentPage.set(0); }
+  setCreatedTo(d: string): void            { this.filterCreatedTo.set(d);      this.currentPage.set(0); }
+
+  clearDateFilters(): void {
+    this.filterActivationFrom.set('');
+    this.filterActivationTo.set('');
+    this.filterCreatedFrom.set('');
+    this.filterCreatedTo.set('');
+    this.currentPage.set(0);
+  }
+
+  readonly hasDateFilters = computed(() =>
+    !!(this.filterActivationFrom() || this.filterActivationTo() || this.filterCreatedFrom() || this.filterCreatedTo()),
+  );
 
   readonly listRows = computed<CampaignRow[]>(() => {
-    const q   = this.searchQuery().toLowerCase().trim();
-    const pos = this.selectedPosition();
-    const st  = this.selectedStatus();
+    const q          = this.searchQuery().toLowerCase().trim();
+    const st         = this.selectedStatus();
+    const actFrom    = this.filterActivationFrom();
+    const actTo      = this.filterActivationTo();
+    const creatFrom  = this.filterCreatedFrom();
+    const creatTo    = this.filterCreatedTo();
     return this.campaigns()
       .filter(c => {
-        if (pos !== 'all' && c.position !== pos) return false;
         if (st !== 'all' && campaignStatus(c) !== st) return false;
         if (q && !c.name.toLowerCase().includes(q) && !c.advertiser.toLowerCase().includes(q)) return false;
+        if (actFrom && c.start_date < actFrom) return false;
+        if (actTo   && c.start_date > actTo)   return false;
+        const createdDay = c.created_at.slice(0, 10);
+        if (creatFrom && createdDay < creatFrom) return false;
+        if (creatTo   && createdDay > creatTo)   return false;
         return true;
       })
       .map(c => ({
@@ -104,6 +128,7 @@ export class AdCampaignsComponent implements OnInit {
         position: c.position,
         startDate: c.start_date,
         endDate: c.end_date,
+        createdAt: c.created_at.slice(0, 10),
         status: campaignStatus(c),
         imagePath: c.image_path || null,
       }));
@@ -128,7 +153,7 @@ export class AdCampaignsComponent implements OnInit {
   readonly editorAdvertiser  = signal('');
   readonly editorStartDate   = signal('');
   readonly editorEndDate     = signal('');
-  readonly editorPosition    = signal<AdPosition>('header');
+  readonly editorPosition    = signal<AdPosition>('footer');
   readonly editorLinkUrl     = signal('');
   readonly editorActive      = signal(false);
   readonly editorImagePath   = signal<string | null>(null);
@@ -152,10 +177,17 @@ export class AdCampaignsComponent implements OnInit {
     return this.campaignService.getBannerUrl(path);
   });
 
-  readonly validationItems = computed(() => {
+  readonly validationItems = computed<{ ok: boolean; label: string; kind?: 'warn' | 'error' }[]>(() => {
     const start = this.editorStartDate();
     const end   = this.editorEndDate();
     const days  = start && end ? daysBetween(start, end) : 0;
+    const durationItem = (start && end)
+      ? days > 14
+        ? { ok: false, label: `Durée ${days} j — limite maximale de 14 jours dépassée`, kind: 'error' as const }
+        : days > 7
+          ? { ok: true,  label: `Durée ${days} j — au-delà de la période normale (7 j recommandés)`, kind: 'warn' as const }
+          : null
+      : null;
     return [
       { ok: this.editorName().trim().length >= 3,
         label: 'Nom de la campagne renseigné (≥ 3 caractères)' },
@@ -167,22 +199,24 @@ export class AdCampaignsComponent implements OnInit {
         label: 'Date de début antérieure à la date de fin' },
       { ok: this.editorHasBanner(),
         label: 'Bannière publicitaire ajoutée (≤ 150 Ko)' },
-      ...(days > 14
-        ? [{ ok: false, label: `Durée ${days} j — dépasse les 14 jours recommandés (normal : 7 j)` }]
-        : days > 7
-          ? [{ ok: false, label: `Durée ${days} j — dépasse la durée normale d'une semaine (7 j)` }]
-          : []),
+      ...(durationItem ? [durationItem] : []),
     ];
   });
 
+  readonly isDurationExceeded = computed(() => {
+    const start = this.editorStartDate();
+    const end   = this.editorEndDate();
+    return !!(start && end && daysBetween(start, end) > 14);
+  });
+
   readonly editorCurrentStatus = computed<CampaignStatus>(() => {
-    if (!this.editorActive()) return 'inactive';
+    if (!this.editorActive()) return 'terminee';
     const today = new Date().toISOString().slice(0, 10);
     const s = this.editorStartDate();
     const e = this.editorEndDate();
-    if (!s || !e) return 'inactive';
-    if (s > today) return 'scheduled';
-    if (e < today) return 'ended';
+    if (!s || !e) return 'terminee';
+    if (s > today) return 'planifiee';
+    if (e < today) return 'terminee';
     return 'active';
   });
 
@@ -196,7 +230,7 @@ export class AdCampaignsComponent implements OnInit {
     this.editorAdvertiser.set(c?.advertiser ?? '');
     this.editorStartDate.set(c?.start_date ?? '');
     this.editorEndDate.set(c?.end_date ?? '');
-    this.editorPosition.set(c?.position ?? 'header');
+    this.editorPosition.set(c?.position ?? 'footer');
     this.editorLinkUrl.set(c?.link_url ?? '');
     this.editorActive.set(c?.active ?? false);
     this.editorImagePath.set(c?.image_path || null);

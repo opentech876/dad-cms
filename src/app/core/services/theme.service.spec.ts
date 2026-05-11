@@ -70,6 +70,89 @@ describe('ThemeService', () => {
     });
   });
 
+  // ── _apply() — attributs DOM ─────────────────────────────────────────────
+
+  describe('_apply() — attributs DOM', () => {
+    const root = document.documentElement;
+
+    afterEach(() => {
+      root.removeAttribute('data-theme');
+      root.removeAttribute('data-mode');
+    });
+
+    it('archive + system → pas de data-theme ni data-mode', () => {
+      service.setTheme('archive');
+      service.setColorMode('system');
+      TestBed.flushEffects();
+      expect(root.getAttribute('data-theme')).toBeNull();
+      expect(root.getAttribute('data-mode')).toBeNull();
+    });
+
+    it('broadsheet + system → data-theme="broadsheet", pas de data-mode', () => {
+      service.setTheme('broadsheet');
+      service.setColorMode('system');
+      TestBed.flushEffects();
+      expect(root.getAttribute('data-theme')).toBe('broadsheet');
+      expect(root.getAttribute('data-mode')).toBeNull();
+    });
+
+    it('field + system → data-theme="field", pas de data-mode', () => {
+      service.setTheme('field');
+      service.setColorMode('system');
+      TestBed.flushEffects();
+      expect(root.getAttribute('data-theme')).toBe('field');
+      expect(root.getAttribute('data-mode')).toBeNull();
+    });
+
+    it('archive + dark → pas de data-theme, data-mode="dark"', () => {
+      service.setTheme('archive');
+      service.setColorMode('dark');
+      TestBed.flushEffects();
+      expect(root.getAttribute('data-theme')).toBeNull();
+      expect(root.getAttribute('data-mode')).toBe('dark');
+    });
+
+    it('broadsheet + dark → data-theme="broadsheet", data-mode="dark"', () => {
+      service.setTheme('broadsheet');
+      service.setColorMode('dark');
+      TestBed.flushEffects();
+      expect(root.getAttribute('data-theme')).toBe('broadsheet');
+      expect(root.getAttribute('data-mode')).toBe('dark');
+    });
+
+    it('field + light → data-theme="field", data-mode="light"', () => {
+      service.setTheme('field');
+      service.setColorMode('light');
+      TestBed.flushEffects();
+      expect(root.getAttribute('data-theme')).toBe('field');
+      expect(root.getAttribute('data-mode')).toBe('light');
+    });
+
+    it('archive + light → pas de data-theme, data-mode="light"', () => {
+      service.setTheme('archive');
+      service.setColorMode('light');
+      TestBed.flushEffects();
+      expect(root.getAttribute('data-theme')).toBeNull();
+      expect(root.getAttribute('data-mode')).toBe('light');
+    });
+
+    it('passer de broadsheet à archive supprime data-theme', () => {
+      service.setTheme('broadsheet');
+      TestBed.flushEffects();
+      service.setTheme('archive');
+      TestBed.flushEffects();
+      expect(root.getAttribute('data-theme')).toBeNull();
+    });
+
+    it('passer de dark à system supprime data-mode', () => {
+      service.setColorMode('dark');
+      TestBed.flushEffects();
+      service.setColorMode('system');
+      TestBed.flushEffects();
+      expect(root.getAttribute('data-mode')).toBeNull();
+    });
+  });
+
   // ── _load (persistance) ───────────────────────────────────────────────────
 
   describe('persistance', () => {
@@ -95,6 +178,50 @@ describe('ThemeService', () => {
       TestBed.configureTestingModule({});
       const svc = TestBed.inject(ThemeService);
       expect(svc.colorMode()).toBe('system');
+    });
+  });
+
+  // ── loadFromProfile ───────────────────────────────────────────────────────
+
+  describe('loadFromProfile()', () => {
+    it('applique un thème valide depuis le profil', () => {
+      service.loadFromProfile('broadsheet', null);
+      expect(service.theme()).toBe('broadsheet');
+    });
+
+    it('applique un mode valide depuis le profil', () => {
+      service.loadFromProfile(null, 'dark');
+      expect(service.colorMode()).toBe('dark');
+    });
+
+    it('persiste le thème dans localStorage après chargement du profil', () => {
+      service.loadFromProfile('field', null);
+      expect(localStorage.getItem('dad-theme')).toBe('field');
+    });
+
+    it('persiste le mode dans localStorage après chargement du profil', () => {
+      service.loadFromProfile(null, 'light');
+      expect(localStorage.getItem('dad-color-mode')).toBe('light');
+    });
+
+    it('ignore un thème invalide provenant du profil', () => {
+      service.setTheme('archive');
+      service.loadFromProfile('invalid-theme', null);
+      expect(service.theme()).toBe('archive');
+    });
+
+    it('ignore un mode invalide provenant du profil', () => {
+      service.setColorMode('system');
+      service.loadFromProfile(null, 'invalid-mode');
+      expect(service.colorMode()).toBe('system');
+    });
+
+    it('ne modifie rien si les deux valeurs sont null', () => {
+      service.setTheme('broadsheet');
+      service.setColorMode('dark');
+      service.loadFromProfile(null, null);
+      expect(service.theme()).toBe('broadsheet');
+      expect(service.colorMode()).toBe('dark');
     });
   });
 });

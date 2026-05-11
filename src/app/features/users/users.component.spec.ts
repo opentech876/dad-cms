@@ -292,6 +292,100 @@ describe('UsersComponent', () => {
     });
   });
 
+  // ── role modal ─────────────────────────────────────────────────────────────
+
+  describe('openRoleModal() / closeRoleModal()', () => {
+    beforeEach(async () => { await component.ngOnInit(); });
+
+    it('ouvre la modal et positionne roleModalUserId', () => {
+      component.openRoleModal('u1');
+      expect(component.showRoleModal()).toBe(true);
+      expect(component.roleModalUserId()).toBe('u1');
+    });
+
+    it('pré-sélectionne le rôle courant de l\'utilisateur', () => {
+      component.openRoleModal('u1'); // u1 est 'editeur'
+      expect(component.roleModalTargetRole()).toBe('editeur');
+    });
+
+    it('closeRoleModal ferme la modal', () => {
+      component.openRoleModal('u1');
+      component.closeRoleModal();
+      expect(component.showRoleModal()).toBe(false);
+    });
+  });
+
+  describe('submitRoleChange()', () => {
+    beforeEach(async () => {
+      await component.ngOnInit();
+      component.openRoleModal('u1');
+      component.roleModalTargetRole.set('chef_equipe');
+    });
+
+    it('appelle manageUser avec update_role et le nouveau rôle', async () => {
+      await component.submitRoleChange();
+      expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u1', 'update_role', 'chef_equipe');
+    });
+
+    it('ferme la modal après l\'action', async () => {
+      await component.submitRoleChange();
+      expect(component.showRoleModal()).toBe(false);
+    });
+
+    it('ne fait rien si roleModalUserId est null', async () => {
+      component.roleModalUserId.set(null);
+      await component.submitRoleChange();
+      expect(mockWorkspace.manageUser).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── confirm modal ──────────────────────────────────────────────────────────
+
+  describe('openConfirmModal() / closeConfirmModal()', () => {
+    it('ouvre la modal avec userId et action', () => {
+      component.openConfirmModal('u1', 'block');
+      expect(component.showConfirmModal()).toBe(true);
+      expect(component.confirmModalUserId()).toBe('u1');
+      expect(component.confirmModalAction()).toBe('block');
+    });
+
+    it('closeConfirmModal ferme la modal', () => {
+      component.openConfirmModal('u1', 'block');
+      component.closeConfirmModal();
+      expect(component.showConfirmModal()).toBe(false);
+    });
+  });
+
+  describe('confirmAction()', () => {
+    beforeEach(async () => { await component.ngOnInit(); });
+
+    it('appelle manageUser avec l\'userId et l\'action confirmée', async () => {
+      component.openConfirmModal('u1', 'block');
+      await component.confirmAction();
+      expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u1', 'block', undefined);
+    });
+
+    it('ferme la modal après l\'action', async () => {
+      component.openConfirmModal('u1', 'remove');
+      await component.confirmAction();
+      expect(component.showConfirmModal()).toBe(false);
+    });
+
+    it('ne fait rien si confirmModalUserId est null', async () => {
+      component.openConfirmModal('u1', 'block');
+      component.confirmModalUserId.set(null);
+      await component.confirmAction();
+      expect(mockWorkspace.manageUser).not.toHaveBeenCalled();
+    });
+
+    it('ne fait rien si confirmModalAction est null', async () => {
+      component.confirmModalUserId.set('u1');
+      component.confirmModalAction.set(null);
+      await component.confirmAction();
+      expect(mockWorkspace.manageUser).not.toHaveBeenCalled();
+    });
+  });
+
   // ── submitInvite() ─────────────────────────────────────────────────────────
 
   describe('submitInvite()', () => {

@@ -19,7 +19,12 @@
       "Bash(awk -F\"|\" '$3+0 < 70 && $3 !~ /Branch/ && $3+0 > 0 {print}')",
       "Bash(sort -t\"|\" -k3 -n)",
       "Bash(npx ng *)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(npx tsc *)",
+      "Bash(grep -iE '\\\\.\\(xlsx|xls|csv\\)$')",
+      "Bash(node -e ' *)",
+      "Bash(node node_modules/xlsx/bin/xlsx.njs \"DayAfterDayBrazzaville Congo.xlsm\")",
+      "Bash(bun add *)"
     ]
   },
   "enabledPlugins": {

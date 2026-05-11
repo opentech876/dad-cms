@@ -72,6 +72,11 @@ export class SupabaseService {
     return this.supabase.auth.signOut();
   }
 
+  async hasWorkspaceRole(): Promise<boolean> {
+    const { data } = await this.supabase.from('user_roles').select('role').limit(1);
+    return Array.isArray(data) && data.length > 0;
+  }
+
   /** Appelle une Edge Function */
   async invoke<T = any>(functionName: string, body?: any): Promise<{ data: T | null; error: any }> {
     const result = await this.supabase.functions.invoke<T>(functionName, { body });

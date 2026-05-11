@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { CalendarComponent } from './calendar.component';
 import { CalendarService } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
@@ -238,8 +238,23 @@ describe('CalendarComponent', () => {
 
     it('le signal entries est mis à jour avec les données retournées', () => {
       mockCalendarEntryService.getEntriesForCalendar.mockReturnValueOnce(of(fakeEntries));
-      component.selectCalendar('cal-3');
+      component.selectCalendar('cal-1'); // cal-1 n'est pas dans le cache
       expect(component.entries().length).toBe(1);
+    });
+
+    it('loadingEntries passe à true pendant le chargement et revient à false', () => {
+      const subject = new Subject<CalendarEntryWithEvent[]>();
+      mockCalendarEntryService.getEntriesForCalendar.mockReturnValueOnce(subject.asObservable());
+      component.selectCalendar('cal-1');
+      expect(component.loadingEntries()).toBe(true);
+      subject.next([]);
+      subject.complete();
+      expect(component.loadingEntries()).toBe(false);
+    });
+
+    it('loadingEntries est false après un chargement synchrone', () => {
+      component.selectCalendar('cal-2');
+      expect(component.loadingEntries()).toBe(false);
     });
   });
 
@@ -248,7 +263,7 @@ describe('CalendarComponent', () => {
   describe('entriesByMmdd', () => {
     it('groupe les entrées par mmdd', () => {
       mockCalendarEntryService.getEntriesForCalendar.mockReturnValueOnce(of(fakeEntries));
-      component.selectCalendar('cal-3');
+      component.selectCalendar('cal-1'); // cal-1 n'est pas encore dans le cache
       const byMmdd = component.entriesByMmdd();
       expect(byMmdd.has('08-15')).toBe(true);
       expect(byMmdd.get('08-15')?.length).toBe(1);
@@ -372,7 +387,7 @@ describe('CalendarComponent', () => {
 
   it('yearHeatmap colore un jour avec 1 événement en intensity 1', () => {
     mockCalendarEntryService.getEntriesForCalendar.mockReturnValueOnce(of(fakeEntries));
-    component.selectCalendar('cal-3');
+    component.selectCalendar('cal-1'); // cal-1 n'est pas dans le cache
     component.selectedYear.set(2026);
     const août = component.yearHeatmap()[7]; // index 7 = août
     const day15 = août.cells.find(c => c.d === 15);
@@ -527,21 +542,15 @@ describe('CalendarComponent', () => {
   // ── navigation shortcuts ───────────────────────────────────────────────────
 
   describe('navigation shortcuts', () => {
-    it('editEvent navigue vers /evenements', () => {
+    it('goToEvents() navigue vers /evenements', () => {
       const router = TestBed.inject(Router);
-      component.editEvent('evt-1');
+      component.goToEvents();
       expect(router.navigate).toHaveBeenCalledWith(['/evenements']);
     });
 
-    it('addEventForDay navigue vers /evenements', () => {
+    it('goToCampaigns() navigue vers /campagnes', () => {
       const router = TestBed.inject(Router);
-      component.addEventForDay();
-      expect(router.navigate).toHaveBeenCalledWith(['/evenements']);
-    });
-
-    it('editCampaign navigue vers /campagnes', () => {
-      const router = TestBed.inject(Router);
-      component.editCampaign('camp-1');
+      component.goToCampaigns();
       expect(router.navigate).toHaveBeenCalledWith(['/campagnes']);
     });
   });
@@ -569,7 +578,7 @@ describe('CalendarComponent', () => {
 
     it("inclut l'événement du jour s'il y en a un", () => {
       mockCalendarEntryService.getEntriesForCalendar.mockReturnValueOnce(of(fakeEntries));
-      component.selectCalendar('cal-3');
+      component.selectCalendar('cal-1'); // cal-1 n'est pas dans le cache
       component.openDayDetail(15, 7); // mmdd = '08-15'
       expect(component.selectedDayDetail()?.events.length).toBe(1);
     });

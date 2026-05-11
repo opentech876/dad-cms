@@ -187,7 +187,8 @@
   justify-content: center;
   flex-shrink: 0;
 
-  &--ok       { background: var(--success-soft); color: var(--success); }
-  &--warn     { background: var(--warning-soft); color: var(--warning); }
-  &--duration { background: var(--warning-soft); color: var(--warning); }
+  &--ok      { background: var(--success-soft); color: var(--success); }
+  &--warn    { background: var(--warning-soft); color: var(--warning); }
+  &--pending { background: var(--bg-sunken);    color: var(--fg-3); }
+  &--error   { background: var(--danger-soft);  color: var(--danger); }
 }

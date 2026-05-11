@@ -1,0 +1,208 @@
+.profile-page {
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+// ── Topbar ─────────────────────────────────────────────────────
+
+.profile-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.profile-topbar-title {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fg-1);
+  flex: 1;
+}
+
+// ── Hero card ──────────────────────────────────────────────────
+
+.profile-hero {
+  padding: 28px 28px 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  border-bottom: none;
+}
+
+.profile-avatar-wrap {
+  flex-shrink: 0;
+  position: relative;
+}
+
+.profile-avatar-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 30px;
+  font-weight: 700;
+  font-family: var(--font-serif);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--bg-surface);
+  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-sm);
+  letter-spacing: -0.02em;
+  overflow: hidden;
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.profile-avatar-upload-btn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--fg-2);
+  transition: background 0.15s;
+  box-shadow: var(--shadow-sm);
+
+  &:hover {
+    background: var(--bg-surface-2);
+    color: var(--fg-1);
+  }
+}
+
+.profile-avatar-confirm-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 22px;
+  height: 22px;
+  min-width: 0;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-hero-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-hero-name {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--fg-1);
+  margin: 0;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-hero-email {
+  font-size: 13px;
+  color: var(--fg-3);
+  margin: 0;
+}
+
+.profile-hero-badge {
+  margin-top: 6px;
+}
+
+// ── Sections ───────────────────────────────────────────────────
+// Reusing settings-section classes from global, but need edge
+// handling for the card stack (hero + sections = one visual block)
+
+.profile-section-stack {
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--bg-surface);
+  margin-bottom: 16px;
+
+  // Remove inner section borders since the stack already has one
+  .settings-section {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .settings-section + .settings-section {
+    border-top: 1px solid var(--border-1);
+  }
+
+  &--hero {
+    // Hero card sits at the top with a subtle gradient bottom border
+    .profile-hero {
+      border-bottom: 1px solid var(--border-1);
+    }
+  }
+}
+
+// ── Form fields inside group ───────────────────────────────────
+
+.profile-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-save-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-1);
+  background: var(--bg-surface-2);
+}
+
+// ── Account info rows ──────────────────────────────────────────
+
+.profile-info-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border-1);
+  gap: 12px;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.profile-info-label {
+  width: 160px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-3);
+}
+
+.profile-info-value {
+  font-size: 13px;
+  color: var(--fg-1);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

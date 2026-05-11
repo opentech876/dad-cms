@@ -65,6 +65,18 @@ export class UsersComponent implements OnInit {
 
   readonly activeMenuUserId = signal<string | null>(null);
 
+  readonly showRoleModal = signal(false);
+  readonly roleModalUserId = signal<string | null>(null);
+  readonly roleModalTargetRole = signal<AppRole>('editeur');
+
+  readonly showConfirmModal = signal(false);
+  readonly confirmModalUserId = signal<string | null>(null);
+  readonly confirmModalAction = signal<'block' | 'unblock' | 'remove' | null>(null);
+
+  readonly confirmModalUser = computed(() =>
+    this.users().find(u => u.userId === this.confirmModalUserId()) ?? null
+  );
+
   readonly permissionsMatrix: (string | number)[][] = [
     ["Créer / configurer l'espace",         1, 0, 0, 0],
     ['Inviter / bloquer un membre',         1, 0, 0, 0],
@@ -139,6 +151,42 @@ export class UsersComponent implements OnInit {
 
   closeActionsMenu(): void {
     this.activeMenuUserId.set(null);
+  }
+
+  openRoleModal(userId: string): void {
+    const user = this.users().find(u => u.userId === userId);
+    this.roleModalUserId.set(userId);
+    this.roleModalTargetRole.set(user?.role ?? 'editeur');
+    this.showRoleModal.set(true);
+  }
+
+  closeRoleModal(): void {
+    this.showRoleModal.set(false);
+  }
+
+  async submitRoleChange(): Promise<void> {
+    const userId = this.roleModalUserId();
+    if (!userId) return;
+    await this.handleAction(userId, 'update_role', this.roleModalTargetRole());
+    this.closeRoleModal();
+  }
+
+  openConfirmModal(userId: string, action: 'block' | 'unblock' | 'remove'): void {
+    this.confirmModalUserId.set(userId);
+    this.confirmModalAction.set(action);
+    this.showConfirmModal.set(true);
+  }
+
+  closeConfirmModal(): void {
+    this.showConfirmModal.set(false);
+  }
+
+  async confirmAction(): Promise<void> {
+    const userId = this.confirmModalUserId();
+    const action = this.confirmModalAction();
+    if (!userId || !action) return;
+    await this.handleAction(userId, action);
+    this.closeConfirmModal();
   }
 
   openInviteModal(): void {

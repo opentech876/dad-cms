@@ -68,6 +68,14 @@ export class WorkspaceService {
     ).pipe(map(({ data }) => data));
   }
 
+  saveAppearance(userId: string, theme: string, colorMode: string): Observable<void> {
+    return from(
+      this.supabaseService.client
+        .from('profiles')
+        .upsert({ user_id: userId, theme, color_mode: colorMode }, { onConflict: 'user_id' }),
+    ).pipe(map(() => undefined));
+  }
+
   updateWorkspace(id: string, name: string): Observable<{ success: boolean; error?: string }> {
     return from(
       this.supabaseService.client.auth.getUser().then(({ data: { user } }: any) =>
@@ -80,6 +88,32 @@ export class WorkspaceService {
       map(({ error }: any) =>
         error ? { success: false, error: error.message } : { success: true },
       ),
+    );
+  }
+
+  uploadAvatar(userId: string, file: File): Observable<{ success: boolean; avatarUrl?: string; error?: string }> {
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const storagePath = `${userId}/avatar.${ext}`;
+    return from(
+      this.supabaseService.client.storage
+        .from('avatars')
+        .upload(storagePath, file, { upsert: true }),
+    ).pipe(
+      switchMap(({ data, error }: any) => {
+        if (error) return [{ success: false, error: error.message as string }];
+        const avatarUrl = this.supabaseService.client.storage
+          .from('avatars')
+          .getPublicUrl(data!.path).data.publicUrl;
+        return from(
+          this.supabaseService.client
+            .from('profiles')
+            .upsert({ user_id: userId, avatar_url: avatarUrl }, { onConflict: 'user_id' }),
+        ).pipe(
+          map(({ error: dbErr }: any) =>
+            dbErr ? { success: false, error: dbErr.message as string } : { success: true, avatarUrl },
+          ),
+        );
+      }),
     );
   }
 

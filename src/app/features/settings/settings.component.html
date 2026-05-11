@@ -58,30 +58,81 @@
     </div>
   </section>
 
-  <!-- ══ Espace de travail (owner only) ══ -->
+  <!-- ══ État de l'instance Supabase (owner uniquement) ══ -->
   @if (isOwner()) {
     <section class="settings-section">
       <div class="settings-section-header">
         <div class="settings-section-icon">
-          <tui-icon icon="@tui.building" style="font-size:18px;" />
+          <tui-icon icon="@tui.database" style="font-size:18px;" />
         </div>
-        <div>
-          <div class="settings-section-title">Espace de travail</div>
-          <div class="settings-section-sub">Informations générales de votre organisation</div>
+        <div style="flex:1;">
+          <div class="settings-section-title">État de l'instance Supabase</div>
+          <div class="settings-section-sub">Connectivité et utilisation du stockage</div>
         </div>
+        <button class="btn btn-flat btn-sm" type="button" (click)="refreshHealth()" title="Actualiser">
+          <tui-icon icon="@tui.refresh-cw" style="font-size:14px;" />
+          Actualiser
+        </button>
       </div>
 
       <div class="settings-group">
-        <div class="settings-group-label">Nom de l'espace de travail</div>
-        <div class="settings-inline-form">
-          <input class="input" type="text" placeholder="Day After Day"
-                 [value]="workspaceName()" (input)="workspaceName.set($any($event.target).value)" />
-          <button class="btn btn-primary btn-sm" type="button"
-                  [disabled]="wsSaving() || !workspaceName().trim()"
-                  (click)="saveWorkspaceName()">
-            @if (wsSaving()) { <span class="spinner"></span> }
-            Enregistrer
-          </button>
+        <div class="settings-health-grid">
+
+          <!-- Connection status -->
+          <div class="settings-health-card">
+            <div class="settings-health-card__label">Base de données</div>
+            @switch (dbStatus()) {
+              @case ('checking') {
+                <div class="settings-health-card__value">
+                  <span class="spinner" style="border-color:rgba(0,0,0,0.12); border-top-color:var(--accent);"></span>
+                  Vérification…
+                </div>
+              }
+              @case ('connected') {
+                <div class="settings-health-card__value settings-health-card__value--ok">
+                  <span class="settings-health-dot settings-health-dot--ok"></span>
+                  Connecté
+                </div>
+              }
+              @default {
+                <div class="settings-health-card__value settings-health-card__value--error">
+                  <span class="settings-health-dot settings-health-dot--error"></span>
+                  Erreur de connexion
+                </div>
+              }
+            }
+          </div>
+
+          <!-- Storage used -->
+          <div class="settings-health-card">
+            <div class="settings-health-card__label">Stockage utilisé</div>
+            @if (storageUsedMb() !== null) {
+              <div class="settings-health-card__value">
+                <span style="font-family:var(--font-serif); font-size:22px; font-weight:600; letter-spacing:-0.02em;">
+                  {{ storageUsedMb() }} Mo
+                </span>
+              </div>
+              <div class="settings-health-bar-wrap">
+                <div class="settings-health-bar"
+                     [style.width.%]="storagePercent()"
+                     [class.settings-health-bar--warn]="storageUsedMb()! > 350">
+                </div>
+              </div>
+              <div style="font-size:11px; color:var(--fg-3); margin-top:4px;">sur 500 Mo (Free tier)</div>
+            } @else {
+              <div class="settings-health-card__value" style="color:var(--fg-3);">—</div>
+            }
+          </div>
+
+          <!-- Plan -->
+          <div class="settings-health-card">
+            <div class="settings-health-card__label">Plan</div>
+            <div class="settings-health-card__value">
+              <span style="font-family:var(--font-serif); font-size:20px; font-weight:600;">Free tier</span>
+            </div>
+            <div style="font-size:11px; color:var(--fg-3); margin-top:4px;">2 Go de bande passante / mois</div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -114,7 +165,7 @@
       </div>
       <div class="settings-about-row">
         <dt>Client</dt>
-        <dd>DIOUGA-DIOP Lamine</dd>
+        <dd>DIOUGA-DIOP Lamine · OPEN-TECH</dd>
       </div>
     </dl>
   </section>

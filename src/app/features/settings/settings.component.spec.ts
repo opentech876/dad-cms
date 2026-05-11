@@ -2,47 +2,40 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { SettingsComponent } from './settings.component';
 import { ThemeService, ThemeId, ColorMode } from '../../core/services/theme.service';
-import { WorkspaceService } from '../../core/workspace/workspace.service';
-import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { ToastService } from '../../core/services/toast.service';
+import { SupabaseService } from '../../core/supabase/supabase.service';
 import { signal } from '@angular/core';
+
+function makeClientMock(dbError: any = null, storageData: any = 45) {
+  const selectMock = jest.fn().mockResolvedValue({ error: dbError });
+  const fromMock   = jest.fn().mockReturnValue({ select: selectMock });
+  const rpcMock    = jest.fn().mockResolvedValue({ data: storageData });
+  return { from: fromMock, rpc: rpcMock };
+}
 
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
   let fixture: ComponentFixture<SettingsComponent>;
   let mockTheme: jest.Mocked<Pick<ThemeService, 'setTheme' | 'setColorMode' | 'theme' | 'colorMode'>>;
-  let mockWorkspace: jest.Mocked<Pick<WorkspaceService, 'getWorkspaces' | 'updateWorkspace'>>;
-  let mockWorkspaceCtx: { activeWorkspaceId: ReturnType<typeof signal<string | null>> };
   let mockAuth: { currentRole$: any };
-  let mockToast: jest.Mocked<Pick<ToastService, 'success' | 'error'>>;
+  let mockSupabase: { client: ReturnType<typeof makeClientMock> };
 
   beforeEach(async () => {
     mockTheme = {
-      theme:     signal<ThemeId>('archive') as any,
-      colorMode: signal<ColorMode>('system') as any,
+      theme:        signal<ThemeId>('archive') as any,
+      colorMode:    signal<ColorMode>('system') as any,
       setTheme:     jest.fn(),
       setColorMode: jest.fn(),
     };
-
-    mockWorkspace = {
-      getWorkspaces:   jest.fn().mockReturnValue(of([{ id: 'ws-1', name: 'Day After Day' }])),
-      updateWorkspace: jest.fn().mockReturnValue(of({ success: true })),
-    };
-
-    mockWorkspaceCtx = { activeWorkspaceId: signal<string | null>('ws-1') };
-
-    mockAuth  = { currentRole$: of('owner') };
-    mockToast = { success: jest.fn(), error: jest.fn() };
+    mockAuth     = { currentRole$: of('editeur') };
+    mockSupabase = { client: makeClientMock() };
 
     await TestBed.configureTestingModule({
       imports: [SettingsComponent],
       providers: [
-        { provide: ThemeService,           useValue: mockTheme },
-        { provide: WorkspaceService,        useValue: mockWorkspace },
-        { provide: WorkspaceContextService, useValue: mockWorkspaceCtx },
-        { provide: AuthService,             useValue: mockAuth },
-        { provide: ToastService,            useValue: mockToast },
+        { provide: ThemeService,    useValue: mockTheme },
+        { provide: AuthService,     useValue: mockAuth },
+        { provide: SupabaseService, useValue: mockSupabase },
       ],
     }).compileComponents();
 
@@ -53,6 +46,14 @@ describe('SettingsComponent', () => {
 
   it('devrait être créé', () => {
     expect(component).toBeTruthy();
+  });
+
+  // ── isOwner ─────────────────────────────────────────────────────────────────
+
+  describe('isOwner()', () => {
+    it('vaut false pour un rôle editeur', () => {
+      expect(component.isOwner()).toBe(false);
+    });
   });
 
   // ── Apparence — thème ───────────────────────────────────────────────────────
@@ -87,53 +88,66 @@ describe('SettingsComponent', () => {
     });
   });
 
-  // ── Espace de travail ───────────────────────────────────────────────────────
+  // ── _checkHealth ────────────────────────────────────────────────────────────
 
-  describe('ngOnInit()', () => {
-    it('charge les espaces de travail via WorkspaceService', () => {
-      expect(mockWorkspace.getWorkspaces).toHaveBeenCalled();
+  describe('_checkHealth()', () => {
+    it('passe dbStatus à connected quand la requête DB réussit', async () => {
+      await component['_checkHealth']();
+      expect(component.dbStatus()).toBe('connected');
     });
 
-    it('pré-remplit workspaceName avec le nom de l\'espace actif', () => {
-      expect(component.workspaceName()).toBe('Day After Day');
+    it('passe dbStatus à error quand la requête DB échoue', async () => {
+      mockSupabase.client = makeClientMock({ message: 'Connexion refusée' }) as any;
+      await component['_checkHealth']();
+      expect(component.dbStatus()).toBe('error');
     });
 
-    it('expose isOwner = true pour le rôle owner', () => {
-      expect(component.isOwner()).toBe(true);
+    it('remplit storageUsedMb avec la valeur retournée par l\'RPC', async () => {
+      mockSupabase.client = makeClientMock(null, 42) as any;
+      await component['_checkHealth']();
+      expect(component.storageUsedMb()).toBe(42);
+    });
+
+    it('laisse storageUsedMb à null si l\'RPC retourne null', async () => {
+      mockSupabase.client = makeClientMock(null, null) as any;
+      await component['_checkHealth']();
+      expect(component.storageUsedMb()).toBeNull();
     });
   });
 
-  describe('saveWorkspaceName()', () => {
-    it('appelle updateWorkspace() avec l\'id et le nom saisi', async () => {
-      component.workspaceName.set('Nouveau Nom');
-      await component.saveWorkspaceName();
-      expect(mockWorkspace.updateWorkspace).toHaveBeenCalledWith('ws-1', 'Nouveau Nom');
+  // ── storagePercent ──────────────────────────────────────────────────────────
+
+  describe('storagePercent()', () => {
+    it('retourne 0 quand storageUsedMb est null', () => {
+      component.storageUsedMb.set(null);
+      expect(component.storagePercent()).toBe(0);
     });
 
-    it('ne fait rien si le nom est vide', async () => {
-      component.workspaceName.set('   ');
-      await component.saveWorkspaceName();
-      expect(mockWorkspace.updateWorkspace).not.toHaveBeenCalled();
+    it('retourne le bon pourcentage pour 250 Mo / 500 Mo', () => {
+      component.storageUsedMb.set(250);
+      expect(component.storagePercent()).toBe(50);
     });
 
-    it('ne fait rien si aucun workspace actif', async () => {
-      mockWorkspaceCtx.activeWorkspaceId.set(null);
-      component.workspaceName.set('Test');
-      await component.saveWorkspaceName();
-      expect(mockWorkspace.updateWorkspace).not.toHaveBeenCalled();
+    it('plafonne à 100 % si dépassement 500 Mo', () => {
+      component.storageUsedMb.set(600);
+      expect(component.storagePercent()).toBe(100);
+    });
+  });
+
+  // ── refreshHealth ───────────────────────────────────────────────────────────
+
+  describe('refreshHealth()', () => {
+    it('remet storageUsedMb à null au début du refresh', async () => {
+      component.storageUsedMb.set(99);
+      const p = component.refreshHealth();
+      expect(component.storageUsedMb()).toBeNull();
+      await p;
     });
 
-    it('affiche un toast de succès après une sauvegarde réussie', async () => {
-      component.workspaceName.set('Test');
-      await component.saveWorkspaceName();
-      expect(mockToast.success).toHaveBeenCalled();
-    });
-
-    it('affiche un toast d\'erreur si updateWorkspace() échoue', async () => {
-      mockWorkspace.updateWorkspace.mockReturnValue(of({ success: false, error: 'Accès refusé' }));
-      component.workspaceName.set('Test');
-      await component.saveWorkspaceName();
-      expect(mockToast.error).toHaveBeenCalledWith('Accès refusé.');
+    it('remet dbStatus à checking puis le passe à connected', async () => {
+      component.dbStatus.set('error');
+      await component.refreshHealth();
+      expect(component.dbStatus()).toBe('connected');
     });
   });
 });
