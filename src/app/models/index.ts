@@ -162,3 +162,52 @@ export interface AuditLogEntry {
   new_data: Record<string, unknown> | null;
   changed_at: string;
 }
+
+export type NotificationCategory = 'editorial' | 'campaign' | 'system';
+
+export interface Notification {
+  id: string;
+  title: string;
+  body: string;
+  category: NotificationCategory;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface Device {
+  id: string;
+  user_id: string | null;
+  expo_push_token: string;
+  platform: 'ios' | 'android';
+  app_version: string | null;
+  registered_at: string;
+  last_seen_at: string | null;
+}
+
+export interface DeviceLog {
+  id: string;
+  device_id: string | null;
+  action: string;
+  outcome: string | null;
+  error_message: string | null;
+  logged_at: string;
+}
+
+export interface CampaignTap {
+  campaign_id: string;
+  campaign_name: string;
+  advertiser: string;
+  tap_count: number;
+}
+
+export interface DailyActivity {
+  date: string;
+  count: number;
+}
+
+export interface MonthCoverage {
+  month: number;
+  filled_days: number;
+  total_days: number;
+  percent: number;
+}

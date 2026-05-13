@@ -1,11 +1,251 @@
-<div class="page-stub">
-  <div class="stub-icon">
-    <tui-icon icon="@tui.bar-chart-2" />
-  </div>
-  <h2 class="stub-title">Métriques</h2>
-  <p class="stub-desc">
-    Taux de remplissage par période, activité de l'équipe, statistiques de
-    diffusion des campagnes et performances éditoriales.
-  </p>
-  <span class="badge badge-warning">Sprint 4 · En développement</span>
+<div class="metriques-page">
+
+  @if (loading()) {
+    <div class="metriques-loading">
+      <span class="spinner"></span>
+      Chargement des métriques…
+    </div>
+  } @else {
+
+    <!-- ══ KPI cards ══ -->
+    <div class="kpi-grid">
+
+      <div class="kpi-card">
+        <div class="kpi-card__icon kpi-card__icon--devices">
+          <tui-icon icon="@tui.smartphone" style="font-size:18px;" />
+        </div>
+        <div class="kpi-card__body">
+          <div class="kpi-card__value">{{ deviceStats().total | number }}</div>
+          <div class="kpi-card__label">Appareils inscrits</div>
+          <div class="kpi-card__sub">
+            Android&nbsp;{{ deviceStats().android }} · iOS&nbsp;{{ deviceStats().ios }}
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-card__icon kpi-card__icon--notif">
+          <tui-icon icon="@tui.bell" style="font-size:18px;" />
+        </div>
+        <div class="kpi-card__body">
+          @if (notifOpenRate() !== null) {
+            <div class="kpi-card__value">{{ notifOpenRate()! | percent:'1.0-0' }}</div>
+          } @else {
+            <div class="kpi-card__value" style="color:var(--fg-3);">—</div>
+          }
+          <div class="kpi-card__label">Taux d'ouverture notifications</div>
+          <div class="kpi-card__sub">réponses / reçues</div>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-card__icon kpi-card__icon--taps">
+          <tui-icon icon="@tui.mouse-pointer-click" style="font-size:18px;" />
+        </div>
+        <div class="kpi-card__body">
+          <div class="kpi-card__value">{{ totalTaps() | number }}</div>
+          <div class="kpi-card__label">Clics sur bannières</div>
+          <div class="kpi-card__sub">{{ campaignTaps().length }} campagne{{ campaignTaps().length > 1 ? 's' : '' }}</div>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-card__icon kpi-card__icon--coverage">
+          <tui-icon icon="@tui.calendar-check" style="font-size:18px;" />
+        </div>
+        <div class="kpi-card__body">
+          <div class="kpi-card__value">{{ coveragePercent() }}%</div>
+          <div class="kpi-card__label">Couverture calendrier 2026</div>
+          <div class="kpi-card__sub">mois entièrement remplis</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══ Row: CMS activity chart ══ -->
+    <div class="card metriques-chart-card">
+      <div class="metriques-chart-header">
+        <div>
+          <div class="metriques-chart-title">Activité CMS — 30 derniers jours</div>
+          <div class="metriques-chart-sub">Opérations dans le journal d'audit (INSERT / UPDATE / DELETE)</div>
+        </div>
+        @if (activityPoints().max > 0) {
+          <span class="metriques-chart-peak">
+            pic&nbsp;<strong>{{ activityPoints().max | number }}</strong>
+          </span>
+        }
+      </div>
+
+      @if (cmsActivity().length === 0) {
+        <div class="metriques-empty">Aucune activité enregistrée</div>
+      } @else {
+        <div class="metriques-svg-wrap">
+          <svg viewBox="0 0 560 88" preserveAspectRatio="none" class="metriques-area-chart">
+            <defs>
+              <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.25" />
+                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.03" />
+              </linearGradient>
+            </defs>
+            <polygon
+              [attr.points]="activityPoints().area"
+              fill="url(#actGrad)"
+            />
+            <polyline
+              [attr.points]="activityPoints().polyline"
+              fill="none"
+              stroke="var(--accent)"
+              stroke-width="2"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
+            @for (pt of activityPoints().points; track pt.d.date) {
+              <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="3"
+                      fill="var(--accent)" />
+            }
+          </svg>
+          <!-- X-axis labels -->
+          <div class="metriques-x-axis">
+            @for (pt of activityPoints().points; track pt.d.date) {
+              <span class="metriques-x-label">{{ pt.d.date | slice:5 }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- ══ Row: Calendar coverage bar chart ══ -->
+    <div class="card metriques-chart-card">
+      <div class="metriques-chart-header">
+        <div>
+          <div class="metriques-chart-title">Couverture calendrier 2026 par mois</div>
+          <div class="metriques-chart-sub">Pourcentage de jours avec au moins un événement</div>
+        </div>
+      </div>
+      <div class="metriques-bar-chart">
+        @for (bar of coverageBarData(); track bar.label) {
+          <div class="metriques-bar-col">
+            <div class="metriques-bar-track">
+              <div
+                class="metriques-bar-fill"
+                [class.metriques-bar-fill--full]="bar.percent >= 100"
+                [class.metriques-bar-fill--empty]="bar.percent === 0"
+                [style.height.%]="bar.percent">
+              </div>
+            </div>
+            <span class="metriques-bar-pct">{{ bar.percent }}%</span>
+            <span class="metriques-bar-label">{{ bar.label }}</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- ══ Row: Campaign taps + Device logs ══ -->
+    <div class="metriques-two-col">
+
+      <!-- Campaign taps table -->
+      <div class="card">
+        <div class="metriques-table-header">
+          <tui-icon icon="@tui.mouse-pointer-click" style="font-size:15px; color:var(--warning);" />
+          <span class="metriques-table-title">Clics par campagne</span>
+        </div>
+        @if (campaignTaps().length === 0) {
+          <div class="metriques-empty">Aucune donnée</div>
+        } @else {
+          <table class="metriques-table">
+            <thead>
+              <tr>
+                <th>Campagne</th>
+                <th>Annonceur</th>
+                <th style="text-align:right">Clics</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (tap of campaignTaps(); track tap.campaign_id) {
+                <tr>
+                  <td>{{ tap.campaign_name }}</td>
+                  <td style="color:var(--fg-3)">{{ tap.advertiser }}</td>
+                  <td style="text-align:right; font-weight:600; font-variant-numeric:tabular-nums">
+                    {{ tap.tap_count | number }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+
+      <!-- Device log breakdown -->
+      <div class="card">
+        <div class="metriques-table-header">
+          <tui-icon icon="@tui.activity" style="font-size:15px; color:var(--accent);" />
+          <span class="metriques-table-title">Événements appareils</span>
+        </div>
+        @if (logBreakdown().length === 0) {
+          <div class="metriques-empty">Aucune donnée</div>
+        } @else {
+          <table class="metriques-table">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th style="text-align:right">Total</th>
+                <th style="text-align:right">Succès</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (log of logBreakdown(); track log.action) {
+                <tr>
+                  <td style="font-size:12px; font-family:var(--font-mono, monospace);">{{ log.action }}</td>
+                  <td style="text-align:right; font-variant-numeric:tabular-nums">{{ log.count }}</td>
+                  <td style="text-align:right;">
+                    <span [class.metriques-ok]="log.success === log.count"
+                          [class.metriques-warn]="log.success < log.count">
+                      {{ log.success }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+
+    </div>
+
+    <!-- ══ Mobile platform breakdown ══ -->
+    <div class="card metriques-platform-card">
+      <div class="metriques-table-header">
+        <tui-icon icon="@tui.smartphone" style="font-size:15px; color:var(--success);" />
+        <span class="metriques-table-title">Répartition des appareils mobiles</span>
+      </div>
+      <div class="metriques-platform-grid">
+        <div class="metriques-platform-item">
+          <div class="metriques-platform-icon metriques-platform-icon--android">
+            <tui-icon icon="@tui.smartphone" style="font-size:20px;" />
+          </div>
+          <div class="metriques-platform-label">Android</div>
+          <div class="metriques-platform-value">{{ deviceStats().android }}</div>
+          <div class="metriques-platform-bar">
+            <div class="metriques-platform-bar-fill metriques-platform-bar-fill--android"
+                 [style.width.%]="deviceStats().total > 0 ? (deviceStats().android / deviceStats().total) * 100 : 0">
+            </div>
+          </div>
+        </div>
+        <div class="metriques-platform-item">
+          <div class="metriques-platform-icon metriques-platform-icon--ios">
+            <tui-icon icon="@tui.smartphone" style="font-size:20px;" />
+          </div>
+          <div class="metriques-platform-label">iOS</div>
+          <div class="metriques-platform-value">{{ deviceStats().ios }}</div>
+          <div class="metriques-platform-bar">
+            <div class="metriques-platform-bar-fill metriques-platform-bar-fill--ios"
+                 [style.width.%]="deviceStats().total > 0 ? (deviceStats().ios / deviceStats().total) * 100 : 0">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  }
+
 </div>

@@ -79,6 +79,8 @@ export class CalendarEntryService {
         if (!error) return { success: true };
         if (error.code === '42501')
           return { success: false, error: 'insufficient_privilege' };
+        if (error.code === '23505' && error.message?.includes('uq_calendar_entry_one_position_per_event'))
+          return { success: false, error: 'event_already_assigned_this_day' };
         return { success: false, error: error.message };
       }),
     );

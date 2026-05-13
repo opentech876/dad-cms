@@ -9,6 +9,7 @@ import { WorkspaceService } from '../../workspace/workspace.service';
 import { WorkspaceContextService } from '../../workspace/workspace-context.service';
 import { ToastService, ToastType } from '../../services/toast.service';
 import { ThemeService } from '../../services/theme.service';
+import { NotificationService } from '../../notifications/notification.service';
 
 interface NavItem {
   id: string;
@@ -31,9 +32,11 @@ export class ShellComponent implements OnInit {
   private workspaceService = inject(WorkspaceService);
   private workspaceContext = inject(WorkspaceContextService);
   private themeService = inject(ThemeService);
+  private notifService = inject(NotificationService);
   private currentRole = toSignal(this.auth.currentRole$);
 
   readonly toastService = inject(ToastService);
+  readonly notifUnread  = signal(0);
 
   toastIcon(type: ToastType): string {
     const map: Record<ToastType, string> = {
@@ -64,11 +67,12 @@ export class ShellComponent implements OnInit {
   readonly profileSaveLoading = signal(false);
 
   private readonly navItems: NavItem[] = [
-    { id: 'dashboard',    label: 'Tableau de bord',      icon: '@tui.layout-dashboard', path: '/dashboard',    roles: [] },
-    { id: 'calendrier',   label: 'Calendrier éditorial', icon: '@tui.calendar',          path: '/calendrier',   roles: [] },
-    { id: 'evenements',   label: 'Événements',           icon: '@tui.book-open',         path: '/evenements',   roles: ['owner', 'chef_equipe', 'editeur'] },
-    { id: 'campagnes',    label: 'Campagnes pub.',        icon: '@tui.megaphone',         path: '/campagnes',    roles: ['owner', 'chef_equipe', 'charge_communication'] },
-    { id: 'utilisateurs', label: 'Utilisateurs',         icon: '@tui.users',             path: '/utilisateurs', roles: ['owner'] },
+    { id: 'dashboard',      label: 'Tableau de bord',      icon: '@tui.layout-dashboard', path: '/dashboard',      roles: [] },
+    { id: 'calendrier',     label: 'Calendrier éditorial', icon: '@tui.calendar',          path: '/calendrier',     roles: [] },
+    { id: 'evenements',     label: 'Événements',           icon: '@tui.book-open',         path: '/evenements',     roles: ['owner', 'chef_equipe', 'editeur'] },
+    { id: 'campagnes',      label: 'Campagnes pub.',        icon: '@tui.megaphone',         path: '/campagnes',      roles: ['owner', 'chef_equipe', 'charge_communication'] },
+    { id: 'utilisateurs',   label: 'Utilisateurs',         icon: '@tui.users',             path: '/utilisateurs',   roles: ['owner'] },
+    { id: 'notifications',  label: 'Notifications',        icon: '@tui.bell',              path: '/notifications',  roles: [] },
   ];
 
   private readonly adminItems: NavItem[] = [
@@ -87,12 +91,13 @@ export class ShellComponent implements OnInit {
   }
 
   private readonly routeTitles: Record<string, string> = {
-    dashboard:    'Tableau de bord',
-    calendrier:   'Calendrier éditorial',
-    evenements:   'Événements historiques',
-    campagnes:    'Campagnes publicitaires',
-    utilisateurs: 'Utilisateurs',
-    metriques:    'Métriques',
+    dashboard:           'Tableau de bord',
+    calendrier:          'Calendrier éditorial',
+    evenements:          'Événements historiques',
+    campagnes:           'Campagnes publicitaires',
+    utilisateurs:        'Utilisateurs',
+    metriques:           'Métriques',
+    notifications:       'Notifications',
     profil:              'Mon profil',
     parametres:          'Paramètres',
     'espace-de-travail': 'Espace de travail',
@@ -140,6 +145,13 @@ export class ShellComponent implements OnInit {
       const key = e.urlAfterRedirects.split('/').filter(Boolean).at(-1) ?? 'dashboard';
       this.pageTitle.set(this.routeTitles[key] ?? 'Day After Day');
     });
+
+    try {
+      const count = await firstValueFrom(this.notifService.unreadCount());
+      this.notifUnread.set(count);
+    } catch {
+      // Notifications non disponibles — pas bloquant
+    }
   }
 
   async saveProfile(): Promise<void> {

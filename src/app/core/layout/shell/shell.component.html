@@ -83,7 +83,9 @@
           <tui-icon [icon]="item.icon" class="sidebar-nav-icon" />
           @if (!collapsed()) {
             <span class="sidebar-nav-label">{{ item.label }}</span>
-            @if (item.badge) {
+            @if (item.id === 'notifications' && notifUnread() > 0) {
+              <span class="sidebar-nav-badge">{{ notifUnread() > 9 ? '9+' : notifUnread() }}</span>
+            } @else if (item.badge) {
               <span class="sidebar-nav-badge">{{ item.badge }}</span>
             }
           }
@@ -159,9 +161,12 @@
             <span class="kbd">⌘K</span>
           </span>
         </div>
-        <button class="btn btn-flat btn-icon btn-sm topbar-notif-btn" title="Notifications">
+        <button class="btn btn-flat btn-icon btn-sm topbar-notif-btn" title="Notifications"
+                [routerLink]="'/notifications'">
           <tui-icon icon="@tui.bell" style="font-size: 18px" />
-          <span class="topbar-notif-dot"></span>
+          @if (notifUnread() > 0) {
+            <span class="topbar-notif-badge">{{ notifUnread() > 9 ? '9+' : notifUnread() }}</span>
+          }
         </button>
         <button class="btn btn-flat btn-icon btn-sm" title="Se déconnecter" (click)="logout()">
           <tui-icon icon="@tui.log-out" style="font-size: 18px" />

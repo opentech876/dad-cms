@@ -1,1 +1,333 @@
-// Metrics styles will go here in Sprint 4
+.metriques-page {
+  max-width: 1100px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+// ── Loading ──────────────────────────────────────────────
+
+.metriques-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 20px;
+  color: var(--fg-3);
+  font-size: 13px;
+}
+
+// ── KPI grid ─────────────────────────────────────────────
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.kpi-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  padding: 18px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.kpi-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &--devices  { background: var(--accent-soft);  color: var(--accent); }
+  &--notif    { background: var(--success-soft); color: var(--success); }
+  &--taps     { background: var(--warning-soft); color: var(--warning); }
+  &--coverage { background: var(--accent-soft);  color: var(--accent); }
+}
+
+.kpi-card__body { flex: 1; min-width: 0; }
+
+.kpi-card__value {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--fg-1);
+  margin-bottom: 4px;
+}
+
+.kpi-card__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+  margin-bottom: 2px;
+}
+
+.kpi-card__sub {
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+// ── Chart cards ───────────────────────────────────────────
+
+.metriques-chart-card {
+  padding: 20px 24px;
+}
+
+.metriques-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.metriques-chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-1);
+  margin-bottom: 2px;
+}
+
+.metriques-chart-sub {
+  font-size: 12px;
+  color: var(--fg-3);
+}
+
+.metriques-chart-peak {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--fg-3);
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border-1);
+  background: var(--bg-sunken);
+
+  strong { color: var(--fg-1); }
+}
+
+// ── Area chart (activity) ─────────────────────────────────
+
+.metriques-svg-wrap { display: flex; flex-direction: column; gap: 4px; }
+
+.metriques-area-chart {
+  width: 100%;
+  height: 88px;
+  display: block;
+  overflow: visible;
+}
+
+.metriques-x-axis {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.metriques-x-label {
+  font-size: 10px;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+// ── Bar chart (coverage) ──────────────────────────────────
+
+.metriques-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 120px;
+  padding-bottom: 28px;
+  position: relative;
+}
+
+.metriques-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+}
+
+.metriques-bar-track {
+  flex: 1;
+  width: 100%;
+  background: var(--bg-sunken);
+  border-radius: var(--r-sm) var(--r-sm) 2px 2px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  min-height: 0;
+}
+
+.metriques-bar-fill {
+  width: 100%;
+  background: var(--accent);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  transition: height 0.4s ease;
+  min-height: 2px;
+
+  &--full  { background: var(--success); }
+  &--empty { background: var(--border-1); min-height: 0; }
+}
+
+.metriques-bar-pct {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.metriques-bar-label {
+  font-size: 10px;
+  color: var(--fg-3);
+  white-space: nowrap;
+}
+
+// ── Two-column row ────────────────────────────────────────
+
+.metriques-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ── Tables ────────────────────────────────────────────────
+
+.metriques-table-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.metriques-table-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-1);
+}
+
+.metriques-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  thead th {
+    padding: 8px 20px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+    border-bottom: 1px solid var(--border-1);
+  }
+
+  tbody td {
+    padding: 10px 20px;
+    color: var(--fg-1);
+    border-bottom: 1px solid var(--border-1);
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--bg-sunken); }
+}
+
+.metriques-ok   { color: var(--success); font-weight: 600; }
+.metriques-warn { color: var(--warning); font-weight: 600; }
+
+.metriques-empty {
+  padding: 28px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--fg-3);
+}
+
+// ── Platform card ─────────────────────────────────────────
+
+.metriques-platform-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.metriques-platform-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.metriques-platform-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 32px;
+  border-right: 1px solid var(--border-1);
+
+  &:last-child { border-right: none; }
+}
+
+.metriques-platform-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &--android { background: var(--success-soft); color: var(--success); }
+  &--ios     { background: var(--bg-sunken);    color: var(--fg-3); }
+}
+
+.metriques-platform-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.metriques-platform-value {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--fg-1);
+  line-height: 1;
+}
+
+.metriques-platform-bar {
+  width: 100%;
+  max-width: 160px;
+  height: 6px;
+  background: var(--bg-sunken);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.metriques-platform-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+
+  &--android { background: var(--success); }
+  &--ios     { background: var(--accent); }
+}

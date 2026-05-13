@@ -7,6 +7,7 @@ import { AuthService } from '../../auth/auth.service';
 import { WorkspaceService } from '../../workspace/workspace.service';
 import { AppRole, WorkspaceSummary } from '../../../models';
 import { WorkspaceContextService } from '../../workspace/workspace-context.service';
+import { NotificationService } from '../../notifications/notification.service';
 
 describe('ShellComponent — navigation par rôle', () => {
   let component: ShellComponent;
@@ -63,6 +64,10 @@ describe('ShellComponent — navigation par rôle', () => {
           provide: WorkspaceContextService,
           useValue: mockWorkspaceContext,
         },
+        {
+          provide: NotificationService,
+          useValue: { unreadCount: jest.fn().mockReturnValue(of(3)) },
+        },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     });
@@ -77,9 +82,9 @@ describe('ShellComponent — navigation par rôle', () => {
 
   // ── owner ──────────────────────────────────────────────────────────────────
 
-  it('affiche les 5 navItems pour le rôle owner', () => {
+  it('affiche les 6 navItems pour le rôle owner', () => {
     createComponent('owner');
-    expect(component.visibleNavItems().length).toBe(5);
+    expect(component.visibleNavItems().length).toBe(6);
   });
 
   it('affiche les 3 adminItems pour le rôle owner', () => {

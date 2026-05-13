@@ -24,7 +24,8 @@
       "Bash(grep -iE '\\\\.\\(xlsx|xls|csv\\)$')",
       "Bash(node -e ' *)",
       "Bash(node node_modules/xlsx/bin/xlsx.njs \"DayAfterDayBrazzaville Congo.xlsm\")",
-      "Bash(bun add *)"
+      "Bash(bun add *)",
+      "mcp__plugin_supabase_supabase__list_tables"
     ]
   },
   "enabledPlugins": {

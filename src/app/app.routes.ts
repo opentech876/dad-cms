@@ -91,6 +91,11 @@ export const routes: Routes = [
           import('./features/metriques/metriques.component').then((m) => m.MetriquesComponent),
       },
       {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./features/notifications/notifications.component').then((m) => m.NotificationsComponent),
+      },
+      {
         path: 'profil',
         loadComponent: () =>
           import('./features/profile/profile.component').then((m) => m.ProfileComponent),
