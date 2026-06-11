@@ -12,18 +12,42 @@ export class EventService {
     private workspaceContext: WorkspaceContextService,
   ) {}
 
-  /** Returns all non-deleted events for the active workspace. */
+  /**
+   * Returns all non-deleted events for the active workspace.
+   * Paginates with `.range()` to work around Supabase's default
+   * `max-rows=1000` PostgREST limit — keeps fetching until a page
+   * comes back with fewer than PAGE_SIZE rows.
+   */
   listEvents(): Observable<Event[]> {
     const wsId = this.workspaceContext.activeWorkspaceId();
-    let query = this.supabase.client
-      .from('events')
-      .select('*')
-      .is('deleted_at', null)
-      .order('event_date', { ascending: true });
-    if (wsId) query = (query as any).eq('workspace_id', wsId);
-    return from(query).pipe(
-      map(({ data, error }: any) => (error || !data ? [] : data as Event[])),
-    );
+    const PAGE_SIZE = 1000;
+
+    const fetchPage = (offset: number): Promise<Event[]> => {
+      let query = this.supabase.client
+        .from('events')
+        .select('*')
+        .is('deleted_at', null)
+        .order('event_date', { ascending: true });
+      if (wsId) query = (query as any).eq('workspace_id', wsId);
+      return (query as any)
+        .range(offset, offset + PAGE_SIZE - 1)
+        .then(({ data, error }: any) => (error || !data ? [] : data as Event[]));
+    };
+
+    const fetchAll = async (): Promise<Event[]> => {
+      const all: Event[] = [];
+      let offset = 0;
+      // Cap the loop at 50 pages (50k events) as a defensive guard.
+      for (let i = 0; i < 50; i++) {
+        const page = await fetchPage(offset);
+        all.push(...page);
+        if (page.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
+      return all;
+    };
+
+    return from(fetchAll());
   }
 
   /** Returns all non-deleted events whose MM-DD matches the given string (e.g. '08-15'). */

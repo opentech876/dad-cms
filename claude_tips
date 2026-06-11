@@ -1,0 +1,60 @@
+Voici un résumé des **27 conseils** tirés de la vidéo, organisés par thèmes :
+
+---
+
+### 🛠️ Configuration & Environnement
+
+1. **Configurer VS Code ou Antigravity** — Utiliser des espaces de travail gratuits pour travailler efficacement.
+2. **Cloner des sites depuis une capture d'écran** — La méthode "Dribbble" pour reproduire de beaux designs.
+3. **Ajouter des graphiques 3D avec Spline** — Intégrer de la 3D gratuitement dans ses projets.
+
+---
+
+### ⚡ Productivité & Workflow
+
+4. **Exécuter plusieurs conversations en split screen** — Travailler sur plusieurs tâches en parallèle.
+5. **Contourner le mode de permissions** — Supprimer les popups d'approbation répétitives.
+6. **Dicter ses prompts** — Parler plutôt que taper pour gagner du temps.
+7. **Demander quelles questions poser** — Laisser l'IA suggérer les bonnes questions avant de commencer.
+
+---
+
+### 📋 Qualité & Contrôle
+
+8. **Configurer CLAUDE.md + project_specs** — Des fichiers non-négociables qui définissent le projet comme un employé formé.
+9. **Challenger les directions proposées** — Éviter le "oui-man", exiger un regard critique.
+10. **Quality Gate : noter à 9/10** — Ne valider que ce qui atteint un niveau de qualité élevé.
+11. **Tester avant de répondre** — Économiser des heures de débogage en testant en amont.
+
+---
+
+### 🧠 Mémoire & Contexte
+
+12. **Règles de gestion du contexte** — Structurer les échanges pour éviter la perte d'information.
+13. **Suggestions d'amélioration système** — Laisser l'IA proposer ses propres améliorations.
+14. **Auto-recherche** — L'IA fait les tests à ta place.
+15. **Structurer les réponses correctement** — Définir un format de sortie clair et cohérent.
+16. **Le système de mémoire secret** — Exploiter la mémoire persistante entre les sessions.
+
+---
+
+### 🔄 Automatisation avancée
+
+17. **Message Queuing** — Envoyer des prompts pendant que l'IA travaille encore.
+18. **Plugins & solutions pré-construites** — Gagner du temps avec des outils déjà prêts.
+19. **Le système à 3 couches** — `CLAUDE.md` → Skills → References : une architecture de projet robuste.
+20. **Custom Skills** — Automatiser n'importe quel workflow répété.
+21. **Fichiers de référence** — Une source unique de vérité pour tout le projet.
+22. **Sub-agents en parallèle** — Déléguer des tâches à plusieurs agents simultanément.
+
+---
+
+### 🎛️ Contrôle de session
+
+23. **Bouton Escape** — Arrêter l'IA instantanément.
+24. **Bouton Rewind** — Revenir à n'importe quel point de sauvegarde.
+25. **Auto-sauvegarde** — Protéger son travail automatiquement.
+26. **Compactage manuel avant surcharge** — Gérer le contexte avant qu'il n'explose.
+27. **`/insights`** — Accéder à un rapport complet de toute son activité.
+
+---

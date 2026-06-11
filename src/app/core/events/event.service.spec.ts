@@ -45,6 +45,7 @@ describe('EventService', () => {
       eq:     jest.fn().mockReturnValue(chain),
       is:     jest.fn().mockReturnValue(chain),
       order:  jest.fn().mockReturnValue(chain),
+      range:  jest.fn().mockResolvedValue(result),
       then:   (resolve: any, reject?: any) => Promise.resolve(result).then(resolve, reject),
     });
     return chain;
@@ -141,6 +142,56 @@ describe('EventService', () => {
       await firstValueFrom(service.listEvents());
 
       expect(chain.eq).toHaveBeenCalledWith('workspace_id', 'ws-1');
+    });
+
+    it('pagine au-delà de 1000 lignes (limite PostgREST par défaut)', async () => {
+      // Page 1: 1000 rows ; Page 2: 35 rows → total 1035
+      const page1 = Array.from({ length: 1000 }, (_, i) => ({ ...MOCK_EVENT, id: `evt-${i + 1}` }));
+      const page2 = Array.from({ length: 35 },   (_, i) => ({ ...MOCK_EVENT, id: `evt-${1001 + i}` }));
+
+      // Build a chain whose .range() resolves with different pages on each call
+      const results = [
+        { data: page1, error: null },
+        { data: page2, error: null },
+      ];
+      const chain: any = {};
+      Object.assign(chain, {
+        select: jest.fn().mockReturnValue(chain),
+        eq:     jest.fn().mockReturnValue(chain),
+        is:     jest.fn().mockReturnValue(chain),
+        order:  jest.fn().mockReturnValue(chain),
+        range:  jest.fn().mockImplementation(() => {
+          const next = results.shift() ?? { data: [], error: null };
+          return Promise.resolve(next);
+        }),
+      });
+      mockSupabase.client.from.mockReturnValue(chain);
+
+      const result = await firstValueFrom(service.listEvents());
+
+      expect(result).toHaveLength(1035);
+      expect(chain.range).toHaveBeenCalledTimes(2);
+      expect(chain.range).toHaveBeenNthCalledWith(1, 0, 999);
+      expect(chain.range).toHaveBeenNthCalledWith(2, 1000, 1999);
+    });
+
+    it("s'arrête dès qu'une page renvoie moins de 1000 lignes", async () => {
+      // Single page of 500 rows → only one .range() call
+      const page1 = Array.from({ length: 500 }, (_, i) => ({ ...MOCK_EVENT, id: `evt-${i + 1}` }));
+      const chain: any = {};
+      Object.assign(chain, {
+        select: jest.fn().mockReturnValue(chain),
+        eq:     jest.fn().mockReturnValue(chain),
+        is:     jest.fn().mockReturnValue(chain),
+        order:  jest.fn().mockReturnValue(chain),
+        range:  jest.fn().mockResolvedValue({ data: page1, error: null }),
+      });
+      mockSupabase.client.from.mockReturnValue(chain);
+
+      const result = await firstValueFrom(service.listEvents());
+
+      expect(result).toHaveLength(500);
+      expect(chain.range).toHaveBeenCalledTimes(1);
     });
   });
 

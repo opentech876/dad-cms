@@ -267,8 +267,10 @@ input, textarea, select { font-family: inherit; }
 .divider-v { width: 1px; height: 20px; background: var(--border-2); margin: 0 6px; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
-.spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
-.btn-secondary .spinner, .btn-flat .spinner, .btn-ghost .spinner { border-color: rgba(0,0,0,0.12); border-top-color: var(--accent); }
+/* Default spinner: theme-aware. Uses a neutral-gray ring + accent-colored top, visible across all themes. */
+.spinner { width: 14px; height: 14px; border: 2px solid rgba(127,127,127,0.25); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+/* On primary/danger/success buttons (colored backgrounds), use white-ring spinner for proper contrast against the accent. */
+.btn-primary .spinner, .btn-danger .spinner, .btn-success .spinner { border-color: rgba(255,255,255,0.45); border-top-color: var(--accent-fg, #fff); }
 
 /* ── Stat / KPI Cards ────────────────────────────────────── */
 .stat-grid {

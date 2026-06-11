@@ -124,7 +124,7 @@
   &--other {
     background: var(--warning-soft);
     border-color: var(--warning);
-    color: var(--fg-2);
+    color: var(--warning);
 
     &:hover { filter: brightness(0.94); }
   }

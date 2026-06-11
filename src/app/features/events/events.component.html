@@ -1,14 +1,23 @@
 @if (editorView()) {
-
   <!-- ══ EDITOR ══ -->
   <div class="events-page">
-    <button class="btn btn-flat btn-sm" style="align-self:flex-start; display:inline-flex; align-items:center; gap:4px; margin-bottom:16px;" type="button" (click)="closeEditor()">
-      <tui-icon icon="@tui.chevron-left" style="font-size:14px;" />
+    <button
+      class="btn btn-flat btn-sm"
+      style="
+        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 16px;
+      "
+      type="button"
+      (click)="closeEditor()"
+    >
+      <tui-icon icon="@tui.chevron-left" style="font-size: 14px" />
       Retour aux événements
     </button>
 
     <div class="event-editor-grid">
-
       <!-- ── Left: Form ── -->
       <div class="event-editor-col">
         <div class="card">
@@ -24,24 +33,32 @@
             }
           </div>
 
-          <div class="card-body" style="display:flex; flex-direction:column; gap:16px;">
-
+          <div class="card-body" style="display: flex; flex-direction: column; gap: 16px">
             <!-- Titre -->
             <div class="field required">
               <label class="field-label">Titre</label>
-              <input class="input" style="font-family:var(--font-serif); font-size:16px;"
-                     placeholder="Indépendance de la République du Congo"
-                     [value]="editorTitle()" (input)="editorTitle.set($any($event.target).value)" />
-              <span class="field-hint">{{ titleCharCount() }} / 80 caractères · idéalement 4 à 8 mots</span>
+              <input
+                class="input"
+                style="font-family: var(--font-serif); font-size: 16px"
+                placeholder="Indépendance de la République du Congo"
+                [value]="editorTitle()"
+                (input)="editorTitle.set($any($event.target).value)"
+              />
+              <span class="field-hint"
+                >{{ titleCharCount() }} / 80 caractères · idéalement 4 à 8 mots</span
+              >
             </div>
 
             <!-- Date historique -->
             <div class="field required">
               <label class="field-label">Date historique</label>
               <tui-textfield>
-                <input tuiInputDate type="date"
-                       [ngModel]="editorTuiDay"
-                       (ngModelChange)="onEditorDateChange($event)" />
+                <input
+                  tuiInputDate
+                  type="date"
+                  [ngModel]="editorTuiDay"
+                  (ngModelChange)="onEditorDateChange($event)"
+                />
               </tui-textfield>
               <span class="field-hint">Date réelle de l'événement (ex. 15 août 1960)</span>
             </div>
@@ -49,11 +66,15 @@
             <!-- Description -->
             <div class="field required">
               <label class="field-label">Description historique</label>
-              <textarea class="textarea" rows="6"
-                        style="font-family:var(--font-serif); font-size:14px; line-height:1.55;"
-                        placeholder="Le Congo accède à l'indépendance, mettant fin à la période coloniale française…"
-                        [value]="editorDescription()" (input)="editorDescription.set($any($event.target).value)"></textarea>
-              <div style="display:flex; justify-content:space-between;">
+              <textarea
+                class="textarea"
+                rows="6"
+                style="font-family: var(--font-serif); font-size: 14px; line-height: 1.55"
+                placeholder="Le Congo accède à l'indépendance, mettant fin à la période coloniale française…"
+                [value]="editorDescription()"
+                (input)="editorDescription.set($any($event.target).value)"
+              ></textarea>
+              <div style="display: flex; justify-content: space-between">
                 <span class="field-hint">Markdown léger toléré : **gras**, *italique*</span>
                 <span class="field-hint">{{ descCharCount() }} / 500 caractères</span>
               </div>
@@ -63,58 +84,145 @@
             <div class="field required">
               <label class="field-label">Image illustrative</label>
               @if (editorHasImage()) {
-                <div style="display:grid; grid-template-columns:160px 1fr; gap:14px;">
-
+                <div style="display: grid; grid-template-columns: 160px 1fr; gap: 14px">
                   <!-- Thumbnail -->
-                  <div class="event-img-preview" style="position:relative; overflow:hidden; min-height:110px;">
+                  <div
+                    class="event-img-preview"
+                    style="position: relative; overflow: hidden; min-height: 110px"
+                  >
                     @if (editorImageUrl()) {
-                      <img [src]="editorImageUrl()" alt=""
-                           style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:inherit;" />
-                      <div style="position:absolute; inset:0; background:linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55)); pointer-events:none; border-radius:inherit;"></div>
+                      <img
+                        [src]="editorImageUrl()"
+                        alt=""
+                        style="
+                          position: absolute;
+                          inset: 0;
+                          width: 100%;
+                          height: 100%;
+                          object-fit: cover;
+                          border-radius: inherit;
+                        "
+                      />
+                      <div
+                        style="
+                          position: absolute;
+                          inset: 0;
+                          background: linear-gradient(
+                            to bottom,
+                            transparent 40%,
+                            rgba(0, 0, 0, 0.55)
+                          );
+                          pointer-events: none;
+                          border-radius: inherit;
+                        "
+                      ></div>
                     }
-                    <div style="position:absolute; bottom:0; left:0; right:0; padding:6px; display:flex; justify-content:space-between; align-items:center;">
-                      <span style="font-family:var(--font-serif); font-style:italic; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:90px;"
-                            [style.color]="editorImageUrl() ? '#fff' : 'var(--fg-2)'">{{ editorImageName() }}</span>
-                      <label class="btn btn-flat btn-icon btn-sm" title="Remplacer"
-                             [style.background]="editorImageUrl() ? 'rgba(255,255,255,0.2)' : ''"
-                             [style.color]="editorImageUrl() ? '#fff' : 'inherit'"
-                             style="height:24px; width:24px; cursor:pointer;">
-                        <tui-icon icon="@tui.refresh-cw" style="font-size:12px;" />
-                        <input type="file" accept="image/*" style="display:none;" (change)="onImageChange($event)" />
+                    <div
+                      style="
+                        position: absolute;
+                        bottom: 0;
+                        left: 0;
+                        right: 0;
+                        padding: 6px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                      "
+                    >
+                      <span
+                        style="
+                          font-family: var(--font-serif);
+                          font-style: italic;
+                          font-size: 10px;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                          white-space: nowrap;
+                          max-width: 90px;
+                        "
+                        [style.color]="editorImageUrl() ? '#fff' : 'var(--fg-2)'"
+                        >{{ editorImageName() }}</span
+                      >
+                      <label
+                        class="btn btn-flat btn-icon btn-sm"
+                        title="Remplacer"
+                        [style.background]="editorImageUrl() ? 'rgba(255,255,255,0.2)' : ''"
+                        [style.color]="editorImageUrl() ? '#fff' : 'inherit'"
+                        style="height: 24px; width: 24px; cursor: pointer"
+                      >
+                        <tui-icon icon="@tui.refresh-cw" style="font-size: 12px" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style="display: none"
+                          (change)="onImageChange($event)"
+                        />
                       </label>
                     </div>
                   </div>
 
                   <!-- File info + replace button -->
-                  <div style="display:flex; flex-direction:column; justify-content:space-between;">
-                    <div style="font-size:12px; color:var(--fg-2); display:flex; flex-direction:column; gap:5px;">
+                  <div
+                    style="display: flex; flex-direction: column; justify-content: space-between"
+                  >
+                    <div
+                      style="
+                        font-size: 12px;
+                        color: var(--fg-2);
+                        display: flex;
+                        flex-direction: column;
+                        gap: 5px;
+                      "
+                    >
                       @if (editorImageSizeKb() > 0) {
-                        <div style="display:flex; justify-content:space-between;">
-                          <span style="color:var(--fg-3);">Poids</span>
-                          <span><strong>{{ editorImageSizeKb() }} Ko</strong> / 150 Ko @if (editorImageSizeKb() <= 150) { ✓ }</span>
+                        <div style="display: flex; justify-content: space-between">
+                          <span style="color: var(--fg-3)">Poids</span>
+                          <span
+                            ><strong>{{ editorImageSizeKb() }} Ko</strong> / 150 Ko
+                            @if (editorImageSizeKb() <= 150) {
+                              ✓
+                            }
+                          </span>
                         </div>
                       } @else {
-                        <div style="font-size:11px; color:var(--fg-3);">Image enregistrée</div>
+                        <div style="font-size: 11px; color: var(--fg-3)">Image enregistrée</div>
                       }
-                      <div style="display:flex; justify-content:space-between;">
-                        <span style="color:var(--fg-3);">Bucket</span>
-                        <span style="font-family:monospace; font-size:11px;">historical-images/</span>
+                      <div style="display: flex; justify-content: space-between">
+                        <span style="color: var(--fg-3)">Bucket</span>
+                        <span style="font-family: monospace; font-size: 11px"
+                          >historical-images/</span
+                        >
                       </div>
                     </div>
-                    <label class="btn btn-secondary btn-sm" style="align-self:flex-start; margin-top:8px; cursor:pointer;">
-                      <tui-icon icon="@tui.upload" style="font-size:14px;" />
+                    <label
+                      class="btn btn-secondary btn-sm"
+                      style="align-self: flex-start; margin-top: 8px; cursor: pointer"
+                    >
+                      <tui-icon icon="@tui.upload" style="font-size: 14px" />
                       Remplacer l'image
-                      <input type="file" accept="image/*" style="display:none;" (change)="onImageChange($event)" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style="display: none"
+                        (change)="onImageChange($event)"
+                      />
                     </label>
                   </div>
-
                 </div>
               } @else {
                 <label class="event-upload-zone">
-                  <tui-icon icon="@tui.image" style="font-size:28px; color:var(--fg-3);" />
-                  <span style="font-size:13px; color:var(--fg-2); margin-top:8px;">Cliquer pour ajouter une image</span>
-                  <span class="field-hint" style="margin-top:2px;">800 × 600 px · ≤ 150 Ko · JPEG ou PNG</span>
-                  <input type="file" accept="image/*" style="display:none;" (change)="onImageChange($event)" />
+                  <tui-icon icon="@tui.image" style="font-size: 28px; color: var(--fg-3)" />
+                  <span style="font-size: 13px; color: var(--fg-2); margin-top: 8px"
+                    >Cliquer pour ajouter une image</span
+                  >
+                  <span class="field-hint" style="margin-top: 2px"
+                    >800 × 600 px · ≤ 150 Ko · JPEG ou PNG</span
+                  >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style="display: none"
+                    (change)="onImageChange($event)"
+                  />
                 </label>
               }
             </div>
@@ -122,18 +230,31 @@
             <!-- Légende -->
             <div class="field">
               <label class="field-label">Légende (optionnelle)</label>
-              <input class="input" placeholder="Source, date, auteur de la photo…"
-                     [value]="editorCaption()" (input)="editorCaption.set($any($event.target).value)" />
+              <input
+                class="input"
+                placeholder="Source, date, auteur de la photo…"
+                [value]="editorCaption()"
+                (input)="editorCaption.set($any($event.target).value)"
+              />
             </div>
 
             <!-- Audit dates -->
             @if (editorEventId()) {
-              <div style="display:flex; gap:20px; padding-top:12px; border-top:1px solid var(--border-1); font-size:11.5px; color:var(--fg-3);">
+              <div
+                style="
+                  display: flex;
+                  gap: 20px;
+                  padding-top: 12px;
+                  border-top: 1px solid var(--border-1);
+                  font-size: 11.5px;
+                  color: var(--fg-3);
+                "
+              >
                 @if (editorCreatedAt()) {
-                  <span>Ajouté le {{ editorCreatedAt()!.slice(0,10) }}</span>
+                  <span>Ajouté le {{ editorCreatedAt()!.slice(0, 10) }}</span>
                 }
                 @if (editorUpdatedAt()) {
-                  <span>Mis à jour le {{ editorUpdatedAt()!.slice(0,10) }}</span>
+                  <span>Mis à jour le {{ editorUpdatedAt()!.slice(0, 10) }}</span>
                 }
               </div>
             }
@@ -141,26 +262,50 @@
 
           <div class="card-footer">
             @if (editorEventId()) {
-              <button class="btn btn-flat btn-sm" style="color:var(--danger);" type="button" (click)="deleteEvent()">
-                <tui-icon icon="@tui.trash-2" style="font-size:14px;" />
+              <button
+                class="btn btn-flat btn-sm"
+                style="color: var(--danger)"
+                type="button"
+                (click)="deleteEvent()"
+              >
+                <tui-icon icon="@tui.trash-2" style="font-size: 14px" />
                 Supprimer
               </button>
             }
-            <div style="flex:1;"></div>
+            <div style="flex: 1"></div>
             <!-- Save as draft and immediately open a fresh blank form -->
-            <button class="btn btn-flat btn-sm" type="button" [disabled]="editorSaving()" (click)="saveDraftAndCreateNew()"
-                    title="Enregistre comme brouillon et ouvre un nouveau formulaire">
-              <tui-icon icon="@tui.plus" style="font-size:14px;" />
+            <button
+              class="btn btn-flat btn-sm"
+              type="button"
+              [disabled]="editorSaving()"
+              (click)="saveDraftAndCreateNew()"
+              title="Enregistre comme brouillon et ouvre un nouveau formulaire"
+            >
+              <tui-icon icon="@tui.plus" style="font-size: 14px" />
               Créer un autre
             </button>
-            <button class="btn btn-flat btn-sm" type="button" (click)="closeEditor()">Annuler</button>
-            <button class="btn btn-secondary btn-sm" type="button" [disabled]="editorSaving()" (click)="saveDraft()">
-              @if (editorSaving()) { <span class="spinner"></span> }
+            <button class="btn btn-flat btn-sm" type="button" (click)="closeEditor()">
+              Annuler
+            </button>
+            <button
+              class="btn btn-secondary btn-sm"
+              type="button"
+              [disabled]="editorSaving()"
+              (click)="saveDraft()"
+            >
+              @if (editorSaving()) {
+                <span class="spinner"></span>
+              }
               Enregistrer brouillon
             </button>
-            <button class="btn btn-primary btn-sm" type="button" [disabled]="editorSaving()" (click)="publish()">
+            <button
+              class="btn btn-primary btn-sm"
+              type="button"
+              [disabled]="editorSaving()"
+              (click)="publish()"
+            >
               Publier
-              <tui-icon icon="@tui.check" style="font-size:14px;" />
+              <tui-icon icon="@tui.check" style="font-size: 14px" />
             </button>
           </div>
         </div>
@@ -168,50 +313,58 @@
 
       <!-- ── Right: Assignment panel + Validation ── -->
       <div class="event-editor-col">
-
         <!-- ── Calendar assignment panel ── -->
         <div class="card">
           <div class="card-header">
-            <div style="min-width:0;">
+            <div style="min-width: 0">
               <div class="card-title">Assignation aux calendriers</div>
               @if (editorMmddLabel()) {
                 <div class="card-subtitle">{{ editorMmddLabel() }} · tous les calendriers</div>
               }
             </div>
             @if (assignmentsLoading()) {
-              <span class="spinner" style="margin-left:8px;"></span>
+              <span class="spinner" style="margin-left: 8px"></span>
             }
           </div>
 
           @if (!editorEventId()) {
             <!-- New event: panel locked until first save -->
-            <div style="display:flex; flex-direction:column; align-items:center; padding:28px 20px; gap:10px; color:var(--fg-3); text-align:center;">
-              <tui-icon icon="@tui.calendar" style="font-size:28px;" />
-              <span style="font-size:13px; line-height:1.45; max-width:200px;">
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 28px 20px;
+                gap: 10px;
+                color: var(--fg-3);
+                text-align: center;
+              "
+            >
+              <tui-icon icon="@tui.calendar" style="font-size: 28px" />
+              <span style="font-size: 13px; line-height: 1.45; max-width: 200px">
                 Enregistrez l'événement pour l'assigner à un calendrier.
               </span>
             </div>
-
           } @else if (!assignmentsLoading() && calendars().length === 0) {
-            <div style="padding:20px 18px; font-size:13px; color:var(--fg-3);">
+            <div style="padding: 20px 18px; font-size: 13px; color: var(--fg-3)">
               Aucun calendrier dans cet espace de travail.
             </div>
-
           } @else {
             <div>
               @for (cal of calendars(); track cal.id; let first = $first) {
                 <div class="assignment-row" [class.assignment-row--first]="first">
-
                   <!-- Calendar info -->
-                  <div style="flex:1; min-width:0;">
+                  <div style="flex: 1; min-width: 0">
                     <div class="assignment-cal-name">{{ cal.name }}</div>
-                    <div style="margin-top:3px;">
+                    <div style="margin-top: 3px">
                       @if (cal.status === 'published') {
-                        <span class="badge badge-success badge-dot" style="font-size:10px;">Publié</span>
+                        <span class="badge badge-success badge-dot" style="font-size: 10px"
+                          >Publié</span
+                        >
                       } @else if (cal.status === 'archived') {
-                        <span class="badge" style="font-size:10px; opacity:0.6;">Archivé</span>
+                        <span class="badge" style="font-size: 10px; opacity: 0.6">Archivé</span>
                       } @else {
-                        <span class="badge badge-warning" style="font-size:10px;">Brouillon</span>
+                        <span class="badge badge-warning" style="font-size: 10px">Brouillon</span>
                       }
                     </div>
                   </div>
@@ -220,42 +373,63 @@
                   <div class="assignment-slots">
                     @for (pos of positions; track pos) {
                       @let key = cal.id + ':' + pos;
-                      @let state = (slotStates().get(key) ?? 'empty');
+                      @let state = slotStates().get(key) ?? 'empty';
                       <div class="assignment-slot">
-
                         @if (state === 'confirming') {
                           <!-- Button-swap confirmation: auto-cancels after 4 s -->
-                          <span style="font-size:11px; color:var(--fg-3); white-space:nowrap;">Retirer&nbsp;?</span>
-                          <button class="btn btn-flat btn-sm" style="color:var(--danger); padding:4px 8px; font-size:11px; min-width:0;"
-                                  type="button" (click)="confirmRemove(cal.id, pos)">Oui</button>
-                          <button class="btn btn-flat btn-sm" style="padding:4px 8px; font-size:11px; min-width:0;"
-                                  type="button" (click)="cancelRemove()">Non</button>
-
+                          <span style="font-size: 11px; color: var(--fg-3); white-space: nowrap"
+                            >Retirer&nbsp;?</span
+                          >
+                          <button
+                            class="btn btn-flat btn-sm"
+                            style="
+                              color: var(--danger);
+                              padding: 4px 8px;
+                              font-size: 11px;
+                              min-width: 0;
+                            "
+                            type="button"
+                            (click)="confirmRemove(cal.id, pos)"
+                          >
+                            Oui
+                          </button>
+                          <button
+                            class="btn btn-flat btn-sm"
+                            style="padding: 4px 8px; font-size: 11px; min-width: 0"
+                            type="button"
+                            (click)="cancelRemove()"
+                          >
+                            Non
+                          </button>
                         } @else {
-                          <button class="slot-btn"
-                                  [class.slot-btn--ours]="state === 'ours'"
-                                  [class.slot-btn--other]="state === 'other'"
-                                  [disabled]="state === 'busy' || assignmentsLoading()"
-                                  [title]="slotOtherTitles().get(key) ? 'Occupé par : ' + slotOtherTitles().get(key) : ''"
-                                  type="button"
-                                  (click)="toggleSlot(cal.id, pos)">
+                          <button
+                            class="slot-btn"
+                            [class.slot-btn--ours]="state === 'ours'"
+                            [class.slot-btn--other]="state === 'other'"
+                            [disabled]="state === 'busy' || assignmentsLoading()"
+                            [title]="
+                              slotOtherTitles().get(key)
+                                ? 'Occupé par : ' + slotOtherTitles().get(key)
+                                : ''
+                            "
+                            type="button"
+                            (click)="toggleSlot(cal.id, pos)"
+                          >
                             @if (state === 'busy') {
-                              <span class="spinner" style="width:10px; height:10px;"></span>
+                              <span class="spinner" style="width: 10px; height: 10px"></span>
                             } @else if (state === 'ours') {
-                              <tui-icon icon="@tui.check" style="font-size:10px;" />
+                              <tui-icon icon="@tui.check" style="font-size: 10px" />
                             } @else if (state === 'other') {
-                              <tui-icon icon="@tui.triangle-alert" style="font-size:10px;" />
+                              <tui-icon icon="@tui.triangle-alert" style="font-size: 10px" />
                             } @else {
-                              <tui-icon icon="@tui.plus" style="font-size:10px;" />
+                              <tui-icon icon="@tui.plus" style="font-size: 10px" />
                             }
                             Pos.&nbsp;{{ pos }}
                           </button>
                         }
-
                       </div>
                     }
                   </div>
-
                 </div>
               }
             </div>
@@ -270,81 +444,199 @@
           <div>
             @for (item of validationItems(); track item.label; let i = $index) {
               <div class="event-validation-row" [class.event-validation-row--first]="i === 0">
-                <span class="event-validation-dot"
-                      [class.event-validation-dot--ok]="item.ok"
-                      [class.event-validation-dot--warn]="!item.ok">
+                <span
+                  class="event-validation-dot"
+                  [class.event-validation-dot--ok]="item.ok"
+                  [class.event-validation-dot--warn]="!item.ok"
+                >
                   @if (item.ok) {
-                    <tui-icon icon="@tui.check" style="font-size:11px;" />
+                    <tui-icon icon="@tui.check" style="font-size: 11px" />
                   } @else {
-                    <tui-icon icon="@tui.triangle-alert" style="font-size:11px;" />
+                    <tui-icon icon="@tui.triangle-alert" style="font-size: 11px" />
                   }
                 </span>
-                <span [style.color]="item.ok ? 'var(--fg-1)' : 'var(--fg-2)'">{{ item.label }}</span>
+                <span [style.color]="item.ok ? 'var(--fg-1)' : 'var(--fg-2)'">{{
+                  item.label
+                }}</span>
               </div>
             }
           </div>
         </div>
-
       </div>
     </div>
   </div>
-
 } @else {
-
   <!-- ══ LIST VIEW ══ -->
   <div class="events-page">
-
     <!-- ── KPI strip ── -->
-    <div class="kpi-grid" style="margin-bottom:16px;">
-      <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Total bibliothèque</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1;">{{ stats().total }}</div>
-        <div style="margin-top:10px;"><span class="badge">événements</span></div>
+    <div class="kpi-grid" style="margin-bottom: 16px">
+      <div class="card" style="padding: 18px 20px">
+        <div
+          style="
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--fg-3);
+          "
+        >
+          Total bibliothèque
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 34px;
+            font-weight: 600;
+            margin-top: 6px;
+            letter-spacing: -0.02em;
+          "
+        >
+          {{ stats().total }}
+        </div>
+        <div style="margin-top: 10px"><span class="badge">événements</span></div>
       </div>
-      <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Publiés</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--success);">{{ stats().published }}</div>
-        <div style="margin-top:10px;"><span class="badge badge-success badge-dot">prêts pour le calendrier</span></div>
+      <div class="card" style="padding: 18px 20px">
+        <div
+          style="
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Publiés
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 34px;
+            font-weight: 600;
+            margin-top: 6px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: var(--success);
+          "
+        >
+          {{ stats().published }}
+        </div>
+        <div style="margin-top: 10px">
+          <span class="badge badge-success badge-dot">prêts pour le calendrier</span>
+        </div>
       </div>
-      <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Brouillons</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--warning);">{{ stats().draft }}</div>
-        <div style="margin-top:10px;"><span class="badge badge-warning">en cours de rédaction</span></div>
+      <div class="card" style="padding: 18px 20px">
+        <div
+          style="
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Brouillons
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 34px;
+            font-weight: 600;
+            margin-top: 6px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: var(--warning);
+          "
+        >
+          {{ stats().draft }}
+        </div>
+        <div style="margin-top: 10px">
+          <span class="badge badge-warning">en cours de rédaction</span>
+        </div>
       </div>
-      <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Sans image</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--danger);">{{ stats().noImage }}</div>
-        <div style="margin-top:10px;"><span class="badge badge-danger">à compléter</span></div>
+      <div class="card" style="padding: 18px 20px">
+        <div
+          style="
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Sans image
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 34px;
+            font-weight: 600;
+            margin-top: 6px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: var(--danger);
+          "
+        >
+          {{ stats().noImage }}
+        </div>
+        <div style="margin-top: 10px"><span class="badge badge-danger">à compléter</span></div>
       </div>
     </div>
 
     <!-- ── Toolbar ── -->
-    <div class="card" style="padding:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-      <div class="input-group" style="width:280px;">
+    <div
+      class="card"
+      style="
+        padding: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      "
+    >
+      <div class="input-group" style="width: 280px">
         <span class="input-icon">&#128269;</span>
-        <input class="input has-icon" placeholder="Rechercher par titre ou date…"
-               [value]="searchQuery()" (input)="setSearchQuery($any($event.target).value)"
-               style="height:36px; font-size:13px;">
+        <input
+          class="input has-icon"
+          placeholder="Rechercher par titre ou date…"
+          [value]="searchQuery()"
+          (input)="setSearchQuery($any($event.target).value)"
+          style="height: 36px; font-size: 13px"
+        />
       </div>
-      <input class="input" type="number" min="1" max="9999" step="1"
-             placeholder="Année historique…"
-             [value]="selectedYear() || ''"
-             (input)="setSelectedYear(+$any($event.target).value || 0)"
-             style="width:160px; height:36px; font-size:13px;">
-      <select class="select" style="width:150px; height:36px; font-size:13px;"
-              [value]="selectedStatus()" (change)="setSelectedStatus($any($event.target).value)">
+      <input
+        class="input"
+        type="number"
+        min="1"
+        max="9999"
+        step="1"
+        placeholder="Année historique…"
+        [value]="selectedYear() || ''"
+        (input)="setSelectedYear(+$any($event.target).value || 0)"
+        style="width: 160px; height: 36px; font-size: 13px"
+      />
+      <select
+        class="select"
+        style="width: 150px; height: 36px; font-size: 13px"
+        [value]="selectedStatus()"
+        (change)="setSelectedStatus($any($event.target).value)"
+      >
         <option value="all">Tous statuts</option>
         <option value="published">Publiés</option>
         <option value="draft">Brouillons</option>
       </select>
-      <div style="flex:1;"></div>
-      <button class="btn btn-flat btn-sm" type="button" (click)="openImportModal()"
-              title="Importer depuis un fichier Excel">
-        <tui-icon icon="@tui.upload" style="font-size:14px;" />
+      <div style="flex: 1"></div>
+      <button
+        class="btn btn-flat btn-sm"
+        type="button"
+        (click)="openImportModal()"
+        title="Importer depuis un fichier Excel"
+      >
+        <tui-icon icon="@tui.upload" style="font-size: 14px" />
         Importer Excel
       </button>
       <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
-        <tui-icon icon="@tui.plus" style="font-size:14px;" />
+        <tui-icon icon="@tui.plus" style="font-size: 14px" />
         Nouvel événement
       </button>
     </div>
@@ -354,44 +646,71 @@
       <table class="table">
         <thead>
           <tr>
-            <th style="width:180px;">Date historique</th>
+            <th style="width: 180px">Date historique</th>
             <th>Titre</th>
-            <th style="width:80px; text-align:center;">Image</th>
-            <th style="width:110px;">Statut</th>
-            <th style="width:60px;"></th>
+            <th style="width: 80px; text-align: center">Image</th>
+            <th style="width: 110px">Statut</th>
+            <th style="width: 60px"></th>
           </tr>
         </thead>
         <tbody>
           @if (loading()) {
-            <tr><td colspan="5" style="text-align:center; color:var(--fg-3); padding:32px;">Chargement…</td></tr>
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--fg-3); padding: 32px">
+                Chargement…
+              </td>
+            </tr>
           } @else if (listRows().length === 0) {
-            <tr><td colspan="5" style="text-align:center; color:var(--fg-3); padding:32px; font-style:italic;">Aucun événement trouvé</td></tr>
+            <tr>
+              <td
+                colspan="5"
+                style="text-align: center; color: var(--fg-3); padding: 32px; font-style: italic"
+              >
+                Aucun événement trouvé
+              </td>
+            </tr>
           } @else {
             @for (row of paginatedRows(); track row.eventId) {
-              <tr style="cursor:pointer;" (click)="openEditor(row.eventId)">
+              <tr style="cursor: pointer" (click)="openEditor(row.eventId)">
                 <td>
-                  <span style="font-family:var(--font-serif); font-size:15px; font-weight:600;">{{ row.date }}</span>
+                  <span style="font-family: var(--font-serif); font-size: 15px; font-weight: 600">{{
+                    row.date
+                  }}</span>
                 </td>
                 <td>
-                  <div style="font-family:var(--font-serif); font-style:italic; color:var(--fg-1);">{{ row.title }}</div>
+                  <div
+                    style="font-family: var(--font-serif); font-style: italic; color: var(--fg-1)"
+                  >
+                    {{ row.title }}
+                  </div>
                   @if (row.excerpt) {
-                    <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ row.excerpt }}</div>
+                    <div style="font-size: 12px; color: var(--fg-3); margin-top: 2px">
+                      {{ row.excerpt }}
+                    </div>
                   }
                 </td>
-                <td style="text-align:center;">
+                <td style="text-align: center">
                   @if (row.hasImage) {
-                    <tui-icon icon="@tui.image" style="font-size:16px; color:var(--success);" />
+                    <tui-icon icon="@tui.image" style="font-size: 16px; color: var(--success)" />
                   } @else {
-                    <tui-icon icon="@tui.image-off" style="font-size:16px; color:var(--fg-4);" />
+                    <tui-icon icon="@tui.image-off" style="font-size: 16px; color: var(--fg-4)" />
                   }
                 </td>
                 <td>
-                  @if (row.status === 'published') { <span class="badge badge-success badge-dot">Publié</span> }
-                  @if (row.status === 'draft') { <span class="badge badge-warning badge-dot">Brouillon</span> }
+                  @if (row.status === 'published') {
+                    <span class="badge badge-success badge-dot">Publié</span>
+                  }
+                  @if (row.status === 'draft') {
+                    <span class="badge badge-warning badge-dot">Brouillon</span>
+                  }
                 </td>
                 <td>
-                  <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="$event.stopPropagation(); openEditor(row.eventId)">
-                    <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+                  <button
+                    class="btn btn-flat btn-icon btn-sm"
+                    type="button"
+                    (click)="$event.stopPropagation(); openEditor(row.eventId)"
+                  >
+                    <tui-icon icon="@tui.chevron-right" style="font-size: 14px" />
                   </button>
                 </td>
               </tr>
@@ -402,182 +721,315 @@
 
       <!-- Pagination -->
       @if (totalPages() > 1) {
-        <div style="display:flex; align-items:center; justify-content:flex-end; gap:12px; padding:12px 16px; border-top:1px solid var(--border);">
-          <span style="font-size:13px; color:var(--fg-3);">
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+          "
+        >
+          <span style="font-size: 13px; color: var(--fg-3)">
             Page {{ currentPage() + 1 }} / {{ totalPages() }} · {{ listRows().length }} événements
           </span>
-          <button class="btn btn-flat btn-sm" type="button" [disabled]="currentPage() === 0" (click)="prevPage()">
-            <tui-icon icon="@tui.chevron-left" style="font-size:14px;" />
+          <button
+            class="btn btn-flat btn-sm"
+            type="button"
+            [disabled]="currentPage() === 0"
+            (click)="prevPage()"
+          >
+            <tui-icon icon="@tui.chevron-left" style="font-size: 14px" />
             Précédent
           </button>
-          <button class="btn btn-flat btn-sm" type="button" [disabled]="currentPage() >= totalPages() - 1" (click)="nextPage()">
+          <button
+            class="btn btn-flat btn-sm"
+            type="button"
+            [disabled]="currentPage() >= totalPages() - 1"
+            (click)="nextPage()"
+          >
             Suivant
-            <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+            <tui-icon icon="@tui.chevron-right" style="font-size: 14px" />
           </button>
         </div>
       }
     </div>
-
   </div>
-
 }
 
 <!-- ══ EXCEL IMPORT MODAL ══ -->
 @if (showImportModal()) {
   <div class="modal-backdrop" (click)="importStatus() !== 'importing' && closeImportModal()">
-    <div class="modal modal-lg" (click)="$event.stopPropagation()" style="max-height:90vh; display:flex; flex-direction:column;">
-
+    <div
+      class="modal modal-lg"
+      (click)="$event.stopPropagation()"
+      style="max-height: 90vh; display: flex; flex-direction: column"
+    >
       <div class="modal-header">
         <div>
           <div class="modal-title">Importer depuis Excel</div>
-          <div class="card-subtitle" style="margin-top:4px;">
+          <div class="card-subtitle" style="margin-top: 4px">
             Format attendu : colonnes Date (JJ/MM/AAAA), Événement, Source
           </div>
         </div>
         @if (importStatus() !== 'importing') {
           <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeImportModal()">
-            <tui-icon icon="@tui.x" style="font-size:16px;" />
+            <tui-icon icon="@tui.x" style="font-size: 16px" />
           </button>
         }
       </div>
 
-      <div class="modal-body" style="overflow-y:auto; flex:1;">
-
+      <div class="modal-body" style="overflow-y: auto; flex: 1">
         <!-- IDLE: file picker -->
         @if (importStatus() === 'idle') {
-          <div style="display:flex; flex-direction:column; align-items:center; gap:16px; padding:24px 0;">
-            <div class="empty-icon" style="width:64px; height:64px; font-size:28px;">
-              <tui-icon icon="@tui.file-spreadsheet" style="font-size:28px;" />
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 16px;
+              padding: 24px 0;
+            "
+          >
+            <div class="empty-icon" style="width: 64px; height: 64px; font-size: 28px">
+              <tui-icon icon="@tui.file-spreadsheet" style="font-size: 28px" />
             </div>
-            <div style="text-align:center;">
-              <div style="font-weight:600; color:var(--fg-1); margin-bottom:4px;">Sélectionner un fichier Excel</div>
-              <div style="font-size:12px; color:var(--fg-3);">Formats acceptés : .xlsx, .xlsm — feuille « Tableau_evenements »</div>
+            <div style="text-align: center">
+              <div style="font-weight: 600; color: var(--fg-1); margin-bottom: 4px">
+                Sélectionner un fichier Excel
+              </div>
+              <div style="font-size: 12px; color: var(--fg-3)">
+                Formats acceptés : .xlsx, .xlsm — feuille « Tableau_evenements »
+              </div>
             </div>
-            <label class="btn btn-primary" style="cursor:pointer;">
-              <tui-icon icon="@tui.upload" style="font-size:14px;" />
+            <label class="btn btn-primary" style="cursor: pointer">
+              <tui-icon icon="@tui.upload" style="font-size: 14px" />
               Parcourir…
-              <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none;"
-                     (change)="onImportFileChange($event)" />
+              <input
+                type="file"
+                accept=".xlsx,.xlsm,.xls"
+                style="display: none"
+                (change)="onImportFileChange($event)"
+              />
             </label>
             @if (importError()) {
-              <div style="color:var(--danger); font-size:13px; text-align:center;">{{ importError() }}</div>
+              <div style="color: var(--danger); font-size: 13px; text-align: center">
+                {{ importError() }}
+              </div>
             }
           </div>
         }
 
         <!-- PREVIEW: show first 5 rows + summary -->
         @if (importStatus() === 'preview') {
-          <div style="display:flex; flex-direction:column; gap:16px;">
-            <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--success-soft); border-radius:var(--r-md); border:1px solid var(--success);">
-              <tui-icon icon="@tui.check-circle" style="font-size:18px; color:var(--success);" />
+          <div style="display: flex; flex-direction: column; gap: 16px">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 16px;
+                background: var(--success-soft);
+                border-radius: var(--r-md);
+                border: 1px solid var(--success);
+              "
+            >
+              <tui-icon icon="@tui.check-circle" style="font-size: 18px; color: var(--success)" />
               <div>
-                <div style="font-weight:600; color:var(--success); font-size:13px;">
+                <div style="font-weight: 600; color: var(--success); font-size: 13px">
                   {{ importPreview().length }} événement(s) prêts à être importés
                 </div>
                 @if (importSkipped()) {
-                  <div style="font-size:12px; color:var(--fg-3);">{{ importSkipped() }} ligne(s) ignorée(s) (date invalide ou vide)</div>
+                  <div style="font-size: 12px; color: var(--fg-3)">
+                    {{ importSkipped() }} ligne(s) ignorée(s)
+                    @if (importSkippedBadDate() && importSkippedEmpty()) {
+                      <span>· {{ importSkippedBadDate() }} date invalide, {{ importSkippedEmpty() }} ligne vide</span>
+                    } @else if (importSkippedBadDate()) {
+                      <span>· date invalide</span>
+                    } @else if (importSkippedEmpty()) {
+                      <span>· ligne vide</span>
+                    }
+                  </div>
                 }
               </div>
             </div>
 
             <!-- Preview table — first 5 rows -->
             <div>
-              <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--fg-3); margin-bottom:8px;">
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 600;
+                  letter-spacing: 0.08em;
+                  text-transform: uppercase;
+                  color: var(--fg-3);
+                  margin-bottom: 8px;
+                "
+              >
                 Aperçu (5 premières lignes)
               </div>
               <div class="table-wrap">
-                <table class="table" style="font-size:12px;">
+                <table class="table" style="font-size: 12px">
                   <thead>
                     <tr>
-                      <th style="width:100px;">Date</th>
+                      <th style="width: 100px">Date</th>
                       <th>Titre généré</th>
-                      <th style="width:140px;">Source</th>
+                      <th style="width: 140px">Source</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (row of importPreview().slice(0, 5); track row.date + row.title) {
                       <tr>
-                        <td style="font-family:var(--font-mono); color:var(--fg-2);">{{ row.rawDate }}</td>
-                        <td style="color:var(--fg-1);">{{ row.title }}</td>
-                        <td style="color:var(--fg-3); font-size:11px;">{{ row.source || '—' }}</td>
+                        <td style="font-family: var(--font-mono); color: var(--fg-2)">
+                          {{ row.rawDate }}
+                        </td>
+                        <td style="color: var(--fg-1)">{{ row.title }}</td>
+                        <td style="color: var(--fg-3); font-size: 11px">{{ row.source || '—' }}</td>
                       </tr>
                     }
                   </tbody>
                 </table>
               </div>
               @if (importPreview().length > 5) {
-                <div style="font-size:12px; color:var(--fg-3); margin-top:6px; text-align:center;">
+                <div
+                  style="font-size: 12px; color: var(--fg-3); margin-top: 6px; text-align: center"
+                >
                   … et {{ importPreview().length - 5 }} autre(s) ligne(s)
                 </div>
               }
             </div>
 
             <!-- Re-pick file -->
-            <label style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--fg-3);">
-              <tui-icon icon="@tui.refresh-cw" style="font-size:13px;" />
+            <label
+              style="
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 12px;
+                color: var(--fg-3);
+              "
+            >
+              <tui-icon icon="@tui.refresh-cw" style="font-size: 13px" />
               Choisir un autre fichier
-              <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none;"
-                     (change)="onImportFileChange($event)" />
+              <input
+                type="file"
+                accept=".xlsx,.xlsm,.xls"
+                style="display: none"
+                (change)="onImportFileChange($event)"
+              />
             </label>
           </div>
         }
 
         <!-- IMPORTING: progress -->
         @if (importStatus() === 'importing') {
-          <div style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:32px 0;">
-            <div class="spinner" style="width:32px; height:32px; border-width:3px; border-color:rgba(0,0,0,0.1); border-top-color:var(--accent);"></div>
-            <div style="text-align:center;">
-              <div style="font-weight:600; color:var(--fg-1); margin-bottom:4px;">Import en cours…</div>
-              <div style="font-size:12px; color:var(--fg-3);">{{ importProgress() }}% — Veuillez patienter</div>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 20px;
+              padding: 32px 0;
+            "
+          >
+            <div class="spinner" style="width: 32px; height: 32px; border-width: 3px"></div>
+            <div style="text-align: center">
+              <div style="font-weight: 600; color: var(--fg-1); margin-bottom: 4px">
+                Import en cours…
+              </div>
+              <div style="font-size: 12px; color: var(--fg-3)">
+                {{ importProgress() }}% — Veuillez patienter
+              </div>
             </div>
-            <div style="width:100%; max-width:320px; height:6px; background:var(--bg-surface-2); border-radius:3px; overflow:hidden;">
-              <div style="height:100%; background:var(--accent); border-radius:3px; transition:width 0.3s;"
-                   [style.width]="importProgress() + '%'"></div>
+            <div
+              style="
+                width: 100%;
+                max-width: 320px;
+                height: 6px;
+                background: var(--bg-surface-2);
+                border-radius: 3px;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  height: 100%;
+                  background: var(--accent);
+                  border-radius: 3px;
+                  transition: width 0.3s;
+                "
+                [style.width]="importProgress() + '%'"
+              ></div>
             </div>
           </div>
         }
 
         <!-- DONE: summary -->
         @if (importStatus() === 'done') {
-          <div style="display:flex; flex-direction:column; align-items:center; gap:16px; padding:24px 0;">
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 16px;
+              padding: 24px 0;
+            "
+          >
             @if (importError()) {
-              <tui-icon icon="@tui.triangle-alert" style="font-size:40px; color:var(--warning);" />
-              <div style="text-align:center;">
-                <div style="font-weight:600; color:var(--fg-1);">Import terminé avec des erreurs</div>
-                <div style="font-size:13px; color:var(--fg-3); margin-top:4px;">{{ importInserted() }} événement(s) importé(s)</div>
-                <div style="font-size:12px; color:var(--danger); margin-top:8px;">{{ importError() }}</div>
+              <tui-icon icon="@tui.triangle-alert" style="font-size: 40px; color: var(--warning)" />
+              <div style="text-align: center">
+                <div style="font-weight: 600; color: var(--fg-1)">
+                  Import terminé avec des erreurs
+                </div>
+                <div style="font-size: 13px; color: var(--fg-3); margin-top: 4px">
+                  {{ importInserted() }} événement(s) importé(s)
+                </div>
+                <div style="font-size: 12px; color: var(--danger); margin-top: 8px">
+                  {{ importError() }}
+                </div>
               </div>
             } @else {
-              <tui-icon icon="@tui.check-circle" style="font-size:40px; color:var(--success);" />
-              <div style="text-align:center;">
-                <div style="font-weight:600; font-size:16px; color:var(--fg-1);">Import réussi !</div>
-                <div style="font-size:13px; color:var(--fg-3); margin-top:4px;">
-                  {{ importInserted() }} événement(s) ajouté(s) à la bibliothèque en statut <em>Brouillon</em>.
+              <tui-icon icon="@tui.check-circle" style="font-size: 40px; color: var(--success)" />
+              <div style="text-align: center">
+                <div style="font-weight: 600; font-size: 16px; color: var(--fg-1)">
+                  Import réussi !
+                </div>
+                <div style="font-size: 13px; color: var(--fg-3); margin-top: 4px">
+                  {{ importInserted() }} événement(s) ajouté(s) à la bibliothèque en statut
+                  <em>Brouillon</em>.
                 </div>
                 @if (importSkipped()) {
-                  <div style="font-size:12px; color:var(--fg-3); margin-top:4px;">{{ importSkipped() }} ligne(s) ignorée(s)</div>
+                  <div style="font-size: 12px; color: var(--fg-3); margin-top: 4px">
+                    {{ importSkipped() }} ligne(s) ignorée(s)
+                  </div>
                 }
               </div>
             }
           </div>
         }
-
       </div>
 
       <div class="modal-footer">
         @if (importStatus() === 'preview') {
-          <button class="btn btn-flat btn-sm" type="button" (click)="closeImportModal()">Annuler</button>
+          <button class="btn btn-flat btn-sm" type="button" (click)="closeImportModal()">
+            Annuler
+          </button>
           <button class="btn btn-primary btn-sm" type="button" (click)="runImport()">
-            <tui-icon icon="@tui.download" style="font-size:14px;" />
+            <tui-icon icon="@tui.download" style="font-size: 14px" />
             Importer {{ importPreview().length }} événement(s)
           </button>
         } @else if (importStatus() === 'done') {
-          <button class="btn btn-primary btn-sm" type="button" (click)="closeImportModal()">Fermer</button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="closeImportModal()">
+            Fermer
+          </button>
         } @else if (importStatus() === 'idle') {
-          <button class="btn btn-flat btn-sm" type="button" (click)="closeImportModal()">Annuler</button>
+          <button class="btn btn-flat btn-sm" type="button" (click)="closeImportModal()">
+            Annuler
+          </button>
         }
       </div>
-
     </div>
   </div>
 }

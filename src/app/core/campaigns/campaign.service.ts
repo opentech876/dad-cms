@@ -12,17 +12,42 @@ export class CampaignService {
     private workspaceContext: WorkspaceContextService,
   ) {}
 
+  /**
+   * Returns all non-deleted ad campaigns for the active workspace.
+   * Paginates with `.range()` to work around Supabase's default
+   * `max-rows=1000` PostgREST limit — keeps fetching until a page
+   * comes back with fewer than PAGE_SIZE rows.
+   */
   listCampaigns(): Observable<AdCampaign[]> {
     const wsId = this.workspaceContext.activeWorkspaceId();
-    let query = this.supabase.client
-      .from('ad_campaigns')
-      .select('*')
-      .is('deleted_at', null)
-      .order('start_date', { ascending: false });
-    if (wsId) query = (query as any).eq('workspace_id', wsId);
-    return from(query).pipe(
-      map(({ data, error }: any) => (error || !data ? [] : (data as AdCampaign[]))),
-    );
+    const PAGE_SIZE = 1000;
+
+    const fetchPage = (offset: number): Promise<AdCampaign[]> => {
+      let query = this.supabase.client
+        .from('ad_campaigns')
+        .select('*')
+        .is('deleted_at', null)
+        .order('start_date', { ascending: false });
+      if (wsId) query = (query as any).eq('workspace_id', wsId);
+      return (query as any)
+        .range(offset, offset + PAGE_SIZE - 1)
+        .then(({ data, error }: any) => (error || !data ? [] : (data as AdCampaign[])));
+    };
+
+    const fetchAll = async (): Promise<AdCampaign[]> => {
+      const all: AdCampaign[] = [];
+      let offset = 0;
+      // Cap the loop at 50 pages (50k campaigns) as a defensive guard.
+      for (let i = 0; i < 50; i++) {
+        const page = await fetchPage(offset);
+        all.push(...page);
+        if (page.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
+      return all;
+    };
+
+    return from(fetchAll());
   }
 
   createCampaign(dto: CreateCampaignDto): Observable<{ success: boolean; id?: string; error?: string }> {

@@ -622,4 +622,80 @@ describe('EventsComponent', () => {
       expect(component.editorEventId()).toBeNull();
     });
   });
+
+  // ── Excel import: date cell parsing ───────────────────────────────
+  describe('parseDateCell — formats acceptés', () => {
+    it('parse une chaîne dd/mm/yyyy', () => {
+      expect((component as any)._parseDateCell('15/05/2026')).toBe('2026-05-15');
+    });
+
+    it('parse une chaîne d/m/yyyy sans zéros', () => {
+      expect((component as any)._parseDateCell('5/1/2026')).toBe('2026-01-05');
+    });
+
+    it('parse une chaîne ISO yyyy-mm-dd', () => {
+      expect((component as any)._parseDateCell('2026-08-15')).toBe('2026-08-15');
+    });
+
+    it('parse un objet Date JS', () => {
+      // 15 mai 2026 à midi UTC pour éviter les sauts de fuseau
+      const d = new Date(Date.UTC(2026, 4, 15, 12, 0, 0));
+      expect((component as any)._parseDateCell(d)).toBe('2026-05-15');
+    });
+
+    it('parse un numéro de série Excel (45782 = 2025-05-15)', () => {
+      // Excel serial 45792 = 2025-05-15
+      const serial = 45792;
+      const result = (component as any)._parseDateCell(serial);
+      expect(result).toBe('2025-05-15');
+    });
+
+    it('renvoie null pour une chaîne vide', () => {
+      expect((component as any)._parseDateCell('')).toBeNull();
+    });
+
+    it('renvoie null pour une chaîne invalide', () => {
+      expect((component as any)._parseDateCell('pas une date')).toBeNull();
+    });
+
+    it('renvoie null pour un mois hors plage (13)', () => {
+      expect((component as any)._parseDateCell('15/13/2026')).toBeNull();
+    });
+
+    it('renvoie null pour null/undefined', () => {
+      expect((component as any)._parseDateCell(null)).toBeNull();
+      expect((component as any)._parseDateCell(undefined)).toBeNull();
+    });
+  });
+
+  describe('_parseImportRows — robustesse formats Excel', () => {
+    it('accepte un mélange de formats (Date, serial, dd/mm/yyyy)', () => {
+      const rows: any[][] = [
+        ['15/05/2026',                   'Indépendance', 'Source A'],
+        [new Date(Date.UTC(2026, 7, 15, 12, 0, 0)), 'Fête nationale', 'Source B'],
+        [45792,                          'Anniversaire', ''],
+        ['',                             'Sans date',    ''],          // skip — pas de date
+        ['mauvais',                      'Mauvaise date',''],          // skip — date invalide
+      ];
+      const result = (component as any)._parseImportRows(rows);
+      expect(result.valid).toHaveLength(3);
+      expect(result.skipped).toBe(2);
+      expect(result.valid[0].date).toBe('2026-05-15');
+      expect(result.valid[1].date).toBe('2026-08-15');
+      expect(result.valid[2].date).toBe('2025-05-15');
+    });
+
+    it('compte les lignes ignorées par raison (empty vs badDate)', () => {
+      const rows: any[][] = [
+        ['', '', ''],                  // empty
+        ['15/05/2026', '', ''],        // empty title
+        ['mauvais', 'Titre', ''],      // bad date
+      ];
+      const result = (component as any)._parseImportRows(rows);
+      expect(result.valid).toHaveLength(0);
+      expect(result.skipped).toBe(3);
+      expect(result.skippedEmpty).toBe(2);
+      expect(result.skippedBadDate).toBe(1);
+    });
+  });
 });

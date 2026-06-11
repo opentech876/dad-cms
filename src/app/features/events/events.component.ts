@@ -473,19 +473,23 @@ export class EventsComponent implements OnInit {
 
   // ── Excel import ─────────────────────────────────────────────────────────────
 
-  readonly showImportModal = signal(false);
-  readonly importPreview   = signal<ImportPreviewRow[]>([]);
-  readonly importStatus    = signal<'idle' | 'preview' | 'importing' | 'done'>('idle');
-  readonly importInserted  = signal(0);
-  readonly importSkipped   = signal(0);
-  readonly importError     = signal<string | null>(null);
-  readonly importProgress  = signal(0);
+  readonly showImportModal      = signal(false);
+  readonly importPreview        = signal<ImportPreviewRow[]>([]);
+  readonly importStatus         = signal<'idle' | 'preview' | 'importing' | 'done'>('idle');
+  readonly importInserted       = signal(0);
+  readonly importSkipped        = signal(0);
+  readonly importSkippedEmpty   = signal(0);
+  readonly importSkippedBadDate = signal(0);
+  readonly importError          = signal<string | null>(null);
+  readonly importProgress       = signal(0);
 
   openImportModal(): void {
     this.importStatus.set('idle');
     this.importPreview.set([]);
     this.importInserted.set(0);
     this.importSkipped.set(0);
+    this.importSkippedEmpty.set(0);
+    this.importSkippedBadDate.set(0);
     this.importError.set(null);
     this.importProgress.set(0);
     this.showImportModal.set(true);
@@ -500,14 +504,23 @@ export class EventsComponent implements OnInit {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: 'array' });
+        // cellDates: true → Excel-typed date cells come back as JS Date objects
+        // (instead of opaque serial numbers). raw: false on sheet_to_json keeps
+        // text-formatted cells as strings while letting cellDates handle dates.
+        const wb = XLSX.read(data, { type: 'array', cellDates: true });
         const sheetName = wb.SheetNames.includes('Tableau_evenements')
           ? 'Tableau_evenements'
           : wb.SheetNames[0];
-        const rows = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[sheetName], { header: 1, defval: '' }) as string[][];
-        const { valid, skipped } = this._parseImportRows(rows.slice(1));
-        this.importPreview.set(valid);
-        this.importSkipped.set(skipped);
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], {
+          header: 1,
+          defval: '',
+          raw: true,
+        }) as unknown[][];
+        const result = this._parseImportRows(rows.slice(1));
+        this.importPreview.set(result.valid);
+        this.importSkipped.set(result.skipped);
+        this.importSkippedEmpty.set(result.skippedEmpty);
+        this.importSkippedBadDate.set(result.skippedBadDate);
         this.importStatus.set('preview');
         this.importError.set(null);
       } catch {
@@ -518,33 +531,86 @@ export class EventsComponent implements OnInit {
     if (ev?.target) ev.target.value = '';
   }
 
-  private _parseImportRows(rows: string[][]): { valid: ImportPreviewRow[]; skipped: number } {
-    let skipped = 0;
+  private _parseImportRows(rows: unknown[][]): {
+    valid: ImportPreviewRow[];
+    skipped: number;
+    skippedEmpty: number;
+    skippedBadDate: number;
+  } {
+    let skippedEmpty = 0;
+    let skippedBadDate = 0;
     const valid: ImportPreviewRow[] = [];
     for (const row of rows) {
-      const rawDate  = String(row[0] ?? '').trim();
+      const rawCell  = row[0];
+      const rawDate  = rawCell instanceof Date ? rawCell.toISOString() : String(rawCell ?? '').trim();
       const rawEvent = String(row[1] ?? '').trim().replace(/\r\n|\r/g, '\n');
-      if (!rawDate || !rawEvent) { skipped++; continue; }
-      const date = this._parseDDMMYYYY(rawDate);
-      if (!date) { skipped++; continue; }
+      if (!rawDate || !rawEvent) { skippedEmpty++; continue; }
+      const date = this._parseDateCell(rawCell);
+      if (!date) { skippedBadDate++; continue; }
       const source      = String(row[2] ?? '').trim();
       const title       = this._extractTitle(rawEvent);
       const description = source ? `${rawEvent}\n\nSource : ${source}` : rawEvent;
       valid.push({ date, title, description, rawDate, source });
     }
-    return { valid, skipped };
+    return { valid, skipped: skippedEmpty + skippedBadDate, skippedEmpty, skippedBadDate };
   }
 
-  private _parseDDMMYYYY(raw: string): string | null {
-    const parts = raw.split('/');
-    if (parts.length !== 3) return null;
-    const day   = parts[0].padStart(2, '0');
-    const month = parts[1].padStart(2, '0');
-    const year  = parts[2];
-    const m = parseInt(month, 10);
-    const d = parseInt(day, 10);
-    if (m < 1 || m > 12 || d < 1 || d > 31 || year.length < 4) return null;
-    return `${year}-${month}-${day}`;
+  /**
+   * Parse a date cell from Excel into ISO `yyyy-mm-dd`.
+   * Handles: JS Date objects (cellDates:true), Excel serial numbers,
+   * "dd/mm/yyyy", "d/m/yyyy", and "yyyy-mm-dd" strings.
+   * Returns null on anything we can't interpret.
+   */
+  private _parseDateCell(raw: unknown): string | null {
+    if (raw === null || raw === undefined || raw === '') return null;
+
+    // 1. JS Date object (from XLSX with cellDates: true)
+    if (raw instanceof Date) {
+      if (isNaN(raw.getTime())) return null;
+      return this._dateToIso(raw);
+    }
+
+    // 2. Excel serial number (days since 1900-01-01, with the 1900 leap-year bug)
+    if (typeof raw === 'number' && isFinite(raw)) {
+      // Excel epoch is 1899-12-30 UTC (accounts for the leap-year bug).
+      const ms = Math.round((raw - 25569) * 86400 * 1000);
+      const d = new Date(ms);
+      if (isNaN(d.getTime())) return null;
+      return this._dateToIso(d);
+    }
+
+    const s = String(raw).trim();
+    if (!s) return null;
+
+    // 3. ISO yyyy-mm-dd (or yyyy-mm-ddTHH:MM:SS from Date.toISOString())
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) {
+      const y = +iso[1], m = +iso[2], d = +iso[3];
+      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        return `${iso[1]}-${iso[2]}-${iso[3]}`;
+      }
+      return null;
+    }
+
+    // 4. dd/mm/yyyy or d/m/yyyy (also supports - and . as separators)
+    const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+    if (dmy) {
+      const d = +dmy[1], m = +dmy[2];
+      let y = +dmy[3];
+      if (y < 100) y += y < 50 ? 2000 : 1900; // 2-digit year heuristic
+      if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+      return `${y.toString().padStart(4, '0')}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
+    }
+
+    return null;
+  }
+
+  private _dateToIso(d: Date): string {
+    // Use UTC parts to avoid TZ shifts moving the day boundary
+    const y = d.getUTCFullYear().toString().padStart(4, '0');
+    const m = (d.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = d.getUTCDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   private _extractTitle(text: string): string {

@@ -36,6 +36,7 @@ describe('CampaignService', () => {
         eq: (col: string, val: unknown) => { eqCalls.push([col, val]); return makeQuery(data); },
         is: () => makeQuery(data),
         order: () => makeQuery(data),
+        range: () => Promise.resolve({ data, error: err }),
         single: () =>
           Promise.resolve({
             data: err ? null : (Array.isArray(data) ? data[0] ?? null : data),
@@ -114,6 +115,82 @@ describe('CampaignService', () => {
       mockSupabase.client = buildClient({ simulateError: 'DB error' });
       const result = await firstValueFrom(service.listCampaigns());
       expect(result).toEqual([]);
+    });
+
+    it('pagine au-delà de 1000 lignes (limite PostgREST par défaut)', async () => {
+      // Set up a client whose .range() returns two pages of data:
+      // page 1 = 1000 campaigns, page 2 = 35 campaigns → total 1035
+      const page1 = Array.from({ length: 1000 }, (_, i) => ({ ...fakeCampaigns[0], id: `c-${i + 1}` }));
+      const page2 = Array.from({ length: 35 },   (_, i) => ({ ...fakeCampaigns[0], id: `c-${1001 + i}` }));
+      const pages = [page1, page2];
+      const rangeSpy = jest.fn().mockImplementation(() => {
+        const next = pages.shift() ?? [];
+        return Promise.resolve({ data: next, error: null });
+      });
+      const chain: any = {};
+      Object.assign(chain, {
+        select: jest.fn().mockReturnValue(chain),
+        eq:     jest.fn().mockReturnValue(chain),
+        is:     jest.fn().mockReturnValue(chain),
+        order:  jest.fn().mockReturnValue(chain),
+        range:  rangeSpy,
+      });
+      mockSupabase.client = {
+        auth: { getUser: jest.fn() },
+        from: jest.fn().mockReturnValue(chain),
+        storage: { from: jest.fn() },
+      };
+
+      // Re-inject service with the new client
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          CampaignService,
+          { provide: SupabaseService, useValue: mockSupabase },
+          { provide: WorkspaceContextService, useValue: mockWorkspaceContext },
+        ],
+      });
+      service = TestBed.inject(CampaignService);
+
+      const result = await firstValueFrom(service.listCampaigns());
+
+      expect(result).toHaveLength(1035);
+      expect(rangeSpy).toHaveBeenCalledTimes(2);
+      expect(rangeSpy).toHaveBeenNthCalledWith(1, 0, 999);
+      expect(rangeSpy).toHaveBeenNthCalledWith(2, 1000, 1999);
+    });
+
+    it("s'arrête dès qu'une page renvoie moins de 1000 lignes", async () => {
+      const page1 = Array.from({ length: 500 }, (_, i) => ({ ...fakeCampaigns[0], id: `c-${i + 1}` }));
+      const rangeSpy = jest.fn().mockResolvedValue({ data: page1, error: null });
+      const chain: any = {};
+      Object.assign(chain, {
+        select: jest.fn().mockReturnValue(chain),
+        eq:     jest.fn().mockReturnValue(chain),
+        is:     jest.fn().mockReturnValue(chain),
+        order:  jest.fn().mockReturnValue(chain),
+        range:  rangeSpy,
+      });
+      mockSupabase.client = {
+        auth: { getUser: jest.fn() },
+        from: jest.fn().mockReturnValue(chain),
+        storage: { from: jest.fn() },
+      };
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          CampaignService,
+          { provide: SupabaseService, useValue: mockSupabase },
+          { provide: WorkspaceContextService, useValue: mockWorkspaceContext },
+        ],
+      });
+      service = TestBed.inject(CampaignService);
+
+      const result = await firstValueFrom(service.listCampaigns());
+
+      expect(result).toHaveLength(500);
+      expect(rangeSpy).toHaveBeenCalledTimes(1);
     });
   });
 

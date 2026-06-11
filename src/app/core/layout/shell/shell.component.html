@@ -161,13 +161,13 @@
             <span class="kbd">⌘K</span>
           </span>
         </div>
-        <button class="btn btn-flat btn-icon btn-sm topbar-notif-btn" title="Notifications"
-                [routerLink]="'/notifications'">
+        <a class="btn btn-flat btn-icon btn-sm topbar-notif-btn" title="Notifications"
+           routerLink="/notifications">
           <tui-icon icon="@tui.bell" style="font-size: 18px" />
           @if (notifUnread() > 0) {
             <span class="topbar-notif-badge">{{ notifUnread() > 9 ? '9+' : notifUnread() }}</span>
           }
-        </button>
+        </a>
         <button class="btn btn-flat btn-icon btn-sm" title="Se déconnecter" (click)="logout()">
           <tui-icon icon="@tui.log-out" style="font-size: 18px" />
         </button>

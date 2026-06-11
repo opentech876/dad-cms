@@ -1,6 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { from, map, Observable } from 'rxjs';
-import { CampaignTap, DailyActivity, Device, DeviceLog, MonthCoverage } from '../../models';
+import { CampaignTap, DailyActivity, DeviceLog, MonthCoverage } from '../../models';
+
+type DeviceSlice = { id: string; platform: 'ios' | 'android'; registered_at: string; last_seen_at: string | null };
 import { SupabaseService } from '../supabase/supabase.service';
 
 export interface DeviceStats {
@@ -22,7 +24,7 @@ export class MetriquesService {
     ).pipe(
       map(({ data, error }) => {
         if (error) throw error;
-        const devices: Device[] = data ?? [];
+        const devices: DeviceSlice[] = (data ?? []) as DeviceSlice[];
         return {
           total:   devices.length,
           android: devices.filter(d => d.platform === 'android').length,
