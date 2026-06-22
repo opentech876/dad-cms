@@ -6,8 +6,9 @@ import { DayDetailComponent } from './day-detail.component';
 import { EventService } from '../../../core/events/event.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../../core/calendar/calendar-entry.service';
 import { CampaignService } from '../../../core/campaigns/campaign.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { AdCampaign, CampaignAssignment, Event } from '../../../models';
+import { AdCampaign, Event } from '../../../models';
 
 const MOCK_LIBRARY_EVENTS: Event[] = [
   {
@@ -43,11 +44,6 @@ const MOCK_CAMPAIGNS: AdCampaign[] = [
   },
 ];
 
-const MOCK_ASSIGNMENT: CampaignAssignment = {
-  id: 'assign-1', campaign_id: 'camp-1', calendar_id: 'cal-1',
-  event_date: '2026-08-15', created_by: 'u1', created_at: '2026-01-01T00:00:00Z',
-};
-
 const MOCK_ENTRIES: CalendarEntryWithEvent[] = [
   {
     id: 'entry-1', calendar_id: 'cal-1', mmdd: '08-15', position: 1,
@@ -72,12 +68,10 @@ describe('DayDetailComponent', () => {
   };
   let mockCampaignService: {
     listCampaigns: jest.Mock;
-    listCampaignAssignments: jest.Mock;
-    createCampaignAssignment: jest.Mock;
-    deleteCampaignAssignment: jest.Mock;
   };
   let mockRouter: { navigate: jest.Mock };
   let mockToast: jest.Mocked<Pick<ToastService, 'success' | 'error'>>;
+  let mockAuth: { hasRoleAtLeast: jest.Mock };
 
   beforeEach(async () => {
     mockEventService = {
@@ -90,12 +84,12 @@ describe('DayDetailComponent', () => {
     };
     mockCampaignService = {
       listCampaigns: jest.fn().mockReturnValue(of(MOCK_CAMPAIGNS)),
-      listCampaignAssignments: jest.fn().mockReturnValue(of([MOCK_ASSIGNMENT])),
-      createCampaignAssignment: jest.fn().mockReturnValue(of({ success: true, id: 'assign-new' })),
-      deleteCampaignAssignment: jest.fn().mockReturnValue(of({ success: true })),
     };
     mockRouter = { navigate: jest.fn() };
     mockToast  = { success: jest.fn(), error: jest.fn() };
+    // Default: chef_equipe so save() proceeds. The 'role-gated' describe block
+    // overrides to return false (plain editeur).
+    mockAuth = { hasRoleAtLeast: jest.fn().mockReturnValue(of(true)) };
 
     await TestBed.configureTestingModule({
       imports: [DayDetailComponent],
@@ -103,6 +97,7 @@ describe('DayDetailComponent', () => {
         { provide: EventService, useValue: mockEventService },
         { provide: CalendarEntryService, useValue: mockCalendarEntryService },
         { provide: CampaignService, useValue: mockCampaignService },
+        { provide: AuthService, useValue: mockAuth },
         { provide: Router, useValue: mockRouter },
         { provide: ToastService, useValue: mockToast },
         {
@@ -302,115 +297,63 @@ describe('DayDetailComponent', () => {
     });
   });
 
-  // ── chargement campagnes ────────────────────────────────────────────────────
+  // ── chargement campagnes (lecture seule) ───────────────────────────────────
 
-  describe('chargement campagnes', () => {
+  describe('availableCampaigns', () => {
     it('appelle listCampaigns au démarrage', () => {
       expect(mockCampaignService.listCampaigns).toHaveBeenCalled();
     });
 
-    it('appelle listCampaignAssignments avec calendarId', () => {
-      expect(mockCampaignService.listCampaignAssignments).toHaveBeenCalledWith('cal-1');
-    });
-
-    it('filtre availableCampaigns aux campagnes actives couvrant la date', () => {
+    it('filtre aux campagnes actives couvrant la date', () => {
       // camp-1: 2026-08-01 → 2026-08-31 covers 2026-08-15 ✓
       // camp-2: 2026-09-01 → 2026-09-30 does NOT cover 2026-08-15 ✗
       expect(component.availableCampaigns().length).toBe(1);
       expect(component.availableCampaigns()[0].id).toBe('camp-1');
     });
-
-    it('initialise assignedCampaignId depuis l\'assignment existant pour cette date', () => {
-      expect(component.assignedCampaignId()).toBe('camp-1');
-    });
-
-    it('stocke assignmentId pour permettre la suppression ultérieure', () => {
-      expect(component.assignmentId()).toBe('assign-1');
-    });
-
-    it('assignedCampaignId est null si aucun assignment pour cette date', async () => {
-      mockCampaignService.listCampaignAssignments.mockReturnValueOnce(of([]));
-      await component.ngOnInit();
-      expect(component.assignedCampaignId()).toBeNull();
-    });
   });
 
-  // ── assignCampaign ─────────────────────────────────────────────────────────
+  // ── role-gated save (editeur read-only) ────────────────────────────────────
 
-  describe('assignCampaign()', () => {
-    it('crée un nouvel assignment si aucun n\'existait', async () => {
-      mockCampaignService.listCampaignAssignments.mockReturnValueOnce(of([]));
-      await component.ngOnInit();
-      await component.assignCampaign('camp-1');
-      expect(mockCampaignService.createCampaignAssignment).toHaveBeenCalledWith(
-        expect.objectContaining({ campaign_id: 'camp-1', calendar_id: 'cal-1', event_date: '2026-08-15' }),
+  describe('save() — rôle insuffisant', () => {
+    it("refuse d'appeler assignEvent quand canEditAssignments est false", async () => {
+      mockAuth.hasRoleAtLeast.mockReturnValue(of(false));
+      const tb = TestBed.resetTestingModule();
+      await tb.configureTestingModule({
+        imports: [DayDetailComponent],
+        providers: [
+          { provide: EventService, useValue: mockEventService },
+          { provide: CalendarEntryService, useValue: mockCalendarEntryService },
+          { provide: CampaignService, useValue: mockCampaignService },
+          { provide: AuthService, useValue: mockAuth },
+          { provide: Router, useValue: mockRouter },
+          { provide: ToastService, useValue: mockToast },
+          {
+            provide: ActivatedRoute,
+            useValue: {
+              snapshot: { paramMap: { get: (k: string) => k === 'calendarId' ? 'cal-1' : '2026-08-15' } },
+            },
+          },
+        ],
+        schemas: [NO_ERRORS_SCHEMA],
+      }).compileComponents();
+
+      tb.overrideComponent(DayDetailComponent, { set: { template: '' } });
+      const fix = tb.createComponent(DayDetailComponent);
+      const editeurComp = fix.componentInstance;
+      fix.detectChanges();
+      await editeurComp.ngOnInit();
+
+      mockCalendarEntryService.assignEvent.mockClear();
+      mockCalendarEntryService.unassignSlot.mockClear();
+
+      await editeurComp.save();
+
+      expect(editeurComp.canEditAssignments()).toBe(false);
+      expect(mockCalendarEntryService.assignEvent).not.toHaveBeenCalled();
+      expect(mockCalendarEntryService.unassignSlot).not.toHaveBeenCalled();
+      expect(mockToast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Présidence'),
       );
-    });
-
-    it('supprime l\'ancien puis crée le nouveau quand on change de campagne', async () => {
-      await component.assignCampaign('camp-2');
-      expect(mockCampaignService.deleteCampaignAssignment).toHaveBeenCalledWith('assign-1');
-      expect(mockCampaignService.createCampaignAssignment).toHaveBeenCalled();
-    });
-
-    it('supprime l\'assignment existant quand on passe null', async () => {
-      await component.assignCampaign(null);
-      expect(mockCampaignService.deleteCampaignAssignment).toHaveBeenCalledWith('assign-1');
-      expect(mockCampaignService.createCampaignAssignment).not.toHaveBeenCalled();
-    });
-
-    it('ne fait rien si null et aucun assignment existant', async () => {
-      mockCampaignService.listCampaignAssignments.mockReturnValueOnce(of([]));
-      await component.ngOnInit();
-      await component.assignCampaign(null);
-      expect(mockCampaignService.deleteCampaignAssignment).not.toHaveBeenCalled();
-    });
-
-    it('met assignedCampaignId à jour après création', async () => {
-      mockCampaignService.listCampaignAssignments.mockReturnValueOnce(of([]));
-      await component.ngOnInit();
-      await component.assignCampaign('camp-1');
-      expect(component.assignedCampaignId()).toBe('camp-1');
-    });
-
-    it('remet assignedCampaignId à null après suppression', async () => {
-      await component.assignCampaign(null);
-      expect(component.assignedCampaignId()).toBeNull();
-    });
-
-    it('campaignSaving est false après l\'opération', async () => {
-      await component.assignCampaign('camp-1');
-      expect(component.campaignSaving()).toBe(false);
-    });
-
-    it('affiche un toast de succès après assignation', async () => {
-      mockCampaignService.listCampaignAssignments.mockReturnValueOnce(of([]));
-      await component.ngOnInit();
-      await component.assignCampaign('camp-1');
-      expect(mockToast.success).toHaveBeenCalled();
-    });
-
-    it('affiche un toast de succès après retrait', async () => {
-      await component.assignCampaign(null);
-      expect(mockToast.success).toHaveBeenCalled();
-    });
-
-    it('affiche un toast d\'erreur si createCampaignAssignment échoue', async () => {
-      mockCampaignService.listCampaignAssignments.mockReturnValueOnce(of([]));
-      await component.ngOnInit();
-      mockCampaignService.createCampaignAssignment.mockReturnValue(
-        of({ success: false, error: 'Contrainte unique' }),
-      );
-      await component.assignCampaign('camp-1');
-      expect(mockToast.error).toHaveBeenCalledWith('Contrainte unique');
-    });
-
-    it('affiche un toast d\'erreur si deleteCampaignAssignment échoue', async () => {
-      mockCampaignService.deleteCampaignAssignment.mockReturnValue(
-        of({ success: false, error: 'Accès refusé' }),
-      );
-      await component.assignCampaign(null);
-      expect(mockToast.error).toHaveBeenCalledWith('Accès refusé');
     });
   });
 });

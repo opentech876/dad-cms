@@ -1,3 +1,35 @@
+.profile-pending-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--info-soft, #eef4fb);
+  border: 1px solid rgba(33, 98, 158, 0.2);
+  border-radius: var(--r-md, 8px);
+  color: var(--info, #21629e);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.profile-eye-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--fg-3);
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 120ms ease;
+
+  &:hover { color: var(--fg-1); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+}
+
 .profile-page {
   max-width: 680px;
   display: flex;

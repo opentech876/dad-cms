@@ -21,7 +21,6 @@ describe('CalendarService', () => {
       created_by: null,
       published_at: null,
       calendar_entries: [{ count: 412 }],
-      campaign_assignments: [{ count: 8 }],
     },
     {
       id: 'cal-2',
@@ -31,7 +30,6 @@ describe('CalendarService', () => {
       created_by: 'uid-1',
       published_at: '2025-01-15T10:00:00Z',
       calendar_entries: [{ count: 487 }],
-      campaign_assignments: [{ count: 12 }],
     },
   ];
 
@@ -113,13 +111,6 @@ describe('CalendarService', () => {
 
       expect(result[0].eventCount).toBe(412);
       expect(result[1].eventCount).toBe(487);
-    });
-
-    it('mappe campaignCount depuis le tableau campaign_assignments embarqué', async () => {
-      const result = await firstValueFrom(service.listCalendars());
-
-      expect(result[0].campaignCount).toBe(8);
-      expect(result[1].campaignCount).toBe(12);
     });
 
     it('retourne un tableau vide en cas d\'erreur DB', async () => {

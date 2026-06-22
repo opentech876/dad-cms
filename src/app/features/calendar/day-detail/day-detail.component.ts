@@ -1,5 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { SlicePipe } from '@angular/common';
+import { DatePipe, SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
@@ -7,14 +7,15 @@ import { EventService } from '../../../core/events/event.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../../core/calendar/calendar-entry.service';
 import { CampaignService } from '../../../core/campaigns/campaign.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { AdCampaign, Event, EventPosition } from '../../../models';
-
-const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+import { formatDateLong } from '../../../core/utils/date.utils';
+import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-day-detail',
   standalone: true,
-  imports: [TuiIcon, SlicePipe],
+  imports: [TuiIcon, SlicePipe, DatePipe],
   templateUrl: './day-detail.component.html',
 })
 export class DayDetailComponent implements OnInit {
@@ -23,7 +24,18 @@ export class DayDetailComponent implements OnInit {
   private readonly eventService = inject(EventService);
   private readonly calendarEntryService = inject(CalendarEntryService);
   private readonly campaignService = inject(CampaignService);
+  private readonly authService = inject(AuthService);
   private readonly toast = inject(ToastService);
+
+  /**
+   * True only for chef_equipe+ (i.e. chef_equipe or owner). Plain editeurs no
+   * longer assign events directly — they go through the Presidence apply flow
+   * on /calendrier. presidence + charge_communication also see a read-only view.
+   */
+  readonly canEditAssignments = toSignal(
+    this.authService.hasRoleAtLeast('chef_equipe'),
+    { initialValue: false },
+  );
 
   calendarId = '';
   date = '';       // full YYYY-MM-DD (calendar publication date)
@@ -42,39 +54,28 @@ export class DayDetailComponent implements OnInit {
 
   readonly saveLoading = signal(false);
 
-  /** Active campaigns whose date range covers this calendar date. */
+  /**
+   * Active campaigns whose date range covers this calendar date. Shown
+   * read-only so the editor can see which campaigns the mobile will
+   * automatically render on this day (the system has no per-day campaign
+   * assignment — coverage is purely date-range driven).
+   */
   readonly availableCampaigns = signal<AdCampaign[]>([]);
-
-  /** Campaign ID currently assigned to this date (null = none). */
-  readonly assignedCampaignId = signal<string | null>(null);
-
-  /** DB id of the existing campaign_assignment row (needed for deletion). */
-  readonly assignmentId = signal<string | null>(null);
-
-  readonly campaignSaving = signal(false);
 
   readonly event1 = computed(() => this.libraryEvents().find(e => e.id === this.selectedPos1()) ?? null);
   readonly event2 = computed(() => this.libraryEvents().find(e => e.id === this.selectedPos2()) ?? null);
 
-  readonly dateLabel = computed(() => {
-    const parts = this.date.split('-');
-    if (parts.length !== 3) return this.date;
-    const d = parseInt(parts[2], 10);
-    const m = parseInt(parts[1], 10) - 1;
-    const y = parseInt(parts[0], 10);
-    return `${d} ${MONTHS_FR[m]} ${y}`;
-  });
+  readonly dateLabel = computed(() => formatDateLong(this.date) || this.date);
 
   async ngOnInit(): Promise<void> {
     this.calendarId = this.route.snapshot.paramMap.get('calendarId') ?? '';
     this.date       = this.route.snapshot.paramMap.get('date') ?? '';
     this.mmdd       = this.date.slice(5); // 'MM-DD'
 
-    const [libEvents, allEntries, allCampaigns, assignments] = await Promise.all([
+    const [libEvents, allEntries, allCampaigns] = await Promise.all([
       firstValueFrom(this.eventService.listEventsByMmdd(this.mmdd)),
       firstValueFrom(this.calendarEntryService.getEntriesForCalendar(this.calendarId)),
       firstValueFrom(this.campaignService.listCampaigns()),
-      firstValueFrom(this.campaignService.listCampaignAssignments(this.calendarId)),
     ]);
 
     this.libraryEvents.set(libEvents);
@@ -87,10 +88,6 @@ export class DayDetailComponent implements OnInit {
     this.availableCampaigns.set(
       allCampaigns.filter(c => c.active && c.start_date <= this.date && c.end_date >= this.date),
     );
-
-    const todayAssignment = assignments.find(a => a.event_date === this.date);
-    this.assignedCampaignId.set(todayAssignment?.campaign_id ?? null);
-    this.assignmentId.set(todayAssignment?.id ?? null);
   }
 
   assign(eventId: string | null, position: EventPosition): void {
@@ -100,6 +97,10 @@ export class DayDetailComponent implements OnInit {
 
   async save(): Promise<void> {
     if (this.saveLoading()) return;
+    if (!this.canEditAssignments()) {
+      this.toast.error('Les affectations sont gérées par la Présidence et appliquées par l\'équipe éditoriale.');
+      return;
+    }
     this.saveLoading.set(true);
 
     const ops: Promise<{ success: boolean; error?: string }>[] = [];
@@ -126,44 +127,6 @@ export class DayDetailComponent implements OnInit {
     } else {
       this.toast.success('Affectations sauvegardées.');
     }
-  }
-
-  async assignCampaign(campaignId: string | null): Promise<void> {
-    if (this.campaignSaving()) return;
-    this.campaignSaving.set(true);
-
-    const existingAssignmentId = this.assignmentId();
-
-    if (existingAssignmentId) {
-      const res = await firstValueFrom(this.campaignService.deleteCampaignAssignment(existingAssignmentId));
-      if (!res.success) {
-        this.toast.error(res.error ?? 'Erreur lors du retrait de la campagne.');
-        this.campaignSaving.set(false);
-        return;
-      }
-      this.assignmentId.set(null);
-      this.assignedCampaignId.set(null);
-    }
-
-    if (campaignId) {
-      const res = await firstValueFrom(this.campaignService.createCampaignAssignment({
-        campaign_id: campaignId,
-        calendar_id: this.calendarId,
-        event_date: this.date,
-      }));
-      if (!res.success) {
-        this.toast.error(res.error ?? 'Erreur lors de l\'assignation de la campagne.');
-        this.campaignSaving.set(false);
-        return;
-      }
-      this.assignmentId.set(res.id ?? null);
-      this.assignedCampaignId.set(campaignId);
-      this.toast.success('Campagne assignée.');
-    } else if (existingAssignmentId) {
-      this.toast.success('Campagne retirée.');
-    }
-
-    this.campaignSaving.set(false);
   }
 
   goBack(): void {

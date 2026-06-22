@@ -1,16 +1,32 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { DecimalPipe, PercentPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { SupabaseService } from '../../core/supabase/supabase.service';
+import { CampaignService } from '../../core/campaigns/campaign.service';
+import { CompanyService } from '../../core/companies/company.service';
+import { MetriquesService } from '../../core/metriques/metriques.service';
+import { MONTHS_FR_LONG_CAP, formatDateShort } from '../../core/utils/date.utils';
+import { CampaignTap } from '../../models';
 
 interface KpiStats {
   totalEvents: number;
   publishedCalendars: number;
   activeCampaigns: number;
   yearEvents: number;
+  pendingValidations: number;
+  activeCompanies: number;
 }
 
-interface SparkPoints { pts: string; area: string; cx: number; cy: number; }
-interface AdRow { name: string; advertiser: string; position: 'header' | 'footer'; impressions: string; clicks: string; ctr: string; period: string; }
+interface AdPerformanceRow {
+  campaignId: string;
+  name: string;
+  advertiser: string;
+  impressions: number;
+  clicks: number;
+  ctr: number | null;
+  period: string;
+}
 
 interface FeaturedEvent {
   title: string;
@@ -22,17 +38,18 @@ interface FeaturedEvent {
   also: string;
 }
 
-const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, DecimalPipe, PercentPipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit {
-  private supabase = inject(SupabaseService);
+  private supabase         = inject(SupabaseService);
+  private campaignService  = inject(CampaignService);
+  private companyService   = inject(CompanyService);
+  private metriquesService = inject(MetriquesService);
 
   readonly loading = signal(true);
   readonly stats = signal<KpiStats>({
@@ -40,7 +57,12 @@ export class DashboardComponent implements OnInit {
     publishedCalendars: 0,
     activeCampaigns: 0,
     yearEvents: 0,
+    pendingValidations: 0,
+    activeCompanies: 0,
   });
+
+  /** Real top-5 ad performers by impressions, joined with campaign + company data. */
+  readonly topAdPerformers = signal<AdPerformanceRow[]>([]);
 
   readonly currentYear = new Date().getFullYear();
   readonly todayLabel = new Date().toLocaleDateString('fr-FR', {
@@ -49,29 +71,22 @@ export class DashboardComponent implements OnInit {
     month: 'long',
     year: 'numeric',
   });
+  // Used by the hero's empty-state right-side preview.
+  readonly todayDayNum   = String(new Date().getDate()).padStart(2, '0');
+  readonly todayMonthCap = MONTHS_FR_LONG_CAP[new Date().getMonth()];
 
   readonly featuredEvent = signal<FeaturedEvent>({
     title: '', dropLetter: '', excerpt: '', day: '--', month: '---', year: '----', also: '',
   });
   readonly featuredEventLoading = signal(true);
 
+  /** True once we know there's an event published for today on mobile. */
+  readonly hasFeaturedEvent = computed(() => this.featuredEvent().title.length > 0);
+
   readonly fillRate = computed(() => {
     const maxSlots = 365 * 2;
     return Math.round((this.stats().yearEvents / maxSlots) * 100);
   });
-
-  private buildSparkline(data: number[], w = 120, h = 36): SparkPoints {
-    const max = Math.max(...data), min = Math.min(...data), span = max - min || 1;
-    const ptsArr = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / span) * (h - 4) - 2}`);
-    const pts = ptsArr.join(' ');
-    const lastV = data[data.length - 1];
-    return { pts, area: `0,${h} ${pts} ${w},${h}`, cx: w, cy: h - ((lastV - min) / span) * (h - 4) - 2 };
-  }
-
-  readonly sparkEvents    = this.buildSparkline([12,18,14,22,30,28,35,42,38,45,52,48,55,62]);
-  readonly sparkCoverage  = this.buildSparkline([40,42,45,48,50,53,55,58,60,62,64,65,66,67]);
-  readonly sparkCampaigns = this.buildSparkline([3,4,5,5,6,6,5,5,4,4,5,5,4,4]);
-  readonly sparkReaders   = this.buildSparkline([8,9,10,11,12,11,12,12,13,14,12,12,13,12]);
 
   readonly activityFeed = [
     { id: 1, initials: 'AB', who: 'Aïcha Bemba',     action: 'a publié',    target: 'Indépendance de la République du Congo', meta: 'Calendrier 2025 · 15 août',     time: 'Il y a 8 min'  },
@@ -93,18 +108,11 @@ export class DashboardComponent implements OnInit {
     { icon: '📢', text: '3 campagnes à approuver', meta: 'Demande de Sylvie Mbembé',             bg: 'var(--accent-soft)', fg: 'var(--accent)'  },
   ];
 
-  readonly adPerformance: AdRow[] = [
-    { name: 'Forfait étudiant', advertiser: 'MTN Congo',    position: 'header', impressions: '184 220', clicks: '3 412', ctr: '1,85 %', period: '01/04 → 30/06'            },
-    { name: 'Tontine+',        advertiser: 'SG Congo',      position: 'footer', impressions: '142 008', clicks: '1 977', ctr: '1,39 %', period: '15/03 → 15/05'            },
-    { name: 'Stations',        advertiser: 'TotalEnergies', position: 'footer', impressions: '98 442',  clicks: '1 102', ctr: '1,12 %', period: '01/01 → 31/03'            },
-    { name: "Ngok'",           advertiser: 'BraCongo',      position: 'header', impressions: '0',       clicks: '0',     ctr: '—',      period: '10/05 → 10/07 · planifié' },
-  ];
-
   async ngOnInit(): Promise<void> {
     const db = this.supabase.client;
     const year = this.currentYear;
 
-    const [eventsRes, calendarsRes, campaignsRes, yearEventsRes] = await Promise.all([
+    const [eventsRes, calendarsRes, campaignsRes, yearEventsRes, pendingValRes] = await Promise.all([
       db.from('events').select('*', { count: 'exact', head: true }).is('deleted_at', null),
       db
         .from('calendars')
@@ -122,6 +130,17 @@ export class DashboardComponent implements OnInit {
         .gte('event_date', `${year}-01-01`)
         .lte('event_date', `${year}-12-31`)
         .is('deleted_at', null),
+      db
+        .from('ad_campaigns')
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null)
+        .is('validated_at', null),
+    ]);
+
+    // Companies + top ad performers in parallel.
+    const [companies, taps] = await Promise.all([
+      firstValueFrom(this.companyService.listCompanies()),
+      firstValueFrom(this.metriquesService.getCampaignTaps()),
     ]);
 
     this.stats.set({
@@ -129,14 +148,50 @@ export class DashboardComponent implements OnInit {
       publishedCalendars: calendarsRes.count ?? 0,
       activeCampaigns: campaignsRes.count ?? 0,
       yearEvents: yearEventsRes.count ?? 0,
+      pendingValidations: pendingValRes.count ?? 0,
+      activeCompanies: companies.length,
     });
-    this.loading.set(false);
 
+    await this._loadTopAdPerformers(taps);
+
+    this.loading.set(false);
     await this._loadFeaturedEvent(db, year);
   }
 
+  private async _loadTopAdPerformers(taps: CampaignTap[]): Promise<void> {
+    const top5 = taps.slice(0, 5);
+    if (top5.length === 0) {
+      this.topAdPerformers.set([]);
+      return;
+    }
+    const ids = top5.map(t => t.campaign_id);
+    const { data } = await this.supabase.client
+      .from('ad_campaigns')
+      .select('id, start_date, end_date')
+      .in('id', ids);
+    const dateMap = new Map<string, { start_date: string; end_date: string }>();
+    for (const r of (data ?? []) as any[]) dateMap.set(r.id, { start_date: r.start_date, end_date: r.end_date });
+
+    this.topAdPerformers.set(top5.map(t => {
+      const dates = dateMap.get(t.campaign_id);
+      const period = dates
+        ? `${formatDateShort(dates.start_date)} → ${formatDateShort(dates.end_date)}`
+        : '—';
+      return {
+        campaignId: t.campaign_id,
+        name: t.campaign_name,
+        advertiser: t.advertiser,
+        impressions: t.tap_count,
+        clicks: t.click_count,
+        ctr: t.ctr,
+        period,
+      };
+    }));
+  }
+
   private async _loadFeaturedEvent(db: any, year: number): Promise<void> {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const mmdd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const { data: cal } = await db
       .from('calendars')
@@ -146,32 +201,33 @@ export class DashboardComponent implements OnInit {
       .is('deleted_at', null)
       .maybeSingle();
 
-    if (!cal) { this.featuredEventLoading.set(false); return; }  // no published calendar for this year
+    if (!cal) { this.featuredEventLoading.set(false); return; }
 
-    const { data: events } = await db
-      .from('events')
-      .select('title, description, event_date, position')
+    const { data: entries } = await db
+      .from('calendar_entries')
+      .select('position, event:events(title, description, event_date)')
       .eq('calendar_id', cal.id)
-      .eq('event_date', todayStr)
-      .is('deleted_at', null)
+      .eq('mmdd', mmdd)
       .order('position', { ascending: true });
 
-    const primary = (events as any[] | null)?.find((e: any) => e.position === 1);
-    if (!primary) { this.featuredEventLoading.set(false); return; }
+    const rows = (entries as any[] | null) ?? [];
+    const primary = rows.find(r => r.position === 1);
+    if (!primary?.event) { this.featuredEventLoading.set(false); return; }
 
-    const secondary = (events as any[]).find((e: any) => e.position === 2);
-    const desc: string = primary.description ?? '';
-    const dateParts = (primary.event_date as string).split('-');
+    const secondary = rows.find(r => r.position === 2);
+    const ev = primary.event;
+    const desc: string = ev.description ?? '';
+    const dateParts = (ev.event_date as string).split('-');
     const monthIndex = parseInt(dateParts[1], 10) - 1;
 
     this.featuredEvent.set({
-      title: primary.title,
+      title: ev.title,
       dropLetter: desc.charAt(0),
       excerpt: desc.slice(1),
       day: dateParts[2],
-      month: MONTHS_FR[monthIndex] ?? '',
+      month: MONTHS_FR_LONG_CAP[monthIndex] ?? '',
       year: dateParts[0],
-      also: secondary ? secondary.title : '',
+      also: secondary?.event?.title ?? '',
     });
     this.featuredEventLoading.set(false);
   }

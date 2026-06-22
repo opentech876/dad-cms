@@ -5,13 +5,14 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZoneChangeDetection,
 } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withRouterConfig, RouteReuseStrategy } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideTaiga } from '@taiga-ui/core';
 import { routes } from './app.routes';
 import { registerLocaleData } from '@angular/common';
 import localeFr from '@angular/common/locales/fr';
 import { GlobalErrorHandler } from './core/services/global-error-handler';
+import { RefreshRouteReuseStrategy } from './core/router/refresh-route-reuse.strategy';
 
 registerLocaleData(localeFr);
 
@@ -19,10 +20,11 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
-    provideRouter(routes),
+    provideRouter(routes, withRouterConfig({ onSameUrlNavigation: 'reload' })),
     provideHttpClient(),
     provideTaiga(),
     { provide: LOCALE_ID, useValue: 'fr' },
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
+    { provide: RouteReuseStrategy, useClass: RefreshRouteReuseStrategy },
   ],
 };

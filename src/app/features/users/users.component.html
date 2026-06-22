@@ -111,6 +111,60 @@
       </div>
       <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">campagnes pub.</div>
     </div>
+    <div class="card" style="padding: 18px 20px">
+      <div
+        style="
+          font-size: 11px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--fg-3);
+          font-weight: 600;
+        "
+      >
+        Présidence
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 6px;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          color: var(--accent);
+        "
+      >
+        {{ kpiPresidence() }}
+      </div>
+      <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">recommandations éditoriales</div>
+    </div>
+    <div class="card" style="padding: 18px 20px">
+      <div
+        style="
+          font-size: 11px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--fg-3);
+          font-weight: 600;
+        "
+      >
+        Chef d'équipe comm.
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 6px;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          color: var(--warning);
+        "
+      >
+        {{ kpiCommercialLead() }}
+      </div>
+      <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">supervision commerciale</div>
+    </div>
   </div>
 
   <!-- ── Toolbar ── -->
@@ -141,6 +195,8 @@
       <option>Chef d'équipe</option>
       <option>Éditeur</option>
       <option>Chargé comm.</option>
+      <option>Chef d'équipe comm.</option>
+      <option>Présidence</option>
     </select>
     <div style="flex: 1"></div>
     <button class="btn btn-primary btn-sm" type="button" (click)="openInviteModal()">
@@ -221,6 +277,12 @@
                   @if (user.role === 'charge_communication') {
                     <span class="badge badge-warning">Chargé comm.</span>
                   }
+                  @if (user.role === 'presidence') {
+                    <span class="badge badge-accent">Présidence</span>
+                  }
+                  @if (user.role === 'chef_equipe_commerciale') {
+                    <span class="badge badge-warning">Chef d'équipe comm.</span>
+                  }
                 </td>
                 <td>
                   @if (user.banned) {
@@ -246,6 +308,14 @@
                         (click)="openRoleModal(user.userId)"
                       >
                         <tui-icon icon="@tui.shield" style="font-size: 14px" />
+                      </button>
+                      <button
+                        class="btn btn-flat btn-icon btn-sm"
+                        title="Définir un mot de passe"
+                        type="button"
+                        (click)="openPasswordModal(user.userId)"
+                      >
+                        <tui-icon icon="@tui.key-round" style="font-size: 14px" />
                       </button>
                       @if (user.banned) {
                         <button
@@ -305,6 +375,8 @@
             <th style="text-align: center">Chef d'équipe</th>
             <th style="text-align: center">Éditeur</th>
             <th style="text-align: center">Chargé comm.</th>
+            <th style="text-align: center">Présidence</th>
+            <th style="text-align: center">Chef d'éq. comm.</th>
           </tr>
         </thead>
         <tbody>
@@ -352,6 +424,8 @@
             <option value="chef_equipe">Chef d'équipe</option>
             <option value="editeur">Éditeur</option>
             <option value="charge_communication">Chargé de communication</option>
+            <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
+            <option value="presidence">Présidence</option>
           </select>
           <span class="field-hint">
             @if (roleModalTargetRole() === 'chef_equipe') {
@@ -362,6 +436,12 @@
             }
             @if (roleModalTargetRole() === 'charge_communication') {
               Campagnes publicitaires et tableaux de bord.
+            }
+            @if (roleModalTargetRole() === 'presidence') {
+              Recommandations éditoriales (Présidence) — décide les événements à proposer chaque jour.
+            }
+            @if (roleModalTargetRole() === 'chef_equipe_commerciale') {
+              Gestion des compagnies (annonceurs) et supervision des campagnes publicitaires.
             }
           </span>
         </div>
@@ -447,6 +527,66 @@
             Retirer définitivement
           </button>
         }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Set-password modal -->
+@if (showPasswordModal()) {
+  <div class="modal-backdrop" (click)="closePasswordModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Définir un mot de passe</span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closePasswordModal()">
+          <tui-icon icon="@tui.x" style="font-size: 18px" />
+        </button>
+      </div>
+      <div class="modal-body">
+        @if (passwordModalUser(); as u) {
+          <p style="font-size: 13.5px; color: var(--fg-1); margin-bottom: 12px">
+            Utilisateur&nbsp;: <strong>{{ u.fullName ?? u.email }}</strong>
+          </p>
+        }
+        <p style="font-size: 12.5px; color: var(--fg-3); margin-bottom: 16px">
+          Le nouveau mot de passe sera immédiatement actif. Aucun e-mail n'est envoyé.
+          Communiquez-le à l'utilisateur via un canal de confiance.
+        </p>
+        <div class="field" style="margin-bottom:14px;">
+          <label class="field-label">Nouveau mot de passe</label>
+          <div style="position:relative;">
+            <input class="input"
+                   [type]="passwordModalShow() ? 'text' : 'password'"
+                   placeholder="8 caractères minimum"
+                   autocomplete="new-password" minlength="8"
+                   style="padding-right:42px;"
+                   [value]="passwordModalValue()"
+                   (input)="passwordModalValue.set($any($event.target).value)" />
+            <button type="button"
+                    style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px; cursor:pointer; color:var(--fg-3); display:inline-flex; align-items:center; border-radius:4px;"
+                    (click)="togglePasswordModalShow()"
+                    [attr.aria-label]="passwordModalShow() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+                    tabindex="-1">
+              <tui-icon [icon]="passwordModalShow() ? '@tui.eye-off' : '@tui.eye'" style="font-size:15px;" />
+            </button>
+          </div>
+        </div>
+        @if (passwordModalError()) {
+          <div style="color: var(--danger); font-size: 12.5px; margin-bottom: 8px;">
+            {{ passwordModalError() }}
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closePasswordModal()">
+          Annuler
+        </button>
+        <button class="btn btn-primary btn-sm" type="button"
+                [disabled]="passwordModalLoading() || !passwordModalValue()"
+                (click)="submitSetPassword()">
+          @if (passwordModalLoading()) { <span class="spinner"></span> }
+          Définir le mot de passe
+        </button>
       </div>
     </div>
   </div>

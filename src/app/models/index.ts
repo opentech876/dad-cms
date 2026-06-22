@@ -1,9 +1,13 @@
-export type AppRole = 'owner' | 'chef_equipe' | 'editeur' | 'charge_communication';
+export type AppRole = 'owner' | 'chef_equipe' | 'editeur' | 'charge_communication' | 'presidence' | 'chef_equipe_commerciale';
+
+export type CompanyType =
+  | 'telecom' | 'banque' | 'energie' | 'distribution'
+  | 'services' | 'gouvernement' | 'ong' | 'medias' | 'sante' | 'autre';
 export type EventPosition = 1 | 2;
 export type AdPosition = 'header' | 'footer';
 export type CalendarStatus = 'draft' | 'published' | 'archived';
 export type EventStatus = 'draft' | 'published';
-export type ManageUserAction = 'update_role' | 'block' | 'unblock' | 'remove';
+export type ManageUserAction = 'update_role' | 'block' | 'unblock' | 'remove' | 'set_password';
 
 export interface UserListEntry {
   id: string;
@@ -97,17 +101,17 @@ export interface CalendarEntry {
   created_at: string;
 }
 
-export interface AdCampaign {
+export interface Company {
   id: string;
-  name: string;
-  advertiser: string;
-  start_date: string;
-  end_date: string;
-  position: AdPosition;
-  image_path: string;
-  link_url: string | null;
-  active: boolean;
   workspace_id: string;
+  name: string;
+  type: CompanyType;
+  business_domain: string | null;
+  website: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  notes: string | null;
+  logo_url: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -116,13 +120,58 @@ export interface AdCampaign {
   deleted_by: string | null;
 }
 
-export interface CampaignAssignment {
+export interface CreateCompanyDto {
+  name: string;
+  type: CompanyType;
+  business_domain?: string | null;
+  website?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  notes?: string | null;
+  logo_url?: string | null;
+}
+
+export interface AdCampaign {
   id: string;
-  campaign_id: string;
-  calendar_id: string;
-  event_date: string;
+  name: string;
+  company_id: string;
+  /** Joined company data (populated by Supabase select). */
+  company?: Company | null;
+  start_date: string;
+  end_date: string;
+  position: AdPosition;
+  image_path: string;
+  link_url: string | null;
+  active: boolean;
+  workspace_id: string;
+  /** Validation workflow — two keys (paid + manager confirmed). Mobile hides ads where validated_at IS NULL. */
+  paid_at: string | null;
+  paid_by: string | null;
+  manager_confirmed_at: string | null;
+  manager_confirmed_by: string | null;
+  /** Derived (GENERATED ALWAYS): set when both paid_at AND manager_confirmed_at are set. */
+  validated_at: string | null;
   created_by: string | null;
   created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+  deleted_at: string | null;
+  deleted_by: string | null;
+}
+
+/** Discrete validation state of an AdCampaign, used by the UI to render badges + actions. */
+export type CampaignValidationState =
+  | 'pending'    // no key flipped yet
+  | 'paid'       // paid but not manager-confirmed
+  | 'confirmed'  // manager-confirmed but not paid
+  | 'validated'; // both done
+
+export function campaignValidationState(c: Pick<AdCampaign, 'paid_at' | 'manager_confirmed_at'>): CampaignValidationState {
+  const paid = !!c.paid_at, confirmed = !!c.manager_confirmed_at;
+  if (paid && confirmed) return 'validated';
+  if (paid) return 'paid';
+  if (confirmed) return 'confirmed';
+  return 'pending';
 }
 
 export interface ContentVersion {
@@ -135,7 +184,7 @@ export interface ContentVersion {
 /** DTO for creating a new ad campaign. */
 export interface CreateCampaignDto {
   name: string;
-  advertiser: string;
+  company_id: string;
   start_date: string;   // YYYY-MM-DD
   end_date: string;     // YYYY-MM-DD
   position: AdPosition;
@@ -186,18 +235,23 @@ export interface Device {
 
 export interface DeviceLog {
   id: string;
-  device_id: string | null;
+  device_uuid: string | null;
   action: string;
   outcome: string | null;
   error_message: string | null;
-  logged_at: string;
+  created_at: string;
 }
 
 export interface CampaignTap {
   campaign_id: string;
   campaign_name: string;
   advertiser: string;
+  /** Total impressions (rows in ad_campaign_device_views). */
   tap_count: number;
+  /** Total clicks (rows in ad_campaign_device_clicks). 0 until mobile ships record_ad_campaign_click. */
+  click_count: number;
+  /** Computed: click_count / tap_count. null when tap_count = 0. */
+  ctr: number | null;
 }
 
 export interface DailyActivity {

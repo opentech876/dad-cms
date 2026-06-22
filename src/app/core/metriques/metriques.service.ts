@@ -38,8 +38,8 @@ export class MetriquesService {
     return from(
       this.supabase.client
         .from('devices_logs')
-        .select('id, device_id, action, outcome, error_message, logged_at')
-        .order('logged_at', { ascending: false })
+        .select('id, device_uuid, action, outcome, error_message, created_at')
+        .order('created_at', { ascending: false })
         .limit(100),
     ).pipe(
       map(({ data, error }) => {
@@ -50,16 +50,21 @@ export class MetriquesService {
   }
 
   getCampaignTaps(): Observable<CampaignTap[]> {
+    const viewsP = this.supabase.client
+      .from('ad_campaign_device_views')
+      .select('campaign_id, ad_campaigns(name, company:companies(name))');
+    const clicksP = this.supabase.client
+      .from('ad_campaign_device_clicks')
+      .select('campaign_id');
+
     return from(
-      this.supabase.client
-        .from('ad_campaign_device_views')
-        .select('campaign_id, ad_campaigns(name, advertiser)'),
-    ).pipe(
-      map(({ data, error }) => {
-        if (error) throw error;
-        const rows: any[] = data ?? [];
+      Promise.all([viewsP, clicksP]).then(([viewsRes, clicksRes]) => {
+        if (viewsRes.error) throw viewsRes.error;
+        const viewRows:  any[] = viewsRes.data  ?? [];
+        const clickRows: any[] = clicksRes.error ? [] : (clicksRes.data ?? []);
+
         const agg = new Map<string, CampaignTap>();
-        for (const row of rows) {
+        for (const row of viewRows) {
           const existing = agg.get(row.campaign_id);
           if (existing) {
             existing.tap_count++;
@@ -67,14 +72,35 @@ export class MetriquesService {
             agg.set(row.campaign_id, {
               campaign_id:   row.campaign_id,
               campaign_name: row.ad_campaigns?.name ?? '—',
-              advertiser:    row.ad_campaigns?.advertiser ?? '—',
+              advertiser:    row.ad_campaigns?.company?.name ?? '—',
               tap_count:     1,
+              click_count:   0,
+              ctr:           null,
             });
           }
         }
+        for (const row of clickRows) {
+          const existing = agg.get(row.campaign_id);
+          if (existing) {
+            existing.click_count++;
+          } else {
+            // Clicks recorded against a campaign that has zero views — still surface.
+            agg.set(row.campaign_id, {
+              campaign_id:   row.campaign_id,
+              campaign_name: '—',
+              advertiser:    '—',
+              tap_count:     0,
+              click_count:   1,
+              ctr:           null,
+            });
+          }
+        }
+        for (const t of agg.values()) {
+          t.ctr = t.tap_count > 0 ? t.click_count / t.tap_count : null;
+        }
         return Array.from(agg.values()).sort((a, b) => b.tap_count - a.tap_count);
       }),
-    );
+    ).pipe(map(rows => rows));
   }
 
   getCmsActivity(): Observable<DailyActivity[]> {

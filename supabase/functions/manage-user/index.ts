@@ -6,8 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const VALID_ROLES = ['owner', 'chef_equipe', 'editeur', 'charge_communication'];
-const VALID_ACTIONS = ['update_role', 'block', 'unblock', 'remove'];
+const VALID_ROLES = ['owner', 'chef_equipe', 'editeur', 'charge_communication', 'presidence', 'chef_equipe_commerciale'];
+const VALID_ACTIONS = ['update_role', 'block', 'unblock', 'remove', 'set_password'];
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -40,7 +40,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('Session expirée — reconnectez-vous');
     }
 
-    const { userId, action, role } = await req.json();
+    const { userId, action, role, password } = await req.json();
 
     if (!userId) throw new Error("L'identifiant utilisateur est requis");
     if (!action || !VALID_ACTIONS.includes(action)) throw new Error('Action invalide');
@@ -72,6 +72,14 @@ Deno.serve(async (req: Request) => {
       }
       case 'remove': {
         const { error } = await supabase.auth.admin.deleteUser(userId);
+        if (error) throw error;
+        break;
+      }
+      case 'set_password': {
+        if (!password || typeof password !== 'string' || password.length < 8) {
+          throw new Error('Le mot de passe doit comporter au moins 8 caractères');
+        }
+        const { error } = await supabase.auth.admin.updateUserById(userId, { password });
         if (error) throw error;
         break;
       }

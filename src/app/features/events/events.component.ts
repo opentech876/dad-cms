@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import * as XLSX from 'xlsx';
 import { FormsModule } from '@angular/forms';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
@@ -10,6 +11,7 @@ import { EventService } from '../../core/events/event.service';
 import { ToastService } from '../../core/services/toast.service';
 import { CalendarService, CalendarSummary } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntrySlim } from '../../core/calendar/calendar-entry.service';
+import { formatDateShort, formatDayMonthLong } from '../../core/utils/date.utils';
 
 interface EventRow {
   eventId: string;
@@ -31,22 +33,11 @@ interface ImportPreviewRow {
   source:      string;
 }
 
-const MONTHS_FR_SHORT = ['Jan','Fév','Mar','Avr','Mai','Jun','Juil','Aoû','Sep','Oct','Nov','Déc'];
-const MONTHS_FR_LONG  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-
-function formatDate(iso: string): string {
-  const parts = iso.split('-');
-  if (parts.length !== 3) return iso;
-  const d = parseInt(parts[2], 10);
-  const m = parseInt(parts[1], 10) - 1;
-  const y = parseInt(parts[0], 10);
-  return `${d} ${MONTHS_FR_SHORT[m]} ${y}`;
-}
 
 @Component({
   selector: 'app-events',
   standalone: true,
-  imports: [TuiIcon, FormsModule, ...TuiInputDate],
+  imports: [TuiIcon, FormsModule, DatePipe, ...TuiInputDate],
   templateUrl: './events.component.html',
   styleUrl: './events.component.scss',
 })
@@ -107,7 +98,7 @@ export class EventsComponent implements OnInit {
       })
       .map(e => ({
         eventId:  e.id,
-        date:     formatDate(e.event_date),
+        date:     formatDateShort(e.event_date),
         year:     new Date(e.event_date + 'T00:00:00').getFullYear(),
         title:    e.title,
         excerpt:  e.description ? e.description.slice(0, 70) + (e.description.length > 70 ? '…' : '') : null,
@@ -184,8 +175,7 @@ export class EventsComponent implements OnInit {
   readonly editorMmddLabel = computed(() => {
     const d = this.editorDate();
     if (d.length < 10) return null;
-    const parts = d.split('-');
-    return `${parseInt(parts[2], 10)} ${MONTHS_FR_LONG[parseInt(parts[1], 10) - 1]}`;
+    return formatDayMonthLong(d);
   });
 
   readonly validationItems = computed(() => [

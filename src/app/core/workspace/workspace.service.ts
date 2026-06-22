@@ -185,9 +185,11 @@ export class WorkspaceService {
     userId: string,
     action: ManageUserAction,
     role?: AppRole,
+    password?: string,
   ): Observable<{ success: boolean; error?: string }> {
     const body: Record<string, unknown> = { userId, action };
     if (role) body['role'] = role;
+    if (password) body['password'] = password;
     return from(this.supabaseService.invoke<{ success: boolean }>('manage-user', body)).pipe(
       map(({ error }) =>
         error ? { success: false, error: error.message } : { success: true },

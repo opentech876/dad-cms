@@ -46,6 +46,15 @@
       }
     </div>
 
+    @if (pendingRecommendationsCount() > 0 && canApplyRecommendations()) {
+      <button class="btn btn-primary btn-sm" type="button"
+              [disabled]="recommendationsApplying()"
+              (click)="openApplyDialog()">
+        @if (recommendationsApplying()) { <span class="spinner"></span> }
+        <tui-icon icon="@tui.list-checks" style="font-size:14px;" />
+        Appliquer la recommandation ({{ pendingRecommendationsCount() }})
+      </button>
+    }
     @if (canPublish()) {
       <button class="btn btn-success btn-sm" type="button"
               [disabled]="publishing()"
@@ -456,7 +465,7 @@
       <!-- Footer -->
       <div class="modal-footer">
         <span style="font-size:11.5px; color:var(--fg-3);">
-          Max. 2 événements par date · Position 1 = prioritaire sur mobile
+          Max. 2 événements par date · l'Événement National s'affiche en premier sur mobile
         </span>
         <button class="btn btn-secondary btn-sm" type="button" (click)="closeDayDetail()">Fermer</button>
       </div>
@@ -578,7 +587,7 @@
             </select>
             @if (dupSourceCalendar(); as src) {
               <span class="field-hint">
-                {{ src.eventCount }} événements &middot; {{ src.campaignCount }} campagnes &middot; {{ src.fillPct }}% rempli
+                {{ src.eventCount }} événements &middot; {{ src.fillPct }}% rempli
               </span>
             }
           </div>
@@ -595,17 +604,9 @@
                   <span class="badge">{{ src.eventCount }}</span>
                 }
               </label>
-              <label class="cal-checkbox-option">
-                <input type="checkbox" [checked]="dupIncludeCampaigns()"
-                       (change)="dupIncludeCampaigns.set($any($event.target).checked)" />
-                <span style="flex:1;">Campagnes publicitaires</span>
-                @if (dupSourceCalendar(); as src) {
-                  <span class="badge">{{ src.campaignCount }}</span>
-                }
-              </label>
             </div>
-            @if (!dupIncludeEvents() && !dupIncludeCampaigns()) {
-              <span class="field-hint" style="color:var(--danger);">Sélectionnez au moins un type de contenu.</span>
+            @if (!dupIncludeEvents()) {
+              <span class="field-hint" style="color:var(--danger);">Sélectionnez le contenu à copier.</span>
             }
           </div>
 
@@ -687,13 +688,59 @@
         <div class="modal-footer">
           <button class="btn btn-secondary btn-sm" type="button" (click)="closeDupModal()">Annuler</button>
           <button class="btn btn-primary btn-sm" type="button" (click)="confirmDuplicate()"
-                  [disabled]="!dupIncludeEvents() && !dupIncludeCampaigns()">
+                  [disabled]="!dupIncludeEvents()">
             <tui-icon icon="@tui.copy" style="font-size:14px;" />
             Dupliquer
           </button>
         </div>
       }
 
+    </div>
+  </div>
+}
+
+<!-- ── Apply Presidence recommendations: confirm dialog ─────────────────── -->
+@if (applyDialogVisible()) {
+  <div class="modal-backdrop" (click)="cancelApply()">
+    <div class="modal" style="max-width:560px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin:0; font-size:16px;">Appliquer la recommandation Présidence</h3>
+        <button class="btn btn-flat btn-sm" type="button" (click)="cancelApply()" aria-label="Fermer">
+          <tui-icon icon="@tui.x" style="font-size:14px;" />
+        </button>
+      </div>
+      <div class="modal-body">
+        @if (applyConflicts().length === 0) {
+          <p style="margin:0; font-size:13.5px; color:var(--fg-2);">
+            {{ pendingRecommendationsCount() }} recommandation(s) seront appliquées au calendrier.
+            Aucune affectation existante n'est en conflit.
+          </p>
+        } @else {
+          <p style="margin:0 0 12px 0; font-size:13.5px; color:var(--fg-2);">
+            {{ applyConflicts().length }} jour(s) déjà affecté(s) seront <strong>remplacé(s)</strong> par la recommandation Présidence&nbsp;:
+          </p>
+          <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--fg-2); max-height:240px; overflow:auto;">
+            @for (c of applyConflicts(); track c.mmdd + '-' + c.position) {
+              <li>
+                <strong>{{ c.mmdd }}</strong> · position {{ c.position }} :
+                «&nbsp;{{ c.current_event_title }}&nbsp;» → «&nbsp;{{ c.recommended_event_title }}&nbsp;»
+              </li>
+            }
+          </ul>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="cancelApply()">
+          Annuler
+        </button>
+        <button class="btn btn-primary btn-sm"
+                type="button"
+                [disabled]="recommendationsApplying()"
+                (click)="confirmApply()">
+          @if (recommendationsApplying()) { <span class="spinner"></span> }
+          Appliquer
+        </button>
+      </div>
     </div>
   </div>
 }

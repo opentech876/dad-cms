@@ -36,6 +36,31 @@ export class MetriquesComponent implements OnInit {
     this.campaignTaps().reduce((s, t) => s + t.tap_count, 0),
   );
 
+  /** Sum of impressions across all campaigns (= sum of tap_count). */
+  readonly totalImpressions = this.totalTaps;
+
+  /** Sum of clicks across all campaigns. */
+  readonly totalClicks = computed(() =>
+    this.campaignTaps().reduce((s, t) => s + t.click_count, 0),
+  );
+
+  /** Aggregate CTR — null when there are no impressions yet. */
+  readonly globalCtr = computed<number | null>(() => {
+    const impr = this.totalImpressions();
+    if (impr === 0) return null;
+    return this.totalClicks() / impr;
+  });
+
+  /**
+   * True when campaigns have impressions but zero recorded clicks across the
+   * board — signal that mobile hasn't shipped `record_ad_campaign_click()` yet
+   * (per CLAUDE.md, click tracking RPC adoption is pending mobile release).
+   */
+  readonly clickTrackingPending = computed<boolean>(() => {
+    if (this.campaignTaps().length === 0) return false;
+    return this.totalImpressions() > 0 && this.totalClicks() === 0;
+  });
+
   readonly coveragePercent = computed(() => {
     const months = this.coverage();
     if (months.length === 0) return 0;

@@ -24,7 +24,7 @@
           <div class="card-header">
             <div>
               <div class="card-title">Campagne publicitaire</div>
-              <div class="card-subtitle">Bannière · Pied de page</div>
+              <div class="card-subtitle">Bannière</div>
             </div>
             @switch (editorCurrentStatus()) {
               @case ('active') {
@@ -51,15 +51,30 @@
               />
             </div>
 
-            <!-- Annonceur -->
+            <!-- Annonceur (Compagnie) -->
             <div class="field required">
-              <label class="field-label">Annonceur</label>
-              <input
-                class="input"
-                placeholder="MTN Congo"
-                [value]="editorAdvertiser()"
-                (input)="editorAdvertiser.set($any($event.target).value)"
-              />
+              <label class="field-label">Compagnie annonceuse</label>
+              @if (companies().length === 0) {
+                <div style="font-size: 12.5px; color: var(--fg-3); font-style: italic; padding: 8px 0;">
+                  Aucune compagnie enregistrée.
+                  <a routerLink="/compagnies" style="color: var(--accent);">Créer une compagnie d'abord →</a>
+                </div>
+              } @else {
+                <select
+                  class="select"
+                  (change)="editorCompanyId.set($any($event.target).value || null)"
+                >
+                  <option value="" [selected]="!editorCompanyId()">— Choisir une compagnie —</option>
+                  @for (co of companies(); track co.id) {
+                    <option [value]="co.id" [selected]="co.id === editorCompanyId()">
+                      {{ co.name }}@if (co.business_domain) { · {{ co.business_domain }} }
+                    </option>
+                  }
+                </select>
+                <span class="field-hint">
+                  Gérez la liste des compagnies sur la page <a routerLink="/compagnies" style="color: var(--accent);">Compagnies</a>.
+                </span>
+              }
             </div>
 
             <!-- Période -->
@@ -75,40 +90,17 @@
               >
                 <input
                   class="input"
-                  type="date"
+                  type="date" lang="fr-FR"
                   [value]="editorStartDate()"
                   (change)="editorStartDate.set($any($event.target).value)"
                 />
                 <span style="font-size: 13px; color: var(--fg-3)">→</span>
                 <input
                   class="input"
-                  type="date"
+                  type="date" lang="fr-FR"
                   [value]="editorEndDate()"
                   (change)="editorEndDate.set($any($event.target).value)"
                 />
-              </div>
-            </div>
-
-            <!-- Position (fixed: footer only) -->
-            <div class="field">
-              <label class="field-label">Position de la bannière</label>
-              <div
-                style="
-                  display: inline-flex;
-                  align-items: center;
-                  gap: 8px;
-                  padding: 8px 14px;
-                  background: var(--bg-sunken);
-                  border-radius: var(--r-sm);
-                  border: 1px solid var(--border-1);
-                  font-size: 13px;
-                  color: var(--fg-2);
-                  width: fit-content;
-                "
-              >
-                <tui-icon icon="@tui.arrow-down" style="font-size: 14px" />
-                Pied de page
-                <span style="font-size: 11px; color: var(--fg-3)">(seule position disponible)</span>
               </div>
             </div>
 
@@ -175,6 +167,61 @@
                 }
                 @if (editorUpdatedAt()) {
                   <span>Mis à jour le {{ formatDate(editorUpdatedAt()!.slice(0, 10)) }}</span>
+                }
+              </div>
+            }
+
+            @if (editorCampaignId()) {
+              <div style="margin-top: 16px; padding: 14px; border: 1px solid var(--border-1); border-radius: 8px; background: var(--bg-sunken);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <strong style="font-size: 13px;">Validation</strong>
+                  @switch (editorValidationState()) {
+                    @case ('validated') { <span class="badge badge-success">Validée</span> }
+                    @case ('paid')      { <span class="badge badge-info">Payée</span> }
+                    @case ('confirmed') { <span class="badge badge-info">Confirmée</span> }
+                    @case ('pending')   { <span class="badge badge-warning">À valider</span> }
+                  }
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12.5px; color: var(--fg-2);">
+                  <div>
+                    <div style="font-weight: 600; color: var(--fg-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Paiement</div>
+                    @if (editorPaidAt()) {
+                      <div>✓ Enregistré le {{ formatDate(editorPaidAt()!.slice(0,10)) }}</div>
+                    } @else {
+                      <div style="color: var(--fg-3); font-style: italic;">En attente</div>
+                      @if (canValidate()) {
+                        <button class="btn btn-secondary btn-sm" type="button"
+                                style="margin-top: 6px;"
+                                [disabled]="editorValidationBusy()"
+                                (click)="markPaidFromEditor()">
+                          <tui-icon icon="@tui.banknote" style="font-size: 13px" />
+                          Marquer payée
+                        </button>
+                      }
+                    }
+                  </div>
+                  <div>
+                    <div style="font-weight: 600; color: var(--fg-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Confirmation</div>
+                    @if (editorManagerConfirmedAt()) {
+                      <div>✓ Confirmée le {{ formatDate(editorManagerConfirmedAt()!.slice(0,10)) }}</div>
+                    } @else {
+                      <div style="color: var(--fg-3); font-style: italic;">En attente</div>
+                      @if (canValidate()) {
+                        <button class="btn btn-secondary btn-sm" type="button"
+                                style="margin-top: 6px;"
+                                [disabled]="editorValidationBusy()"
+                                (click)="confirmFromEditor()">
+                          <tui-icon icon="@tui.check-check" style="font-size: 13px" />
+                          Confirmer
+                        </button>
+                      }
+                    }
+                  </div>
+                </div>
+                @if (!editorValidatedAt()) {
+                  <div style="margin-top: 10px; padding: 8px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; font-size: 12px; color: var(--warning);">
+                    ⚠ Tant que la campagne n'est pas validée, le mobile ne la diffuse pas.
+                  </div>
                 }
               </div>
             }
@@ -499,6 +546,23 @@
       </div>
     </div>
 
+    @if (stats().startingSoonUnvalidated > 0) {
+      <div class="card" style="padding: 14px 18px; margin-bottom: 16px; border-left: 3px solid var(--warning); background: rgba(245, 158, 11, 0.06);">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <strong style="font-size: 13px; color: var(--warning);">
+            ⚠ {{ stats().startingSoonUnvalidated }} campagne(s) démarrent dans ≤ 10 jours et ne sont pas validées
+          </strong>
+          <span style="font-size: 12px; color: var(--fg-3);">
+            Sans validation (paiement + confirmation managériale), elles ne seront pas diffusées sur mobile.
+          </span>
+          <div style="flex: 1;"></div>
+          <button class="btn btn-secondary btn-sm" type="button" (click)="setFilterValidation('pending')">
+            Voir les non validées
+          </button>
+        </div>
+      </div>
+    }
+
     <!-- ── Toolbar ── -->
     <div
       class="card"
@@ -518,14 +582,73 @@
         </div>
         <select
           class="select"
-          style="width: 150px; height: 36px; font-size: 13px"
-          [value]="selectedStatus()"
+          style="width: 130px; height: 36px; font-size: 13px"
           (change)="setSelectedStatus($any($event.target).value)"
         >
-          <option value="all">Tous statuts</option>
-          <option value="active">Active</option>
-          <option value="planifiee">Planifiée</option>
-          <option value="terminee">Terminée</option>
+          <option value="all" [selected]="selectedStatus() === 'all'">Tous statuts</option>
+          <option value="active" [selected]="selectedStatus() === 'active'">Active</option>
+          <option value="planifiee" [selected]="selectedStatus() === 'planifiee'">Planifiée</option>
+          <option value="terminee" [selected]="selectedStatus() === 'terminee'">Terminée</option>
+        </select>
+        <select
+          class="select"
+          style="width: 170px; height: 36px; font-size: 13px"
+          (change)="setFilterCompanyId($any($event.target).value)"
+        >
+          <option value="all" [selected]="filterCompanyId() === 'all'">Toutes compagnies</option>
+          @for (co of companies(); track co.id) {
+            <option [value]="co.id" [selected]="filterCompanyId() === co.id">{{ co.name }}</option>
+          }
+        </select>
+        <select
+          class="select"
+          style="width: 170px; height: 36px; font-size: 13px"
+          (change)="setFilterDomain($any($event.target).value)"
+        >
+          <option value="all" [selected]="filterDomain() === 'all'">Tous domaines</option>
+          @for (d of availableDomains(); track d) {
+            <option [value]="d" [selected]="filterDomain() === d">{{ d }}</option>
+          }
+        </select>
+        <select
+          class="select"
+          style="width: 110px; height: 36px; font-size: 13px"
+          (change)="setFilterMonth($any($event.target).value)"
+        >
+          <option value="all" [selected]="filterMonth() === 'all'">Tous mois</option>
+          <option value="01" [selected]="filterMonth() === '01'">Janvier</option>
+          <option value="02" [selected]="filterMonth() === '02'">Février</option>
+          <option value="03" [selected]="filterMonth() === '03'">Mars</option>
+          <option value="04" [selected]="filterMonth() === '04'">Avril</option>
+          <option value="05" [selected]="filterMonth() === '05'">Mai</option>
+          <option value="06" [selected]="filterMonth() === '06'">Juin</option>
+          <option value="07" [selected]="filterMonth() === '07'">Juillet</option>
+          <option value="08" [selected]="filterMonth() === '08'">Août</option>
+          <option value="09" [selected]="filterMonth() === '09'">Septembre</option>
+          <option value="10" [selected]="filterMonth() === '10'">Octobre</option>
+          <option value="11" [selected]="filterMonth() === '11'">Novembre</option>
+          <option value="12" [selected]="filterMonth() === '12'">Décembre</option>
+        </select>
+        <select
+          class="select"
+          style="width: 100px; height: 36px; font-size: 13px"
+          (change)="setFilterYear($any($event.target).value)"
+        >
+          <option value="all" [selected]="filterYear() === 'all'">Toutes années</option>
+          @for (y of availableFilterYears(); track y) {
+            <option [value]="y" [selected]="filterYear() === y">{{ y }}</option>
+          }
+        </select>
+        <select
+          class="select"
+          style="width: 150px; height: 36px; font-size: 13px"
+          (change)="setFilterValidation($any($event.target).value)"
+        >
+          <option value="all"       [selected]="filterValidation() === 'all'">Toutes validations</option>
+          <option value="pending"   [selected]="filterValidation() === 'pending'">À valider</option>
+          <option value="paid"      [selected]="filterValidation() === 'paid'">Payées</option>
+          <option value="confirmed" [selected]="filterValidation() === 'confirmed'">Confirmées</option>
+          <option value="validated" [selected]="filterValidation() === 'validated'">Validées</option>
         </select>
         <div style="flex: 1"></div>
         <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
@@ -540,7 +663,7 @@
         >
         <input
           class="input"
-          type="date"
+          type="date" lang="fr-FR"
           style="height: 32px; font-size: 12px; width: 140px"
           [value]="filterActivationFrom()"
           (change)="setActivationFrom($any($event.target).value)"
@@ -548,7 +671,7 @@
         <span style="font-size: 12px; color: var(--fg-3)">→</span>
         <input
           class="input"
-          type="date"
+          type="date" lang="fr-FR"
           style="height: 32px; font-size: 12px; width: 140px"
           [value]="filterActivationTo()"
           (change)="setActivationTo($any($event.target).value)"
@@ -565,7 +688,7 @@
         >
         <input
           class="input"
-          type="date"
+          type="date" lang="fr-FR"
           style="height: 32px; font-size: 12px; width: 140px"
           [value]="filterCreatedFrom()"
           (change)="setCreatedFrom($any($event.target).value)"
@@ -573,7 +696,7 @@
         <span style="font-size: 12px; color: var(--fg-3)">→</span>
         <input
           class="input"
-          type="date"
+          type="date" lang="fr-FR"
           style="height: 32px; font-size: 12px; width: 140px"
           [value]="filterCreatedTo()"
           (change)="setCreatedTo($any($event.target).value)"
@@ -598,10 +721,10 @@
         <thead>
           <tr>
             <th>Campagne</th>
-            <th style="width: 100px">Position</th>
             <th style="width: 200px">Période</th>
             <th style="width: 80px; text-align: center">Durée</th>
             <th style="width: 110px">Statut</th>
+            <th style="width: 140px">Validation</th>
             <th style="width: 60px"></th>
           </tr>
         </thead>
@@ -659,20 +782,11 @@
                     }
                     <div>
                       <div style="font-weight: 500">{{ row.name }}</div>
-                      <div style="font-size: 12px; color: var(--fg-3)">{{ row.advertiser }}</div>
+                      <div style="font-size: 12px; color: var(--fg-3)">
+                        {{ row.companyName }}@if (row.businessDomain) { <span style="opacity: 0.7"> · {{ row.businessDomain }}</span> }
+                      </div>
                     </div>
                   </div>
-                </td>
-                <td>
-                  @if (row.position === 'header') {
-                    <span class="badge"
-                      ><tui-icon icon="@tui.arrow-up" style="font-size: 11px" /> Entête</span
-                    >
-                  } @else {
-                    <span class="badge"
-                      ><tui-icon icon="@tui.arrow-down" style="font-size: 11px" /> Pied</span
-                    >
-                  }
                 </td>
                 <td
                   style="font-size: 12.5px; color: var(--fg-2); font-variant-numeric: tabular-nums"
@@ -701,13 +815,73 @@
                   }
                 </td>
                 <td>
-                  <button
-                    class="btn btn-flat btn-icon btn-sm"
-                    type="button"
-                    (click)="$event.stopPropagation(); openEditor(row.id)"
-                  >
-                    <tui-icon icon="@tui.chevron-right" style="font-size: 14px" />
-                  </button>
+                  <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+                    @switch (row.validation) {
+                      @case ('validated') {
+                        <span class="badge badge-success" title="Paiement + confirmation managériale enregistrés">
+                          <tui-icon icon="@tui.check" style="font-size: 11px" />
+                          Validée
+                        </span>
+                      }
+                      @case ('paid') {
+                        <span class="badge badge-info" title="Payée — en attente de confirmation managériale">
+                          Payée
+                        </span>
+                      }
+                      @case ('confirmed') {
+                        <span class="badge badge-info" title="Confirmée — en attente de paiement">
+                          Confirmée
+                        </span>
+                      }
+                      @case ('pending') {
+                        <span class="badge badge-warning" title="Ni payée ni confirmée — mobile ne diffusera pas">
+                          À valider
+                        </span>
+                      }
+                    }
+                    @if (row.validation !== 'validated' && row.daysUntilStart >= 0 && row.daysUntilStart <= 10) {
+                      <span
+                        class="badge badge-warning"
+                        [title]="'Démarre dans ' + row.daysUntilStart + ' j et n\'est pas validée'"
+                        style="font-size: 10.5px"
+                      >
+                        ⏰ J-{{ row.daysUntilStart }}
+                      </span>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <div style="display: flex; gap: 4px; justify-content: flex-end">
+                    @if (canValidate() && row.validation !== 'validated') {
+                      @if (row.validation === 'pending' || row.validation === 'confirmed') {
+                        <button
+                          class="btn btn-flat btn-icon btn-sm"
+                          type="button"
+                          title="Marquer payée"
+                          (click)="$event.stopPropagation(); markPaidRow(row.id)"
+                        >
+                          <tui-icon icon="@tui.banknote" style="font-size: 14px" />
+                        </button>
+                      }
+                      @if (row.validation === 'pending' || row.validation === 'paid') {
+                        <button
+                          class="btn btn-flat btn-icon btn-sm"
+                          type="button"
+                          title="Confirmer (manager)"
+                          (click)="$event.stopPropagation(); confirmRow(row.id)"
+                        >
+                          <tui-icon icon="@tui.check-check" style="font-size: 14px" />
+                        </button>
+                      }
+                    }
+                    <button
+                      class="btn btn-flat btn-icon btn-sm"
+                      type="button"
+                      (click)="$event.stopPropagation(); openEditor(row.id)"
+                    >
+                      <tui-icon icon="@tui.chevron-right" style="font-size: 14px" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             }
@@ -750,6 +924,43 @@
           </button>
         </div>
       }
+    </div>
+  </div>
+}
+
+<!-- ── Overlap confirmation dialog ─────────────────────────────────────── -->
+@if (overlapDialogVisible()) {
+  <div class="modal-backdrop" (click)="cancelOverlap()">
+    <div class="modal" style="max-width:520px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin:0; font-size:16px;">Conflit de période détecté</h3>
+        <button class="btn btn-flat btn-sm" type="button" (click)="cancelOverlap()" aria-label="Fermer">
+          <tui-icon icon="@tui.x" style="font-size:14px;" />
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="margin:0 0 12px 0; font-size:13.5px; color:var(--fg-2);">
+          Cette campagne couvre des jours déjà occupés par
+          {{ overlapList().length }} campagne(s) active(s). La campagne la plus
+          récemment modifiée sera affichée sur les jours qui se chevauchent.
+        </p>
+        <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--fg-2);">
+          @for (c of overlapList(); track c.id) {
+            <li>
+              <strong>{{ c.name }}</strong> ({{ c.company?.name ?? '—' }}) —
+              {{ formatDate(c.start_date) }} → {{ formatDate(c.end_date) }}
+            </li>
+          }
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="cancelOverlap()">
+          Annuler
+        </button>
+        <button class="btn btn-primary btn-sm" type="button" (click)="confirmOverlap()">
+          Continuer quand même
+        </button>
+      </div>
     </div>
   </div>
 }

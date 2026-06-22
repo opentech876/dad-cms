@@ -1,14 +1,20 @@
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { User, Session } from '@supabase/supabase-js';
-import { BehaviorSubject, Observable, from, of } from 'rxjs';
+import { Observable, ReplaySubject, from, of } from 'rxjs';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
-import { AppRole } from '../../models'; // ← chemin corrigé
+import { AppRole } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private currentRoleSubject = new BehaviorSubject<AppRole | null>(null);
+  /**
+   * ReplaySubject (buffer 1) instead of BehaviorSubject so subscribers that
+   * arrive *before* the async role lookup completes don't get a stale `null`.
+   * Guards using `take(1)` will wait for the first real emission and then
+   * pick it up immediately on every subsequent subscribe.
+   */
+  private currentRoleSubject = new ReplaySubject<AppRole | null>(1);
   public currentRole$ = this.currentRoleSubject.asObservable();
 
   constructor(
@@ -26,10 +32,7 @@ export class AuthService {
     this.supabaseService.currentUser$
       .pipe(
         switchMap((user) => {
-          if (!user) {
-            this.currentRoleSubject.next(null);
-            return of(null);
-          }
+          if (!user) return of(null);
 
           return from(
             this.supabaseService.client
@@ -61,8 +64,17 @@ export class AuthService {
         if (userRole === 'owner') return true;
         if (userRole === 'chef_equipe')
           return ['chef_equipe', 'editeur', 'charge_communication'].includes(requiredRole);
+        // chef_equipe_commerciale inherits charge_communication (symmetric to
+        // how chef_equipe inherits editeur). It can manage companies and
+        // oversee campaigns.
+        if (userRole === 'chef_equipe_commerciale')
+          return ['chef_equipe_commerciale', 'charge_communication'].includes(requiredRole);
         if (userRole === 'editeur') return requiredRole === 'editeur';
         if (userRole === 'charge_communication') return requiredRole === 'charge_communication';
+        // presidence is a parallel tier: only itself and owner satisfy
+        // has_role_at_least('presidence'). It does not inherit editorial
+        // permissions, and editorial roles do not inherit it.
+        if (userRole === 'presidence') return requiredRole === 'presidence';
         return false;
       }),
     );

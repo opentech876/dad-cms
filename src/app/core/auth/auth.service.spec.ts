@@ -99,6 +99,65 @@ describe('AuthService', () => {
       (service as any).currentRoleSubject.next(null);
       service.hasRoleAtLeast('editeur').subscribe((v) => { expect(v).toBe(false); done(); });
     });
+
+    // ── presidence: parallel tier, only owner inherits ─────────────────────
+
+    it('owner passes presidence check', (done) => {
+      (service as any).currentRoleSubject.next('owner');
+      service.hasRoleAtLeast('presidence').subscribe((v) => { expect(v).toBe(true); done(); });
+    });
+
+    it('presidence passes presidence check', (done) => {
+      (service as any).currentRoleSubject.next('presidence');
+      service.hasRoleAtLeast('presidence').subscribe((v) => { expect(v).toBe(true); done(); });
+    });
+
+    it('chef_equipe fails presidence check (not inherited)', (done) => {
+      (service as any).currentRoleSubject.next('chef_equipe');
+      service.hasRoleAtLeast('presidence').subscribe((v) => { expect(v).toBe(false); done(); });
+    });
+
+    it('presidence fails editeur check (parallel, not inherited)', (done) => {
+      (service as any).currentRoleSubject.next('presidence');
+      service.hasRoleAtLeast('editeur').subscribe((v) => { expect(v).toBe(false); done(); });
+    });
+
+    it('presidence fails charge_communication check', (done) => {
+      (service as any).currentRoleSubject.next('presidence');
+      service.hasRoleAtLeast('charge_communication').subscribe((v) => { expect(v).toBe(false); done(); });
+    });
+
+    // ── chef_equipe_commerciale: inherits charge_communication ───────────────
+
+    it('chef_equipe_commerciale passes itself', (done) => {
+      (service as any).currentRoleSubject.next('chef_equipe_commerciale');
+      service.hasRoleAtLeast('chef_equipe_commerciale').subscribe((v) => { expect(v).toBe(true); done(); });
+    });
+
+    it('chef_equipe_commerciale passes charge_communication check', (done) => {
+      (service as any).currentRoleSubject.next('chef_equipe_commerciale');
+      service.hasRoleAtLeast('charge_communication').subscribe((v) => { expect(v).toBe(true); done(); });
+    });
+
+    it('chef_equipe_commerciale fails editeur check', (done) => {
+      (service as any).currentRoleSubject.next('chef_equipe_commerciale');
+      service.hasRoleAtLeast('editeur').subscribe((v) => { expect(v).toBe(false); done(); });
+    });
+
+    it('chef_equipe_commerciale fails chef_equipe check', (done) => {
+      (service as any).currentRoleSubject.next('chef_equipe_commerciale');
+      service.hasRoleAtLeast('chef_equipe').subscribe((v) => { expect(v).toBe(false); done(); });
+    });
+
+    it('charge_communication fails chef_equipe_commerciale check (parent role)', (done) => {
+      (service as any).currentRoleSubject.next('charge_communication');
+      service.hasRoleAtLeast('chef_equipe_commerciale').subscribe((v) => { expect(v).toBe(false); done(); });
+    });
+
+    it('owner passes chef_equipe_commerciale check', (done) => {
+      (service as any).currentRoleSubject.next('owner');
+      service.hasRoleAtLeast('chef_equipe_commerciale').subscribe((v) => { expect(v).toBe(true); done(); });
+    });
   });
 
   // ── signOut() ──────────────────────────────────────────────────────────────

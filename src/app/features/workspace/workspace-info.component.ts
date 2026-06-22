@@ -4,6 +4,7 @@ import { TuiIcon } from '@taiga-ui/core';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../core/services/toast.service';
+import { formatDateLong } from '../../core/utils/date.utils';
 
 @Component({
   selector: 'app-workspace-info',
@@ -93,11 +94,6 @@ export class WorkspaceInfoComponent implements OnInit {
   }
 
   formatDate(iso: string | null): string {
-    if (!iso) return '—';
-    try {
-      return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch {
-      return iso;
-    }
+    return iso ? (formatDateLong(iso) || iso) : '—';
   }
 }

@@ -6,13 +6,16 @@ import { filter, firstValueFrom } from 'rxjs';
 import { AppRole } from '../../models';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { SupabaseService } from '../../core/supabase/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
 
 const ROLE_LABELS: Record<AppRole, string> = {
-  owner:                  'Propriétaire',
-  chef_equipe:            "Chef d'équipe",
-  editeur:                'Éditeur',
-  charge_communication:   'Chargé de communication',
+  owner:                   'Propriétaire',
+  chef_equipe:             "Chef d'équipe",
+  editeur:                 'Éditeur',
+  charge_communication:    'Chargé de communication',
+  presidence:              'Présidence',
+  chef_equipe_commerciale: "Chef d'équipe commerciale",
 };
 
 @Component({
@@ -25,6 +28,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 export class ProfileComponent implements OnInit {
   private readonly auth             = inject(AuthService);
   private readonly workspaceService = inject(WorkspaceService);
+  private readonly supabase         = inject(SupabaseService);
   private readonly router           = inject(Router);
   private readonly toast            = inject(ToastService);
 
@@ -123,5 +127,87 @@ export class ProfileComponent implements OnInit {
 
   goBack(): void {
     this.router.navigate(['/dashboard']);
+  }
+
+  // ── Email change ─────────────────────────────────────────────────────────
+
+  readonly newEmail        = signal('');
+  readonly emailChanging   = signal(false);
+  readonly emailError      = signal('');
+  readonly pendingNewEmail = signal('');
+
+  async changeEmail(): Promise<void> {
+    if (this.emailChanging()) return;
+    const target = this.newEmail().trim().toLowerCase();
+    this.emailError.set('');
+    if (!target) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(target)) {
+      this.emailError.set("Adresse e-mail invalide. Saisissez une adresse valide.");
+      return;
+    }
+    if (target === this.userEmail().toLowerCase()) {
+      this.emailError.set("Le nouvel e-mail doit être différent de l'actuel.");
+      return;
+    }
+
+    this.emailChanging.set(true);
+    try {
+      const { error } = await this.supabase.updateEmail(target);
+      if (error) {
+        const msg = (error.message ?? '').toLowerCase();
+        this.emailError.set(
+          msg.includes('rate') || msg.includes('limit')
+            ? 'Trop de tentatives. Veuillez patienter quelques minutes.'
+            : msg.includes('already') || msg.includes('exists')
+              ? 'Cette adresse e-mail est déjà utilisée par un autre compte.'
+              : 'Impossible de mettre à jour l\'e-mail : ' + (error.message ?? 'erreur inconnue'),
+        );
+        return;
+      }
+      this.pendingNewEmail.set(target);
+      this.toast.success("Lien de confirmation envoyé. Vérifiez votre boîte de réception.");
+    } finally {
+      this.emailChanging.set(false);
+    }
+  }
+
+  cancelEmailChange(): void {
+    this.pendingNewEmail.set('');
+    this.newEmail.set('');
+    this.emailError.set('');
+  }
+
+  // ── Password change ──────────────────────────────────────────────────────
+
+  readonly newPassword    = signal('');
+  readonly showNewPassword = signal(false);
+  readonly passwordSaving  = signal(false);
+  readonly passwordError   = signal('');
+
+  toggleShowNewPassword(): void { this.showNewPassword.update(v => !v); }
+
+  async changePassword(): Promise<void> {
+    if (this.passwordSaving()) return;
+    const pwd = this.newPassword();
+    this.passwordError.set('');
+
+    if (pwd.length < 8) {
+      this.passwordError.set('Le mot de passe doit comporter au moins 8 caractères.');
+      return;
+    }
+
+    this.passwordSaving.set(true);
+    try {
+      const { error } = await this.supabase.updatePassword(pwd);
+      if (error) {
+        this.passwordError.set('Erreur : ' + error.message);
+        return;
+      }
+      this.supabase.markPasswordSet();
+      this.newPassword.set('');
+      this.toast.success('Mot de passe mis à jour.');
+    } finally {
+      this.passwordSaving.set(false);
+    }
   }
 }

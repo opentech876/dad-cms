@@ -20,13 +20,10 @@ export class LandingComponent implements OnInit {
   readonly todayMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 
   async ngOnInit(): Promise<void> {
+    // '/' is now a pure redirector: logged-in users go to dashboard,
+    // everyone else goes straight to /login. The landing copy is no longer shown.
+    // (This route is still hit by the post-magic-link Supabase redirect.)
     const { data: { session } } = await this.supabase.client.auth.getSession();
-    if (session) {
-      this.router.navigate(['/dashboard']);
-      return;
-    }
-
-    this.isInitialized.set(await this.supabase.isAppInitialized());
-    this.isLoading.set(false);
+    this.router.navigate([session ? '/dashboard' : '/login']);
   }
 }

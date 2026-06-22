@@ -1,0 +1,212 @@
+<div class="companies-page">
+
+  <!-- ── Header ── -->
+  <div class="card" style="padding: 20px 24px; margin-bottom: 16px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+      <div>
+        <h1 style="margin: 0; font-family: var(--font-serif); font-size: 22px; font-weight: 600;">
+          Compagnies & Annonceurs
+        </h1>
+        <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--fg-3);">
+          Annuaire des entreprises avec lesquelles vous travaillez pour les campagnes publicitaires.
+        </p>
+      </div>
+      @if (canWrite()) {
+        <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
+          <tui-icon icon="@tui.plus" style="font-size: 14px" />
+          Nouvelle compagnie
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- ── Toolbar ── -->
+  <div class="card" style="padding: 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <input
+      class="input"
+      placeholder="Nom, domaine d'activité…"
+      [value]="searchQuery()"
+      (input)="setSearchQuery($any($event.target).value)"
+      style="height: 36px; font-size: 13px; flex: 1; min-width: 240px;"
+    />
+    <select class="select" style="width: 200px; height: 36px; font-size: 13px;"
+            (change)="setFilterType($any($event.target).value)">
+      <option value="all" [selected]="filterType() === 'all'">Tous types</option>
+      @for (t of companyTypes; track t) {
+        <option [value]="t" [selected]="filterType() === t">{{ typeLabel(t) }}</option>
+      }
+    </select>
+    <select class="select" style="width: 200px; height: 36px; font-size: 13px;"
+            (change)="setFilterDomain($any($event.target).value)">
+      <option value="all" [selected]="filterDomain() === 'all'">Tous domaines</option>
+      @for (d of availableDomains(); track d) {
+        <option [value]="d" [selected]="filterDomain() === d">{{ d }}</option>
+      }
+    </select>
+  </div>
+
+  <!-- ── List ── -->
+  @if (loading()) {
+    <div class="card" style="padding: 32px; text-align: center; color: var(--fg-3); font-style: italic;">
+      Chargement…
+    </div>
+  } @else if (companies().length === 0) {
+    <div class="card" style="padding: 40px; text-align: center;">
+      <p style="font-style: italic; color: var(--fg-3); margin: 0 0 12px 0;">
+        Aucune compagnie enregistrée dans cet espace.
+      </p>
+      @if (canWrite()) {
+        <button class="btn btn-secondary btn-sm" type="button" (click)="openEditor()">
+          <tui-icon icon="@tui.plus" style="font-size: 13px" />
+          Créer la première compagnie
+        </button>
+      }
+    </div>
+  } @else if (filteredCompanies().length === 0) {
+    <div class="card" style="padding: 32px; text-align: center; color: var(--fg-3); font-style: italic;">
+      Aucun résultat pour ces filtres.
+    </div>
+  } @else {
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <table class="table" style="margin: 0;">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th style="width: 180px;">Type</th>
+            <th style="width: 200px;">Domaine</th>
+            <th style="width: 200px;">Contact</th>
+            <th style="width: 130px;">Ajoutée le</th>
+            @if (canWrite()) { <th style="width: 80px;"></th> }
+          </tr>
+        </thead>
+        <tbody>
+          @for (co of filteredCompanies(); track co.id) {
+            <tr>
+              <td>
+                <div style="font-weight: 500;">{{ co.name }}</div>
+                @if (co.website) {
+                  <a [href]="co.website" target="_blank" rel="noopener"
+                     style="font-size: 11.5px; color: var(--fg-3);">{{ co.website }}</a>
+                }
+              </td>
+              <td>
+                <span class="badge">{{ typeLabel(co.type) }}</span>
+              </td>
+              <td style="font-size: 13px; color: var(--fg-2);">
+                {{ co.business_domain || '—' }}
+              </td>
+              <td style="font-size: 12.5px; color: var(--fg-2); line-height: 1.4;">
+                @if (co.contact_email) {
+                  <div>{{ co.contact_email }}</div>
+                }
+                @if (co.contact_phone) {
+                  <div style="color: var(--fg-3);">{{ co.contact_phone }}</div>
+                }
+                @if (!co.contact_email && !co.contact_phone) { — }
+              </td>
+              <td style="font-size: 12.5px; color: var(--fg-3); font-variant-numeric: tabular-nums;">
+                {{ formatDate(co.created_at) }}
+              </td>
+              @if (canWrite()) {
+                <td>
+                  <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-flat btn-icon btn-sm" type="button"
+                            (click)="openEditor(co.id)" title="Modifier">
+                      <tui-icon icon="@tui.pencil" style="font-size: 14px;" />
+                    </button>
+                    <button class="btn btn-flat btn-icon btn-sm" type="button"
+                            style="color: var(--danger);"
+                            (click)="deleteCompany(co.id)" title="Supprimer">
+                      <tui-icon icon="@tui.trash-2" style="font-size: 14px;" />
+                    </button>
+                  </div>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+<!-- ── Editor modal ── -->
+@if (editorOpen()) {
+  <div class="modal-backdrop" (click)="closeEditor()">
+    <div class="modal" style="max-width: 560px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin: 0; font-size: 16px;">
+          {{ editorId() ? 'Modifier la compagnie' : 'Nouvelle compagnie' }}
+        </h3>
+        <button class="btn btn-flat btn-sm" type="button" (click)="closeEditor()" aria-label="Fermer">
+          <tui-icon icon="@tui.x" style="font-size: 14px;" />
+        </button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="field required">
+          <label class="field-label">Nom *</label>
+          <input class="input"
+                 [value]="editorName()"
+                 (input)="editorName.set($any($event.target).value)"
+                 placeholder="MTN Congo" />
+        </div>
+        <div class="field required">
+          <label class="field-label">Type *</label>
+          <select class="select"
+                  (change)="editorType.set($any($event.target).value)">
+            @for (t of companyTypes; track t) {
+              <option [value]="t" [selected]="editorType() === t">{{ typeLabel(t) }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Domaine d'activité</label>
+          <input class="input"
+                 [value]="editorDomain()"
+                 (input)="editorDomain.set($any($event.target).value)"
+                 placeholder="Téléphonie mobile" />
+          <span class="field-hint">Description courte du secteur (utilisée comme filtre).</span>
+        </div>
+        <div class="field">
+          <label class="field-label">Site web</label>
+          <input class="input" type="url"
+                 [value]="editorWebsite()"
+                 (input)="editorWebsite.set($any($event.target).value)"
+                 placeholder="https://mtn.cg" />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="field">
+            <label class="field-label">Email de contact</label>
+            <input class="input" type="email"
+                   [value]="editorEmail()"
+                   (input)="editorEmail.set($any($event.target).value)"
+                   placeholder="contact@mtn.cg" />
+          </div>
+          <div class="field">
+            <label class="field-label">Téléphone</label>
+            <input class="input"
+                   [value]="editorPhone()"
+                   (input)="editorPhone.set($any($event.target).value)"
+                   placeholder="+242 06 …" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Notes</label>
+          <textarea class="textarea" rows="3"
+                    [value]="editorNotes()"
+                    (input)="editorNotes.set($any($event.target).value)"
+                    placeholder="Contexte, conditions particulières…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeEditor()">Annuler</button>
+        <button class="btn btn-primary btn-sm" type="button"
+                [disabled]="!editorValid() || editorSaving()"
+                (click)="saveEditor()">
+          @if (editorSaving()) { <span class="spinner"></span> }
+          {{ editorId() ? 'Enregistrer' : 'Créer' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

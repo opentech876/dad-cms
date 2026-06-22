@@ -51,20 +51,62 @@
       }
     </div>
 
-    <!-- Workspace badge -->
+    <!-- Workspace switcher -->
     @if (!collapsed()) {
-      <div class="sidebar-workspace">
-        <button class="sidebar-workspace-btn">
-          <div class="sidebar-workspace-icon">DA</div>
+      <div class="sidebar-workspace" style="position:relative;">
+        <button class="sidebar-workspace-btn"
+                type="button"
+                [attr.aria-expanded]="workspaceMenuOpen()"
+                (click)="toggleWorkspaceMenu()">
+          <div class="sidebar-workspace-icon">{{ workspaceInitials() }}</div>
           <div class="sidebar-workspace-info">
-            <span class="sidebar-workspace-name">Day After Day</span>
-            <span class="sidebar-workspace-sub">Espace principal</span>
+            <span class="sidebar-workspace-name">{{ workspaceName() }}</span>
+            <span class="sidebar-workspace-sub">{{ workspaceMemberLabel() }}</span>
           </div>
           <tui-icon
-            icon="@tui.chevron-down"
+            [icon]="workspaceMenuOpen() ? '@tui.chevron-up' : '@tui.chevron-down'"
             style="font-size: 14px; color: var(--sidebar-fg); opacity: 0.6"
           />
         </button>
+
+        @if (workspaceMenuOpen()) {
+          <!-- Backdrop catches outside clicks. -->
+          <div style="position:fixed; inset:0; z-index:90;" (click)="closeWorkspaceMenu()"></div>
+          <div role="menu"
+               style="position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:100;
+                      background:var(--bg-elev); border:1px solid var(--border-1);
+                      border-radius:var(--r-md); box-shadow:var(--shadow-md);
+                      padding:6px; max-height:280px; overflow:auto;">
+            @if (otherWorkspaces().length === 0) {
+              <div style="padding:10px 12px; font-size:12px; color:var(--fg-3); font-style:italic;">
+                Vous n'appartenez qu'à cet espace.
+              </div>
+            }
+            @for (w of otherWorkspaces(); track w.id) {
+              <button role="menuitem"
+                      type="button"
+                      (click)="switchWorkspace(w.id)"
+                      style="display:flex; align-items:center; gap:10px; width:100%;
+                             padding:8px 10px; border:none; background:transparent;
+                             cursor:pointer; border-radius:var(--r-sm); text-align:left;
+                             color:var(--fg-1); font-size:13px;"
+                      onmouseover="this.style.background='var(--bg-sunken)'"
+                      onmouseout="this.style.background='transparent'">
+                <div class="sidebar-workspace-icon" style="width:28px; height:28px; font-size:11px;">
+                  {{ workspaceInitialsFor(w.name) }}
+                </div>
+                <div style="display:flex; flex-direction:column; min-width:0; flex:1;">
+                  <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    {{ w.name }}
+                  </span>
+                  <span style="font-size:11px; color:var(--fg-3);">
+                    {{ workspaceMemberLabelFor(w.member_count) }}
+                  </span>
+                </div>
+              </button>
+            }
+          </div>
+        }
       </div>
     }
 
@@ -140,26 +182,95 @@
     <header class="topbar">
       <h1 class="topbar-title">{{ pageTitle() }}</h1>
       <div class="topbar-actions">
-        <div class="input-group topbar-search">
+        <div class="input-group topbar-search" style="position:relative;">
           <span class="input-icon">
             <tui-icon icon="@tui.search" style="font-size: 16px" />
           </span>
           <input
             class="input has-icon"
-            placeholder="Rechercher événements, dates…"
+            placeholder="Rechercher événements, campagnes, compagnies…"
             style="height: 36px; font-size: 13px; padding-right: 44px"
+            [value]="searchTerm()"
+            (input)="onSearchInput($any($event.target).value)"
+            (focus)="searchTerm() && searchOpen.set(true)"
+            (keydown.enter)="submitSearch()"
+            (keydown.escape)="closeSearchDropdown()"
           />
-          <span
-            style="
-              position: absolute;
-              right: 8px;
-              top: 50%;
-              transform: translateY(-50%);
-              display: flex;
-            "
-          >
-            <span class="kbd">⌘K</span>
-          </span>
+          @if (searchTerm()) {
+            <button type="button"
+                    class="topbar-search-clear"
+                    (click)="onSearchInput(''); closeSearchDropdown()"
+                    aria-label="Effacer la recherche">
+              <tui-icon icon="@tui.x" style="font-size:13px;" />
+            </button>
+          } @else {
+            <span style="position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex;">
+              <span class="kbd">⌘K</span>
+            </span>
+          }
+
+          @if (searchOpen() && searchTerm().trim()) {
+            <div class="topbar-search-backdrop" (click)="closeSearchDropdown()"></div>
+            <div class="topbar-search-dropdown" role="listbox">
+              @if (searchLoading()) {
+                <div class="topbar-search-empty">Recherche en cours…</div>
+              } @else if (!searchHasAny()) {
+                <div class="topbar-search-empty">Aucun résultat pour « {{ searchTerm() }} »</div>
+              } @else {
+                @if (searchResults().events.length > 0) {
+                  <div class="topbar-search-group-label">Événements</div>
+                  @for (r of searchResults().events; track r.id) {
+                    <button type="button" class="topbar-search-item" (click)="goToResult(r)">
+                      <tui-icon icon="@tui.book-open" class="topbar-search-item-icon" />
+                      <div class="topbar-search-item-text">
+                        <span class="topbar-search-item-label">{{ r.label }}</span>
+                        @if (r.subtitle) {<span class="topbar-search-item-sub">{{ r.subtitle }}</span>}
+                      </div>
+                    </button>
+                  }
+                }
+                @if (searchResults().campaigns.length > 0) {
+                  <div class="topbar-search-group-label">Campagnes</div>
+                  @for (r of searchResults().campaigns; track r.id) {
+                    <button type="button" class="topbar-search-item" (click)="goToResult(r)">
+                      <tui-icon icon="@tui.megaphone" class="topbar-search-item-icon" />
+                      <div class="topbar-search-item-text">
+                        <span class="topbar-search-item-label">{{ r.label }}</span>
+                        @if (r.subtitle) {<span class="topbar-search-item-sub">{{ r.subtitle }}</span>}
+                      </div>
+                    </button>
+                  }
+                }
+                @if (searchResults().companies.length > 0) {
+                  <div class="topbar-search-group-label">Compagnies</div>
+                  @for (r of searchResults().companies; track r.id) {
+                    <button type="button" class="topbar-search-item" (click)="goToResult(r)">
+                      <tui-icon icon="@tui.building" class="topbar-search-item-icon" />
+                      <div class="topbar-search-item-text">
+                        <span class="topbar-search-item-label">{{ r.label }}</span>
+                        @if (r.subtitle) {<span class="topbar-search-item-sub">{{ r.subtitle }}</span>}
+                      </div>
+                    </button>
+                  }
+                }
+                @if (searchResults().calendars.length > 0) {
+                  <div class="topbar-search-group-label">Calendriers</div>
+                  @for (r of searchResults().calendars; track r.id) {
+                    <button type="button" class="topbar-search-item" (click)="goToResult(r)">
+                      <tui-icon icon="@tui.calendar" class="topbar-search-item-icon" />
+                      <div class="topbar-search-item-text">
+                        <span class="topbar-search-item-label">{{ r.label }}</span>
+                        @if (r.subtitle) {<span class="topbar-search-item-sub">{{ r.subtitle }}</span>}
+                      </div>
+                    </button>
+                  }
+                }
+                <button type="button" class="topbar-search-all" (click)="submitSearch()">
+                  Voir tous les résultats pour « {{ searchTerm() }} » →
+                </button>
+              }
+            </div>
+          }
         </div>
         <a class="btn btn-flat btn-icon btn-sm topbar-notif-btn" title="Notifications"
            routerLink="/notifications">
@@ -176,6 +287,17 @@
 
     <!-- Page content -->
     <div class="shell-content scroll-pretty">
+      @if (showPasswordBanner()) {
+        <div class="password-banner" role="alert">
+          <tui-icon icon="@tui.shield-alert" style="font-size:16px; flex-shrink:0;" />
+          <span>
+            Votre compte n'a pas encore de mot de passe. Définissez-en un depuis
+            <a routerLink="/profil" class="password-banner-link">votre profil</a>
+            pour vous connecter sans code par e-mail.
+          </span>
+          <button type="button" class="password-banner-close" (click)="dismissPasswordBanner()" aria-label="Fermer">×</button>
+        </div>
+      }
       <router-outlet />
     </div>
   </div>
@@ -211,11 +333,36 @@
                  [value]="profileFullName()" (input)="profileFullName.set($any($event.target).value)"
                  autocomplete="name" />
         </div>
-        <div class="field" style="margin-bottom:20px;">
+        <div class="field" style="margin-bottom:14px;">
           <label class="field-label">Téléphone (optionnel)</label>
           <input class="input" type="tel" placeholder="+242 06 000 00 00"
                  [value]="profilePhone()" (input)="profilePhone.set($any($event.target).value)"
                  autocomplete="tel" />
+        </div>
+        <div class="field" style="margin-bottom:20px;">
+          <label class="field-label">Mot de passe (recommandé)</label>
+          <div style="position:relative;">
+            <input class="input" [type]="showProfilePassword() ? 'text' : 'password'"
+                   placeholder="8 caractères minimum"
+                   [value]="profilePassword()" (input)="profilePassword.set($any($event.target).value)"
+                   autocomplete="new-password" minlength="8"
+                   style="padding-right:42px;" />
+            <button type="button" class="shell-eye-btn"
+                    (click)="toggleShowProfilePassword()"
+                    [attr.aria-label]="showProfilePassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+                    tabindex="-1">
+              <tui-icon [icon]="showProfilePassword() ? '@tui.eye-off' : '@tui.eye'" style="font-size:15px;" />
+            </button>
+          </div>
+          <span class="field-hint">
+            Définir un mot de passe vous évite de recevoir un code par e-mail à chaque connexion.
+            Vous pourrez le changer depuis votre profil.
+          </span>
+          @if (profilePasswordError()) {
+            <span style="color: var(--danger); font-size: 12px; margin-top: 4px; display: block;">
+              {{ profilePasswordError() }}
+            </span>
+          }
         </div>
       </div>
       <div class="modal-footer">

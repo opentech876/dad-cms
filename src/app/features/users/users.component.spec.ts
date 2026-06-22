@@ -388,6 +388,66 @@ describe('UsersComponent', () => {
 
   // ── submitInvite() ─────────────────────────────────────────────────────────
 
+  // ── set-password admin ─────────────────────────────────────────────────────
+
+  describe('openPasswordModal / submitSetPassword', () => {
+    beforeEach(async () => {
+      await component.ngOnInit();
+    });
+
+    it('openPasswordModal initialise les signals et ouvre le modal', () => {
+      component.openPasswordModal('u1');
+      expect(component.showPasswordModal()).toBe(true);
+      expect(component.passwordModalUserId()).toBe('u1');
+      expect(component.passwordModalValue()).toBe('');
+      expect(component.passwordModalShow()).toBe(false);
+      expect(component.passwordModalError()).toBe('');
+    });
+
+    it('togglePasswordModalShow bascule la visibilité', () => {
+      component.togglePasswordModalShow();
+      expect(component.passwordModalShow()).toBe(true);
+      component.togglePasswordModalShow();
+      expect(component.passwordModalShow()).toBe(false);
+    });
+
+    it('passwordModalUser retourne le user actif du modal', () => {
+      component.openPasswordModal('u1');
+      expect(component.passwordModalUser()?.userId).toBe('u1');
+    });
+
+    it('submitSetPassword rejette un mot de passe < 8 caractères', async () => {
+      component.openPasswordModal('u1');
+      component.passwordModalValue.set('court');
+      await component.submitSetPassword();
+      expect(mockWorkspace.manageUser).not.toHaveBeenCalled();
+      expect(component.passwordModalError()).toContain('8 caractères');
+    });
+
+    it("submitSetPassword appelle manageUser avec l'action set_password et le password", async () => {
+      component.openPasswordModal('u1');
+      component.passwordModalValue.set('motdepasseAdmin');
+      await component.submitSetPassword();
+      expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u1', 'set_password', undefined, 'motdepasseAdmin');
+    });
+
+    it('submitSetPassword ferme le modal en cas de succès', async () => {
+      component.openPasswordModal('u1');
+      component.passwordModalValue.set('motdepasseAdmin');
+      await component.submitSetPassword();
+      expect(component.showPasswordModal()).toBe(false);
+    });
+
+    it("submitSetPassword affiche l'erreur en cas d'échec", async () => {
+      mockWorkspace.manageUser.mockReturnValueOnce(of({ success: false, error: 'Boom' }));
+      component.openPasswordModal('u1');
+      component.passwordModalValue.set('motdepasseAdmin');
+      await component.submitSetPassword();
+      expect(component.passwordModalError()).toBe('Boom');
+      expect(component.showPasswordModal()).toBe(true); // modal reste ouvert
+    });
+  });
+
   describe('submitInvite()', () => {
     beforeEach(() => {
       component.openInviteModal();

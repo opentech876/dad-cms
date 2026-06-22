@@ -14,44 +14,48 @@
     <!-- ── Positions ── -->
     <div class="position-slots">
 
-      <!-- Position 1 -->
+      <!-- Position 1 — Événement National -->
       <div class="position-slot">
         <div class="position-slot__label">
-          <span class="badge badge-success">Position 1</span>
+          <span class="badge badge-success">Événement National</span>
           <span style="font-size:12px; color:var(--fg-3);">Affiché en premier sur mobile</span>
         </div>
         @if (event1()) {
           <div class="event-card event-card--selected">
             <div>
               <div style="font-family:var(--font-serif); font-style:italic; font-weight:600;">{{ event1()!.title }}</div>
-              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ event1()!.event_date }}</div>
+              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ event1()!.event_date | date:'longDate':'':'fr' }}</div>
             </div>
-            <button class="btn btn-flat btn-sm" style="color:var(--danger);" type="button" (click)="assign(null, 1)">
-              <tui-icon icon="@tui.x" style="font-size:13px;" />
-              Retirer
-            </button>
+            @if (canEditAssignments()) {
+              <button class="btn btn-flat btn-sm" style="color:var(--danger);" type="button" (click)="assign(null, 1)">
+                <tui-icon icon="@tui.x" style="font-size:13px;" />
+                Retirer
+              </button>
+            }
           </div>
         } @else {
           <div class="empty-slot">Aucun événement sélectionné pour la position 1</div>
         }
       </div>
 
-      <!-- Position 2 -->
+      <!-- Position 2 — Date Internationale -->
       <div class="position-slot">
         <div class="position-slot__label">
-          <span class="badge badge-warning">Position 2</span>
+          <span class="badge badge-warning">Date Internationale</span>
           <span style="font-size:12px; color:var(--fg-3);">Affiché en second « C'est aussi… »</span>
         </div>
         @if (event2()) {
           <div class="event-card event-card--selected">
             <div>
               <div style="font-family:var(--font-serif); font-style:italic; font-weight:600;">{{ event2()!.title }}</div>
-              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ event2()!.event_date }}</div>
+              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ event2()!.event_date | date:'longDate':'':'fr' }}</div>
             </div>
-            <button class="btn btn-flat btn-sm" style="color:var(--danger);" type="button" (click)="assign(null, 2)">
-              <tui-icon icon="@tui.x" style="font-size:13px;" />
-              Retirer
-            </button>
+            @if (canEditAssignments()) {
+              <button class="btn btn-flat btn-sm" style="color:var(--danger);" type="button" (click)="assign(null, 2)">
+                <tui-icon icon="@tui.x" style="font-size:13px;" />
+                Retirer
+              </button>
+            }
           </div>
         } @else {
           <div class="empty-slot">Aucun événement sélectionné pour la position 2</div>
@@ -59,35 +63,26 @@
       </div>
     </div>
 
-    <!-- ── Campagne publicitaire ── -->
+    <!-- ── Campagnes actives ce jour (lecture seule) ── -->
     <div class="campaign-slot">
-      <h2 style="font-size:14px; font-weight:600; color:var(--fg-2); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+      <h2 style="font-size:14px; font-weight:600; color:var(--fg-2); margin-bottom:6px; display:flex; align-items:center; gap:8px;">
         <tui-icon icon="@tui.megaphone" style="font-size:16px; color:var(--fg-3);" />
-        Campagne publicitaire
+        Campagnes publicitaires
       </h2>
+      <p style="font-size:12px; color:var(--fg-3); margin:0 0 12px 0;">
+        Affichées automatiquement par le mobile selon la période et la position de chaque campagne. Pour modifier, ouvrez la page Campagnes.
+      </p>
 
       @if (availableCampaigns().length === 0) {
         <div style="font-size:13px; color:var(--fg-3); font-style:italic;">
           Aucune campagne active ne couvre cette date.
         </div>
       } @else {
-        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <select class="select" style="min-width:220px;"
-                  [value]="assignedCampaignId() ?? ''"
-                  [disabled]="campaignSaving()"
-                  (change)="assignCampaign($any($event.target).value || null)">
-            <option value="">— Aucune campagne —</option>
-            @for (c of availableCampaigns(); track c.id) {
-              <option [value]="c.id">{{ c.name }} ({{ c.advertiser }})</option>
-            }
-          </select>
-          @if (campaignSaving()) {
-            <span class="spinner"></span>
+        <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--fg-2);">
+          @for (c of availableCampaigns(); track c.id) {
+            <li>{{ c.name }} ({{ c.company?.name ?? '—' }})</li>
           }
-          @if (assignedCampaignId()) {
-            <span class="badge badge-success badge-dot" style="font-size:11px;">Assignée</span>
-          }
-        </div>
+        </ul>
       }
     </div>
 
@@ -114,7 +109,7 @@
             <div style="flex:1;">
               <div style="font-family:var(--font-serif); font-style:italic;">{{ evt.title }}</div>
               <div style="font-size:12px; color:var(--fg-3); margin-top:2px; display:flex; gap:8px;">
-                <span>{{ evt.event_date }}</span>
+                <span>{{ evt.event_date | date:'longDate':'':'fr' }}</span>
                 @if (evt.status === 'published') {
                   <span class="badge badge-success badge-dot" style="font-size:10px;">Publié</span>
                 } @else {
@@ -127,18 +122,29 @@
                 </div>
               }
             </div>
-            <div class="event-actions" style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-              <button class="btn btn-flat btn-sm"
-                      [class.btn-success]="selectedPos1() === evt.id"
-                      type="button" (click)="assign(evt.id, 1)">
-                @if (selectedPos1() === evt.id) { ✓ } Position 1
-              </button>
-              <button class="btn btn-flat btn-sm"
-                      [class.btn-warning]="selectedPos2() === evt.id"
-                      type="button" (click)="assign(evt.id, 2)">
-                @if (selectedPos2() === evt.id) { ✓ } Position 2
-              </button>
-            </div>
+            @if (canEditAssignments()) {
+              <div class="event-actions" style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                <button class="btn btn-flat btn-sm"
+                        [class.btn-success]="selectedPos1() === evt.id"
+                        type="button" (click)="assign(evt.id, 1)">
+                  @if (selectedPos1() === evt.id) { ✓ } Événement National
+                </button>
+                <button class="btn btn-flat btn-sm"
+                        [class.btn-warning]="selectedPos2() === evt.id"
+                        type="button" (click)="assign(evt.id, 2)">
+                  @if (selectedPos2() === evt.id) { ✓ } Date Internationale
+                </button>
+              </div>
+            } @else {
+              <div class="event-actions" style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                @if (selectedPos1() === evt.id) {
+                  <span class="badge badge-success" style="font-size:10px;">Événement National (actuel)</span>
+                }
+                @if (selectedPos2() === evt.id) {
+                  <span class="badge badge-warning" style="font-size:10px;">Date Internationale (actuel)</span>
+                }
+              </div>
+            }
           </div>
         }
       }
@@ -147,8 +153,14 @@
 
   <footer class="day-detail-footer">
     <button class="btn btn-flat btn-sm" type="button" (click)="goBack()">Retour</button>
-    <button class="btn btn-primary" type="button" [disabled]="saveLoading()" (click)="save()">
-      @if (saveLoading()) { Enregistrement… } @else { Enregistrer les assignations }
-    </button>
+    @if (canEditAssignments()) {
+      <button class="btn btn-primary" type="button" [disabled]="saveLoading()" (click)="save()">
+        @if (saveLoading()) { Enregistrement… } @else { Enregistrer les assignations }
+      </button>
+    } @else {
+      <span style="font-size:12.5px; color:var(--fg-3); font-style:italic; max-width:340px; text-align:right;">
+        Les affectations sont gérées par la Présidence et appliquées par l'équipe éditoriale via le bouton « Appliquer la recommandation ».
+      </span>
+    }
   </footer>
 </div>

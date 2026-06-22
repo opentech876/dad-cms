@@ -26,6 +26,27 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/login/login.component').then((m) => m.LoginComponent),
   },
+  {
+    path: 'mot-de-passe-oublie',
+    loadComponent: () =>
+      import('./features/auth/forgot-password/forgot-password.component').then(
+        (m) => m.ForgotPasswordComponent,
+      ),
+  },
+  {
+    path: 'reinitialiser-mot-de-passe',
+    loadComponent: () =>
+      import('./features/auth/reset-password/reset-password.component').then(
+        (m) => m.ResetPasswordComponent,
+      ),
+  },
+  {
+    path: 'email-confirme',
+    loadComponent: () =>
+      import('./features/auth/email-confirmed/email-confirmed.component').then(
+        (m) => m.EmailConfirmedComponent,
+      ),
+  },
 
   // ── Workspace (auth requise, pas d'onboardingGuard — c'est la destination) ─
   {
@@ -72,11 +93,18 @@ export const routes: Routes = [
       {
         path: 'campagnes',
         canActivate: [roleGuard],
-        data: { requiredRoles: ['owner', 'chef_equipe', 'charge_communication'] },
+        data: { requiredRoles: ['owner', 'chef_equipe', 'charge_communication', 'chef_equipe_commerciale'] },
         loadComponent: () =>
           import('./features/ad-campaigns/ad-campaigns.component').then(
             (m) => m.AdCampaignsComponent,
           ),
+      },
+      {
+        path: 'compagnies',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['owner', 'chef_equipe_commerciale', 'charge_communication'] },
+        loadComponent: () =>
+          import('./features/companies/companies.component').then((m) => m.CompaniesComponent),
       },
       {
         path: 'utilisateurs',
@@ -86,9 +114,21 @@ export const routes: Routes = [
           import('./features/users/users.component').then((m) => m.UsersComponent),
       },
       {
+        path: 'recommandations',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['owner', 'presidence'] },
+        loadComponent: () =>
+          import('./features/presidence/recommandations.component').then((m) => m.RecommandationsComponent),
+      },
+      {
         path: 'metriques',
         loadComponent: () =>
           import('./features/metriques/metriques.component').then((m) => m.MetriquesComponent),
+      },
+      {
+        path: 'recherche',
+        loadComponent: () =>
+          import('./features/search/search.component').then((m) => m.SearchComponent),
       },
       {
         path: 'notifications',

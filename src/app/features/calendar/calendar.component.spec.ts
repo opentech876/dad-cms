@@ -1,16 +1,19 @@
 import { TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { Router } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { BehaviorSubject, of, Subject } from 'rxjs';
 import { CalendarComponent } from './calendar.component';
 import { CalendarService } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
 import { CampaignService } from '../../core/campaigns/campaign.service';
+import { RecommendationService } from '../../core/presidency/recommendation.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { ToastService } from '../../core/services/toast.service';
 
 const fakeCalendars = [
-  { id: 'cal-1', year: 2024, name: 'Calendrier 2024', status: 'archived'  as const, createdBy: null, publishedAt: null, eventCount: 412, campaignCount: 8,  fillPct: 56 },
-  { id: 'cal-2', year: 2025, name: 'Calendrier 2025', status: 'published' as const, createdBy: null, publishedAt: null, eventCount: 487, campaignCount: 12, fillPct: 67 },
-  { id: 'cal-3', year: 2026, name: 'Calendrier 2026', status: 'draft'     as const, createdBy: null, publishedAt: null, eventCount: 124, campaignCount: 3,  fillPct: 17 },
+  { id: 'cal-1', year: 2024, name: 'Calendrier 2024', status: 'archived'  as const, createdBy: null, publishedAt: null, eventCount: 412, fillPct: 56 },
+  { id: 'cal-2', year: 2025, name: 'Calendrier 2025', status: 'published' as const, createdBy: null, publishedAt: null, eventCount: 487, fillPct: 67 },
+  { id: 'cal-3', year: 2026, name: 'Calendrier 2026', status: 'draft'     as const, createdBy: null, publishedAt: null, eventCount: 124, fillPct: 17 },
 ];
 
 const fakeEntries: CalendarEntryWithEvent[] = [
@@ -43,6 +46,14 @@ describe('CalendarComponent', () => {
   };
   let mockCalendarEntryService: { getEntriesForCalendar: jest.Mock };
   let mockCampaignService: { listCampaigns: jest.Mock };
+  let mockRecommendationService: {
+    countPending: jest.Mock;
+    listByCalendar: jest.Mock;
+    applyAll: jest.Mock;
+    getConflicts: jest.Mock;
+  };
+  let mockToast: { success: jest.Mock; error: jest.Mock; info: jest.Mock };
+  let canApplyRole$: BehaviorSubject<boolean>;
 
   beforeEach(async () => {
     mockCalendarService = {
@@ -60,6 +71,25 @@ describe('CalendarComponent', () => {
       listCampaigns: jest.fn().mockReturnValue(of([])),
     };
 
+    mockRecommendationService = {
+      countPending:   jest.fn().mockReturnValue(of(0)),
+      listByCalendar: jest.fn().mockReturnValue(of([])),
+      applyAll:       jest.fn().mockReturnValue(of({ success: true, applied: 0, skipped: 0 })),
+      getConflicts:   jest.fn().mockReturnValue([]),
+    };
+
+    // Default: signed-in as an editorial role that *can* apply.
+    canApplyRole$ = new BehaviorSubject<boolean>(true);
+    const mockAuthService = {
+      hasRoleAtLeast: jest.fn().mockReturnValue(canApplyRole$.asObservable()),
+    };
+
+    mockToast = {
+      success: jest.fn(),
+      error:   jest.fn(),
+      info:    jest.fn(),
+    };
+
     TestBed.configureTestingModule({
       imports: [CalendarComponent],
       providers: [
@@ -67,6 +97,9 @@ describe('CalendarComponent', () => {
         { provide: CalendarService, useValue: mockCalendarService },
         { provide: CalendarEntryService, useValue: mockCalendarEntryService },
         { provide: CampaignService, useValue: mockCampaignService },
+        { provide: RecommendationService, useValue: mockRecommendationService },
+        { provide: AuthService, useValue: mockAuthService },
+        { provide: ToastService, useValue: mockToast },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     });
@@ -648,6 +681,115 @@ describe('CalendarComponent', () => {
       const before = component.calendars().length;
       component.confirmDuplicate();
       expect(component.calendars().length).toBe(before);
+    });
+  });
+
+  // ── Presidency apply flow ──────────────────────────────────────────────
+  describe('flux d\'application des recommandations Présidence', () => {
+    it('canApplyRecommendations est true pour un rôle éditorial', () => {
+      expect(component.canApplyRecommendations()).toBe(true);
+    });
+
+    it('canApplyRecommendations est false pour un rôle non-éditorial (presidence / charge_communication)', () => {
+      canApplyRole$.next(false);
+      expect(component.canApplyRecommendations()).toBe(false);
+    });
+
+    it('hasRoleAtLeast est appelé avec "editeur" (le tier minimal accepté par la RPC)', () => {
+      const auth = TestBed.inject(AuthService) as unknown as { hasRoleAtLeast: jest.Mock };
+      expect(auth.hasRoleAtLeast).toHaveBeenCalledWith('editeur');
+    });
+
+    it('refreshPendingCount met à jour pendingRecommendationsCount depuis le service', async () => {
+      mockRecommendationService.countPending.mockReturnValueOnce(of(7));
+      await component.refreshPendingCount();
+      expect(component.pendingRecommendationsCount()).toBe(7);
+    });
+
+    it('refreshPendingCount remet à 0 quand aucun calendrier n\'est sélectionné', async () => {
+      component.selectedCalendarId.set('');
+      await component.refreshPendingCount();
+      expect(component.pendingRecommendationsCount()).toBe(0);
+    });
+
+    it('selectCalendar déclenche refreshPendingCount pour le nouveau calendrier', () => {
+      mockRecommendationService.countPending.mockClear();
+      component.selectCalendar('cal-1');
+      expect(mockRecommendationService.countPending).toHaveBeenCalledWith('cal-1');
+    });
+
+    it('openApplyDialog charge les recommandations et les entrées puis ouvre le dialogue', async () => {
+      await component.openApplyDialog();
+      expect(mockRecommendationService.listByCalendar).toHaveBeenCalledWith('cal-3');
+      expect(mockCalendarEntryService.getEntriesForCalendar).toHaveBeenCalledWith('cal-3');
+      expect(mockRecommendationService.getConflicts).toHaveBeenCalled();
+      expect(component.applyDialogVisible()).toBe(true);
+    });
+
+    it('openApplyDialog ne fait rien pour un rôle non-éditorial', async () => {
+      canApplyRole$.next(false);
+      mockRecommendationService.listByCalendar.mockClear();
+      await component.openApplyDialog();
+      expect(mockRecommendationService.listByCalendar).not.toHaveBeenCalled();
+      expect(component.applyDialogVisible()).toBe(false);
+    });
+
+    it('openApplyDialog stocke les conflits pour affichage', async () => {
+      mockRecommendationService.getConflicts.mockReturnValueOnce([
+        { mmdd: '08-15', position: 1, current_event_title: 'A', recommended_event_title: 'B' },
+      ]);
+      await component.openApplyDialog();
+      expect(component.applyConflicts().length).toBe(1);
+    });
+
+    it('cancelApply ferme le dialogue et vide les conflits', () => {
+      component.applyDialogVisible.set(true);
+      component.applyConflicts.set([
+        { mmdd: '01-01', position: 1, current_event_title: 'X', recommended_event_title: 'Y' },
+      ]);
+      component.cancelApply();
+      expect(component.applyDialogVisible()).toBe(false);
+      expect(component.applyConflicts().length).toBe(0);
+    });
+
+    it('confirmApply appelle la RPC applyAll avec overwrite=true', async () => {
+      await component.confirmApply();
+      expect(mockRecommendationService.applyAll).toHaveBeenCalledWith('cal-3', true);
+    });
+
+    it('confirmApply affiche un toast succès avec le nombre appliqué', async () => {
+      mockRecommendationService.applyAll.mockReturnValueOnce(
+        of({ success: true, applied: 4, skipped: 0 }),
+      );
+      await component.confirmApply();
+      expect(mockToast.success).toHaveBeenCalledWith('4 recommandation(s) appliquée(s).');
+    });
+
+    it('confirmApply rafraîchit le compteur après succès', async () => {
+      mockRecommendationService.countPending.mockClear();
+      await component.confirmApply();
+      expect(mockRecommendationService.countPending).toHaveBeenCalled();
+    });
+
+    it('confirmApply affiche un toast erreur quand la RPC échoue', async () => {
+      mockRecommendationService.applyAll.mockReturnValueOnce(
+        of({ success: false, error: 'insufficient_privilege' }),
+      );
+      await component.confirmApply();
+      expect(mockToast.error).toHaveBeenCalled();
+    });
+
+    it('confirmApply ne fait rien pour un rôle non-éditorial', async () => {
+      canApplyRole$.next(false);
+      mockRecommendationService.applyAll.mockClear();
+      await component.confirmApply();
+      expect(mockRecommendationService.applyAll).not.toHaveBeenCalled();
+    });
+
+    it('confirmApply ferme le dialogue après la RPC', async () => {
+      component.applyDialogVisible.set(true);
+      await component.confirmApply();
+      expect(component.applyDialogVisible()).toBe(false);
     });
   });
 });

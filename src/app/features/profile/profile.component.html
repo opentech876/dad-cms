@@ -129,9 +129,102 @@
         <span class="profile-info-label">Authentification</span>
         <span class="profile-info-value" style="display:flex; align-items:center; gap:6px;">
           <tui-icon icon="@tui.mail" style="font-size:14px; color:var(--fg-3);" />
-          Lien magique / OTP
+          Mot de passe ou code par e-mail
         </span>
       </div>
+    </div>
+
+    <!-- ── Email change ── -->
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <div class="settings-section-icon">
+          <tui-icon icon="@tui.mail" style="font-size:18px;" />
+        </div>
+        <div>
+          <div class="settings-section-title">Adresse e-mail</div>
+          <div class="settings-section-sub">Changez l'adresse e-mail associée à votre compte. Un lien de confirmation sera envoyé à la nouvelle adresse.</div>
+        </div>
+      </div>
+
+      @if (pendingNewEmail()) {
+        <div class="profile-pending-box">
+          <tui-icon icon="@tui.mail-check" style="font-size:18px; flex-shrink:0;" />
+          <div style="flex:1;">
+            <strong>Confirmation en attente.</strong>
+            Un lien a été envoyé à <strong>{{ pendingNewEmail() }}</strong>.
+            Cliquez sur le lien dans votre boîte de réception pour finaliser le changement.
+            Votre adresse actuelle ({{ userEmail() }}) reste active jusqu'à la confirmation.
+          </div>
+          <button type="button" class="btn btn-flat btn-sm" (click)="cancelEmailChange()">
+            Annuler
+          </button>
+        </div>
+      } @else {
+        <div class="field" style="margin-bottom:14px;">
+          <label class="field-label">Nouvelle adresse e-mail</label>
+          <input class="input" type="email"
+                 placeholder="prenom.nom@open-tech.cg"
+                 autocomplete="email"
+                 [value]="newEmail()" (input)="newEmail.set($any($event.target).value)" />
+          <span class="field-hint">Adresse actuelle&nbsp;: {{ userEmail() }}</span>
+        </div>
+
+        @if (emailError()) {
+          <div style="color: var(--danger); font-size: 12.5px; margin-bottom: 12px;">
+            {{ emailError() }}
+          </div>
+        }
+
+        <button class="btn btn-primary btn-sm" type="button"
+                [disabled]="emailChanging() || !newEmail()"
+                (click)="changeEmail()">
+          @if (emailChanging()) { <span class="spinner"></span> }
+          Envoyer le lien de confirmation
+        </button>
+      }
+    </div>
+
+    <!-- ── Password change ── -->
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <div class="settings-section-icon">
+          <tui-icon icon="@tui.lock" style="font-size:18px;" />
+        </div>
+        <div>
+          <div class="settings-section-title">Mot de passe</div>
+          <div class="settings-section-sub">Définissez ou changez votre mot de passe pour vous connecter sans recevoir de code par e-mail.</div>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label class="field-label">Nouveau mot de passe</label>
+        <div style="position:relative;">
+          <input class="input" [type]="showNewPassword() ? 'text' : 'password'"
+                 placeholder="8 caractères minimum"
+                 autocomplete="new-password" minlength="8"
+                 style="padding-right:42px;"
+                 [value]="newPassword()" (input)="newPassword.set($any($event.target).value)" />
+          <button type="button" class="profile-eye-btn"
+                  (click)="toggleShowNewPassword()"
+                  [attr.aria-label]="showNewPassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+                  tabindex="-1">
+            <tui-icon [icon]="showNewPassword() ? '@tui.eye-off' : '@tui.eye'" style="font-size:15px;" />
+          </button>
+        </div>
+      </div>
+
+      @if (passwordError()) {
+        <div style="color: var(--danger); font-size: 12.5px; margin-bottom: 12px;">
+          {{ passwordError() }}
+        </div>
+      }
+
+      <button class="btn btn-primary btn-sm" type="button"
+              [disabled]="passwordSaving() || !newPassword()"
+              (click)="changePassword()">
+        @if (passwordSaving()) { <span class="spinner"></span> }
+        Enregistrer le mot de passe
+      </button>
     </div>
   </div>
 

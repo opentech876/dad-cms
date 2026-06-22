@@ -13,7 +13,6 @@ export interface CalendarSummary {
   createdBy: string | null;
   publishedAt: string | null;
   eventCount: number;
-  campaignCount: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -27,7 +26,7 @@ export class CalendarService {
     const wsId = this.workspaceContext.activeWorkspaceId();
     let query = this.supabaseService.client
       .from('calendars')
-      .select('id, year, name, status, created_by, published_at, calendar_entries(count), campaign_assignments(count)')
+      .select('id, year, name, status, created_by, published_at, calendar_entries(count)')
       .is('deleted_at', null)
       .order('year', { ascending: true });
     if (wsId) query = (query as any).eq('workspace_id', wsId);
@@ -42,7 +41,6 @@ export class CalendarService {
           createdBy: cal.created_by ?? null,
           publishedAt: cal.published_at ?? null,
           eventCount: cal.calendar_entries?.[0]?.count ?? 0,
-          campaignCount: cal.campaign_assignments?.[0]?.count ?? 0,
         }));
       }),
     );

@@ -29,7 +29,7 @@
             @if (editorStatus() === 'published') {
               <span class="badge badge-success badge-dot">Publié</span>
             } @else {
-              <span class="badge badge-warning badge-dot">Brouillon</span>
+              <span class="badge badge-warning badge-dot">Réserve</span>
             }
           </div>
 
@@ -55,7 +55,7 @@
               <tui-textfield>
                 <input
                   tuiInputDate
-                  type="date"
+                  type="date" lang="fr-FR"
                   [ngModel]="editorTuiDay"
                   (ngModelChange)="onEditorDateChange($event)"
                 />
@@ -251,10 +251,10 @@
                 "
               >
                 @if (editorCreatedAt()) {
-                  <span>Ajouté le {{ editorCreatedAt()!.slice(0, 10) }}</span>
+                  <span>Ajouté le {{ editorCreatedAt() | date:'longDate':'':'fr' }}</span>
                 }
                 @if (editorUpdatedAt()) {
-                  <span>Mis à jour le {{ editorUpdatedAt()!.slice(0, 10) }}</span>
+                  <span>Mis à jour le {{ editorUpdatedAt() | date:'longDate':'':'fr' }}</span>
                 }
               </div>
             }
@@ -534,7 +534,7 @@
             font-weight: 600;
           "
         >
-          Brouillons
+          Réserves
         </div>
         <div
           style="
@@ -623,7 +623,7 @@
       >
         <option value="all">Tous statuts</option>
         <option value="published">Publiés</option>
-        <option value="draft">Brouillons</option>
+        <option value="draft">Réserves</option>
       </select>
       <div style="flex: 1"></div>
       <button
@@ -637,7 +637,7 @@
       </button>
       <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
         <tui-icon icon="@tui.plus" style="font-size: 14px" />
-        Nouvel événement
+        Ajouter une date historique
       </button>
     </div>
 
@@ -701,7 +701,7 @@
                     <span class="badge badge-success badge-dot">Publié</span>
                   }
                   @if (row.status === 'draft') {
-                    <span class="badge badge-warning badge-dot">Brouillon</span>
+                    <span class="badge badge-warning badge-dot">Réserve</span>
                   }
                 </td>
                 <td>
@@ -998,7 +998,7 @@
                 </div>
                 <div style="font-size: 13px; color: var(--fg-3); margin-top: 4px">
                   {{ importInserted() }} événement(s) ajouté(s) à la bibliothèque en statut
-                  <em>Brouillon</em>.
+                  <em>Réserve</em>.
                 </div>
                 @if (importSkipped()) {
                   <div style="font-size: 12px; color: var(--fg-3); margin-top: 4px">

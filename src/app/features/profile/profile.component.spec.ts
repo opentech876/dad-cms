@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { SupabaseService } from '../../core/supabase/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
 
 describe('ProfileComponent', () => {
@@ -12,6 +13,7 @@ describe('ProfileComponent', () => {
   let fixture: ComponentFixture<ProfileComponent>;
   let mockAuth: { getCurrentUser: jest.Mock; currentRole$: any };
   let mockWorkspace: { getMyProfile: jest.Mock; upsertProfile: jest.Mock };
+  let mockSupabase: { updatePassword: jest.Mock; markPasswordSet: jest.Mock; updateEmail: jest.Mock };
   let mockRouter: { navigate: jest.Mock };
   let mockToast: jest.Mocked<Pick<ToastService, 'success' | 'error'>>;
 
@@ -26,6 +28,11 @@ describe('ProfileComponent', () => {
       getMyProfile: jest.fn().mockReturnValue(of(MOCK_PROFILE)),
       upsertProfile: jest.fn().mockReturnValue(of(undefined)),
     };
+    mockSupabase = {
+      updatePassword:  jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
+      markPasswordSet: jest.fn(),
+      updateEmail:     jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
+    };
     mockRouter = { navigate: jest.fn() };
     mockToast  = { success: jest.fn(), error: jest.fn() };
 
@@ -34,6 +41,7 @@ describe('ProfileComponent', () => {
       providers: [
         { provide: AuthService,    useValue: mockAuth },
         { provide: WorkspaceService, useValue: mockWorkspace },
+        { provide: SupabaseService, useValue: mockSupabase },
         { provide: Router,         useValue: mockRouter },
         { provide: ToastService,   useValue: mockToast },
       ],
@@ -141,6 +149,101 @@ describe('ProfileComponent', () => {
     it('navigue vers /dashboard', () => {
       component.goBack();
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/dashboard']);
+    });
+  });
+
+  // ── changePassword() ───────────────────────────────────────────────────────
+
+  describe('changePassword()', () => {
+    it('rejette un mot de passe < 8 caractères', async () => {
+      component.newPassword.set('court');
+      await component.changePassword();
+      expect(mockSupabase.updatePassword).not.toHaveBeenCalled();
+      expect(component.passwordError()).toContain('8 caractères');
+    });
+
+    it('appelle updatePassword et markPasswordSet en cas de succès', async () => {
+      component.newPassword.set('motdepasse123');
+      await component.changePassword();
+      expect(mockSupabase.updatePassword).toHaveBeenCalledWith('motdepasse123');
+      expect(mockSupabase.markPasswordSet).toHaveBeenCalled();
+      expect(mockToast.success).toHaveBeenCalled();
+    });
+
+    it('efface le champ après succès', async () => {
+      component.newPassword.set('motdepasse123');
+      await component.changePassword();
+      expect(component.newPassword()).toBe('');
+    });
+
+    it("affiche message d'erreur en cas d'échec Supabase", async () => {
+      mockSupabase.updatePassword.mockResolvedValue({ data: null, error: { message: 'Network error' } });
+      component.newPassword.set('motdepasse123');
+      await component.changePassword();
+      expect(component.passwordError()).toContain('Network error');
+      expect(mockToast.success).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── changement d'e-mail ─────────────────────────────────────────────────────
+
+  describe('changeEmail()', () => {
+    it("ne fait rien quand le nouvel e-mail est vide", async () => {
+      component.newEmail.set('');
+      await component.changeEmail();
+      expect(mockSupabase.updateEmail).not.toHaveBeenCalled();
+    });
+
+    it("rejette un format e-mail invalide", async () => {
+      component.newEmail.set('pasunemail');
+      await component.changeEmail();
+      expect(mockSupabase.updateEmail).not.toHaveBeenCalled();
+      expect(component.emailError()).toContain('valide');
+    });
+
+    it("rejette quand le nouvel e-mail est identique à l'actuel", async () => {
+      component.newEmail.set('elvis@test.com'); // same as userEmail from MOCK_PROFILE setup
+      await component.changeEmail();
+      expect(mockSupabase.updateEmail).not.toHaveBeenCalled();
+      expect(component.emailError()).toContain('différent');
+    });
+
+    it("appelle updateEmail et passe pendingNewEmail en cas de succès", async () => {
+      component.newEmail.set('elvis2@test.com');
+      await component.changeEmail();
+      expect(mockSupabase.updateEmail).toHaveBeenCalledWith('elvis2@test.com');
+      expect(component.pendingNewEmail()).toBe('elvis2@test.com');
+      expect(mockToast.success).toHaveBeenCalled();
+    });
+
+    it("affiche message d'erreur en cas d'échec Supabase", async () => {
+      mockSupabase.updateEmail.mockResolvedValue({ data: null, error: { message: 'rate_limit' } });
+      component.newEmail.set('elvis2@test.com');
+      await component.changeEmail();
+      expect(component.emailError()).toBeTruthy();
+      expect(component.pendingNewEmail()).toBe('');
+    });
+
+    it("ne soumet pas quand emailChanging est true", async () => {
+      component.emailChanging.set(true);
+      component.newEmail.set('elvis2@test.com');
+      await component.changeEmail();
+      expect(mockSupabase.updateEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── visibilité du mot de passe ──────────────────────────────────────────────
+
+  describe('visibilité du mot de passe', () => {
+    it('showNewPassword démarre à false', () => {
+      expect(component.showNewPassword()).toBe(false);
+    });
+
+    it('toggleShowNewPassword bascule la visibilité', () => {
+      component.toggleShowNewPassword();
+      expect(component.showNewPassword()).toBe(true);
+      component.toggleShowNewPassword();
+      expect(component.showNewPassword()).toBe(false);
     });
   });
 });

@@ -5,6 +5,29 @@
   gap: 20px;
 }
 
+.metriques-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--info-soft, #eef4fb);
+  border: 1px solid rgba(33, 98, 158, 0.2);
+  border-radius: var(--r-md, 8px);
+  color: var(--info, #21629e);
+  font-size: 13px;
+  line-height: 1.55;
+
+  span { flex: 1; }
+  strong { font-weight: 600; }
+  code {
+    font-size: 12px;
+    padding: 1px 5px;
+    background: rgba(33, 98, 158, 0.1);
+    border-radius: 3px;
+    font-family: var(--font-mono, monospace);
+  }
+}
+
 // ── Loading ──────────────────────────────────────────────
 
 .metriques-loading {

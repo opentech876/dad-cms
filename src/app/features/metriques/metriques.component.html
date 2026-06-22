@@ -7,6 +7,18 @@
     </div>
   } @else {
 
+    @if (clickTrackingPending()) {
+      <div class="metriques-info-banner" role="status">
+        <tui-icon icon="@tui.info" style="font-size:16px; flex-shrink:0;" />
+        <span>
+          <strong>Suivi des clics en attente de l'application mobile.</strong>
+          Les impressions sont enregistrées, mais aucun clic n'est encore remonté&nbsp;: l'app mobile n'a pas
+          encore livré le suivi via <code>record_ad_campaign_click()</code>. CTR&nbsp;= —
+          tant que la mise à jour mobile n'est pas déployée.
+        </span>
+      </div>
+    }
+
     <!-- ══ KPI cards ══ -->
     <div class="kpi-grid">
 
@@ -43,9 +55,14 @@
           <tui-icon icon="@tui.mouse-pointer-click" style="font-size:18px;" />
         </div>
         <div class="kpi-card__body">
-          <div class="kpi-card__value">{{ totalTaps() | number }}</div>
-          <div class="kpi-card__label">Clics sur bannières</div>
-          <div class="kpi-card__sub">{{ campaignTaps().length }} campagne{{ campaignTaps().length > 1 ? 's' : '' }}</div>
+          <div class="kpi-card__value">{{ totalImpressions() | number }}</div>
+          <div class="kpi-card__label">Impressions bannières</div>
+          <div class="kpi-card__sub">
+            {{ totalClicks() | number }} clic{{ totalClicks() > 1 ? 's' : '' }}
+            @if (globalCtr() !== null) {
+              · CTR {{ globalCtr() | percent:'1.2-2' }}
+            }
+          </div>
         </div>
       </div>
 
@@ -147,7 +164,7 @@
       <div class="card">
         <div class="metriques-table-header">
           <tui-icon icon="@tui.mouse-pointer-click" style="font-size:15px; color:var(--warning);" />
-          <span class="metriques-table-title">Clics par campagne</span>
+          <span class="metriques-table-title">Performances par campagne</span>
         </div>
         @if (campaignTaps().length === 0) {
           <div class="metriques-empty">Aucune donnée</div>
@@ -157,7 +174,9 @@
               <tr>
                 <th>Campagne</th>
                 <th>Annonceur</th>
-                <th style="text-align:right">Clics</th>
+                <th style="text-align:right" title="Impressions (bannière vue sur mobile)">Impr.</th>
+                <th style="text-align:right" title="Clics (tap sur la bannière)">Clics</th>
+                <th style="text-align:right" title="Click-Through Rate = clics / impressions">CTR</th>
               </tr>
             </thead>
             <tbody>
@@ -167,6 +186,16 @@
                   <td style="color:var(--fg-3)">{{ tap.advertiser }}</td>
                   <td style="text-align:right; font-weight:600; font-variant-numeric:tabular-nums">
                     {{ tap.tap_count | number }}
+                  </td>
+                  <td style="text-align:right; font-variant-numeric:tabular-nums">
+                    {{ tap.click_count | number }}
+                  </td>
+                  <td style="text-align:right; font-variant-numeric:tabular-nums; color: var(--fg-3)">
+                    @if (tap.ctr !== null) {
+                      {{ tap.ctr | percent:'1.2-2' }}
+                    } @else {
+                      —
+                    }
                   </td>
                 </tr>
               }

@@ -1,37 +1,75 @@
 <div class="dashboard-page">
 
-  <!-- ── Hero — today's date ── -->
+  <!-- ── Hero — today's event ── -->
   <div class="card" style="display:grid; grid-template-columns:1.6fr 1fr; overflow:hidden; border-radius:16px; margin-bottom:20px;">
+
+    <!-- Left column ─────────────────────────────────────────── -->
     <div style="padding:28px 32px; display:flex; flex-direction:column; justify-content:space-between; gap:20px;">
-      <div>
-        <div class="dateline">Aujourd'hui · {{ todayLabel }}</div>
-        <div class="eyebrow" style="margin-top:8px;">Événement publié sur mobile</div>
-        <h2 style="font-family:var(--font-serif); font-size:30px; font-weight:600; margin-top:8px; letter-spacing:-0.015em; line-height:1.15;">
-          {{ featuredEvent().title }}
-        </h2>
-        <p style="margin-top:12px; font-family:var(--font-serif); font-size:15px; line-height:1.55; color:var(--fg-2);">
-          <span class="hero-dropcap">{{ featuredEvent().dropLetter }}</span>{{ featuredEvent().excerpt }}
-        </p>
-      </div>
-      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <span class="badge badge-success badge-dot">Publié</span>
-        <span class="tag">2 événements · 800×600</span>
-        <span class="tag">2 bannières actives</span>
-        <div style="flex:1;"></div>
-        <button class="btn btn-flat btn-sm">Aperçu mobile</button>
-        <a routerLink="/evenements" class="btn btn-secondary btn-sm">Modifier</a>
-      </div>
+      @if (featuredEventLoading()) {
+        <div>
+          <div class="dateline">Aujourd'hui · {{ todayLabel }}</div>
+          <div class="skeleton" style="height:11px; width:38%; margin-top:14px;"></div>
+          <div class="skeleton" style="height:32px; width:78%; margin-top:14px;"></div>
+          <div class="skeleton" style="height:11px; width:90%; margin-top:18px;"></div>
+          <div class="skeleton" style="height:11px; width:84%; margin-top:6px;"></div>
+        </div>
+      } @else if (hasFeaturedEvent()) {
+        <div>
+          <div class="dateline">Aujourd'hui · {{ todayLabel }}</div>
+          <div class="eyebrow" style="margin-top:8px;">Événement publié sur mobile</div>
+          <h2 style="font-family:var(--font-serif); font-size:30px; font-weight:600; margin-top:8px; letter-spacing:-0.015em; line-height:1.15;">
+            {{ featuredEvent().title }}
+          </h2>
+          <p style="margin-top:12px; font-family:var(--font-serif); font-size:15px; line-height:1.55; color:var(--fg-2);">
+            <span class="hero-dropcap">{{ featuredEvent().dropLetter }}</span>{{ featuredEvent().excerpt }}
+          </p>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <span class="badge badge-success badge-dot">Publié</span>
+          <span class="tag">800×600</span>
+          <div style="flex:1;"></div>
+          <a routerLink="/evenements" class="btn btn-secondary btn-sm">Modifier</a>
+        </div>
+      } @else {
+        <!-- Empty state — no calendar_entry assigned for today -->
+        <div>
+          <div class="dateline">Aujourd'hui · {{ todayLabel }}</div>
+          <div class="eyebrow" style="margin-top:8px; color:var(--fg-3);">Aucun événement publié sur mobile</div>
+          <h2 style="font-family:var(--font-serif); font-size:26px; font-weight:600; margin-top:10px; letter-spacing:-0.015em; line-height:1.2; color:var(--fg-2);">
+            Aucune éphéméride à publier aujourd'hui.
+          </h2>
+          <p style="margin-top:12px; font-family:var(--font-serif); font-size:14.5px; line-height:1.55; color:var(--fg-3);">
+            Le calendrier {{ currentYear }} n'a pas encore d'événement assigné au {{ todayDayNum }} {{ todayMonthCap.toLowerCase() }}.
+            Choisissez-en un depuis la bibliothèque ou demandez à la Présidence de proposer une recommandation pour cette date.
+          </p>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <span class="badge badge-dot">En attente</span>
+          <div style="flex:1;"></div>
+          <a routerLink="/calendrier" class="btn btn-flat btn-sm">Voir le calendrier</a>
+          <a routerLink="/evenements" class="btn btn-secondary btn-sm">Ouvrir la bibliothèque</a>
+        </div>
+      }
     </div>
+
+    <!-- Right column — mobile preview ───────────────────────── -->
     <div style="background:linear-gradient(135deg, rgba(138,42,35,0.85) 0%, rgba(31,26,20,0.97) 100%), repeating-linear-gradient(45deg, rgba(216,161,85,0.15) 0 2px, transparent 2px 8px); color:#f3e6c8; padding:32px; display:flex; flex-direction:column; justify-content:space-between; border-left:1px solid var(--border-1);">
       <div style="display:flex; justify-content:space-between; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; opacity:0.8;">
         <span>Aperçu mobile</span>
-        <span>{{ featuredEvent().day }} {{ featuredEvent().month }}</span>
+        <span>{{ hasFeaturedEvent() ? featuredEvent().day + ' ' + featuredEvent().month : todayDayNum + ' ' + todayMonthCap }}</span>
       </div>
       <div style="text-align:center;">
-        <div style="font-family:var(--font-serif); font-size:96px; font-weight:700; line-height:1; color:#f3e6c8;">{{ featuredEvent().day }}</div>
-        <div style="font-family:var(--font-serif); font-size:22px; font-style:italic; margin-top:4px;">{{ featuredEvent().month }} {{ featuredEvent().year }}</div>
-        <div style="margin-top:14px; font-size:12px; opacity:0.7; letter-spacing:0.08em;">—— C'est aussi ——</div>
-        <div style="font-family:var(--font-serif); font-size:14px; margin-top:6px; opacity:0.9;">{{ featuredEvent().also }}</div>
+        @if (hasFeaturedEvent()) {
+          <div style="font-family:var(--font-serif); font-size:96px; font-weight:700; line-height:1; color:#f3e6c8;">{{ featuredEvent().day }}</div>
+          <div style="font-family:var(--font-serif); font-size:22px; font-style:italic; margin-top:4px;">{{ featuredEvent().month }} {{ featuredEvent().year }}</div>
+          <div style="margin-top:14px; font-size:12px; opacity:0.7; letter-spacing:0.08em;">—— C'est aussi ——</div>
+          <div style="font-family:var(--font-serif); font-size:14px; margin-top:6px; opacity:0.9;">{{ featuredEvent().also }}</div>
+        } @else {
+          <div style="font-family:var(--font-serif); font-size:96px; font-weight:700; line-height:1; color:#f3e6c8; opacity:0.55;">{{ todayDayNum }}</div>
+          <div style="font-family:var(--font-serif); font-size:22px; font-style:italic; margin-top:4px; opacity:0.7;">{{ todayMonthCap }} {{ currentYear }}</div>
+          <div style="margin-top:14px; font-size:12px; opacity:0.6; letter-spacing:0.08em;">—— En attente ——</div>
+          <div style="font-family:var(--font-serif); font-size:13px; font-style:italic; margin-top:6px; opacity:0.7;">Aucun contenu publié pour ce jour</div>
+        }
       </div>
       <div style="font-size:10.5px; opacity:0.55; text-align:right;">Day After Day · v2025.1</div>
     </div>
@@ -51,75 +89,39 @@
   } @else {
     <div class="kpi-grid" style="margin-bottom:20px;">
       <div class="card" style="padding:20px;">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
-          <div>
-            <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Événements publiés</div>
-            <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1;">{{ stats().totalEvents }}</div>
-            <div style="font-size:12.5px; color:var(--fg-3); margin-top:4px;">sur 730 attendus</div>
-          </div>
-          <svg width="120" height="36" viewBox="0 0 120 36" style="flex:none;">
-            <polygon [attr.points]="sparkEvents.area" fill="var(--accent)" opacity="0.12"/>
-            <polyline [attr.points]="sparkEvents.pts" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle [attr.cx]="sparkEvents.cx" [attr.cy]="sparkEvents.cy" r="2.5" fill="var(--accent)"/>
-          </svg>
-        </div>
-        <div style="margin-top:14px; display:flex; align-items:center; gap:8px;">
-          <span class="badge badge-success">↑ +12 cette semaine</span>
-          <span style="font-size:12px; color:var(--fg-3);">vs sem. dernière</span>
-        </div>
+        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Événements publiés</div>
+        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1;">{{ stats().totalEvents | number }}</div>
+        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">total sur tous les calendriers</div>
       </div>
       <div class="card" style="padding:20px;">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
-          <div>
-            <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Couverture {{ currentYear }}</div>
-            <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--success);">{{ fillRate() }}%</div>
-            <div style="font-size:12.5px; color:var(--fg-3); margin-top:4px;">{{ stats().yearEvents }} dates renseignées</div>
-          </div>
-          <svg width="120" height="36" viewBox="0 0 120 36" style="flex:none;">
-            <polygon [attr.points]="sparkCoverage.area" fill="var(--success)" opacity="0.12"/>
-            <polyline [attr.points]="sparkCoverage.pts" fill="none" stroke="var(--success)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle [attr.cx]="sparkCoverage.cx" [attr.cy]="sparkCoverage.cy" r="2.5" fill="var(--success)"/>
-          </svg>
-        </div>
-        <div style="margin-top:14px;">
-          <span class="badge badge-success">↑ +3,2 pts</span>
-        </div>
+        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Couverture {{ currentYear }}</div>
+        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--success);">{{ fillRate() }}%</div>
+        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">{{ stats().yearEvents }} dates renseignées</div>
       </div>
       <div class="card" style="padding:20px;">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
-          <div>
-            <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Campagnes actives</div>
-            <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--warning);">{{ stats().activeCampaigns }}</div>
-            <div style="font-size:12.5px; color:var(--fg-3); margin-top:4px;">2 entête · 2 pied de page</div>
-          </div>
-          <svg width="120" height="36" viewBox="0 0 120 36" style="flex:none;">
-            <polygon [attr.points]="sparkCampaigns.area" fill="var(--warning)" opacity="0.12"/>
-            <polyline [attr.points]="sparkCampaigns.pts" fill="none" stroke="var(--warning)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle [attr.cx]="sparkCampaigns.cx" [attr.cy]="sparkCampaigns.cy" r="2.5" fill="var(--warning)"/>
-          </svg>
-        </div>
-        <div style="margin-top:14px;">
-          <span class="badge badge-warning">↓ −1 cette semaine</span>
-        </div>
+        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Campagnes actives</div>
+        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--warning);">{{ stats().activeCampaigns }}</div>
+        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">campagnes diffusées en ce moment</div>
       </div>
-      <div class="card" style="padding:20px;">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
-          <div>
-            <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Lecteurs / jour</div>
-            <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--info);">12,4 K</div>
-            <div style="font-size:12.5px; color:var(--fg-3); margin-top:4px;">moyenne 7 derniers jours</div>
-          </div>
-          <svg width="120" height="36" viewBox="0 0 120 36" style="flex:none;">
-            <polygon [attr.points]="sparkReaders.area" fill="var(--info)" opacity="0.12"/>
-            <polyline [attr.points]="sparkReaders.pts" fill="none" stroke="var(--info)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle [attr.cx]="sparkReaders.cx" [attr.cy]="sparkReaders.cy" r="2.5" fill="var(--info)"/>
-          </svg>
+      <a routerLink="/campagnes" class="card" style="padding:20px; text-decoration:none; color:inherit; display:block;">
+        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Validations en attente</div>
+        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1;"
+             [style.color]="stats().pendingValidations > 0 ? 'var(--warning)' : 'var(--fg-2)'">
+          {{ stats().pendingValidations }}
         </div>
-        <div style="margin-top:14px;">
-          <span class="badge badge-info">↑ +8,1%</span>
-          <span style="font-size:12px; color:var(--fg-3); margin-left:6px;">vs sem. dernière</span>
+        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">
+          @if (stats().pendingValidations > 0) {
+            <span style="color:var(--warning); font-weight:600;">à valider →</span>
+          } @else {
+            tout est à jour
+          }
         </div>
-      </div>
+      </a>
+      <a routerLink="/compagnies" class="card" style="padding:20px; text-decoration:none; color:inherit; display:block;">
+        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Compagnies actives</div>
+        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--info);">{{ stats().activeCompanies }}</div>
+        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">annuaire annonceurs →</div>
+      </a>
     </div>
   }
 
@@ -206,46 +208,51 @@
     </div>
   </div>
 
-  <!-- ── Ad performance table ── -->
+  <!-- ── Top ad performers (live data) ── -->
   <div class="card" style="margin-bottom:20px;">
     <div class="card-header">
       <div>
-        <div class="card-title">Performances publicitaires</div>
-        <div class="card-subtitle">Impressions estimées sur les 30 derniers jours</div>
+        <div class="card-title">Top campagnes</div>
+        <div class="card-subtitle">5 meilleures par impressions cumulées</div>
       </div>
-      <div style="display:flex; gap:6px; align-items:center;">
-        <span class="tag">30 j</span>
-        <a routerLink="/campagnes" class="btn btn-flat btn-sm">Exporter CSV</a>
-      </div>
+      <a routerLink="/metriques" class="btn btn-flat btn-sm">Voir toutes les statistiques →</a>
     </div>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Campagne</th>
-          <th>Annonceur</th>
-          <th>Position</th>
-          <th style="text-align:right;">Impressions</th>
-          <th style="text-align:right;">Clics</th>
-          <th style="text-align:right;">CTR</th>
-          <th>Période</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (r of adPerformance; track r.name) {
+    @if (topAdPerformers().length === 0) {
+      <div style="padding:32px; text-align:center; color:var(--fg-3); font-style:italic;">
+        Aucune impression enregistrée pour le moment.
+      </div>
+    } @else {
+      <table class="table">
+        <thead>
           <tr>
-            <td style="font-weight:500;">{{ r.name }}</td>
-            <td style="color:var(--fg-2);">{{ r.advertiser }}</td>
-            <td>
-              <span class="badge">{{ r.position === 'header' ? '↑ Entête' : '↓ Pied de page' }}</span>
-            </td>
-            <td style="text-align:right; font-variant-numeric:tabular-nums;">{{ r.impressions }}</td>
-            <td style="text-align:right; font-variant-numeric:tabular-nums;">{{ r.clicks }}</td>
-            <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">{{ r.ctr }}</td>
-            <td style="color:var(--fg-3); font-size:12.5px;">{{ r.period }}</td>
+            <th>Campagne</th>
+            <th>Annonceur</th>
+            <th style="text-align:right;">Impressions</th>
+            <th style="text-align:right;">Clics</th>
+            <th style="text-align:right;">CTR</th>
+            <th>Période</th>
           </tr>
-        }
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          @for (r of topAdPerformers(); track r.campaignId) {
+            <tr>
+              <td style="font-weight:500;">{{ r.name }}</td>
+              <td style="color:var(--fg-2);">{{ r.advertiser }}</td>
+              <td style="text-align:right; font-variant-numeric:tabular-nums;">{{ r.impressions | number }}</td>
+              <td style="text-align:right; font-variant-numeric:tabular-nums;">{{ r.clicks | number }}</td>
+              <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">
+                @if (r.ctr !== null) {
+                  {{ r.ctr | percent:'1.2-2' }}
+                } @else {
+                  —
+                }
+              </td>
+              <td style="color:var(--fg-3); font-size:12.5px;">{{ r.period }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
   </div>
 
   <!-- ── Quick access ── -->

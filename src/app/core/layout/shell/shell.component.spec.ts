@@ -8,13 +8,18 @@ import { WorkspaceService } from '../../workspace/workspace.service';
 import { AppRole, WorkspaceSummary } from '../../../models';
 import { WorkspaceContextService } from '../../workspace/workspace-context.service';
 import { NotificationService } from '../../notifications/notification.service';
+import { SupabaseService } from '../../supabase/supabase.service';
+import { SearchService, SearchResults } from '../../search/search.service';
+import { RefreshRouteReuseStrategy } from '../../router/refresh-route-reuse.strategy';
+import { RouteReuseStrategy } from '@angular/router';
 
 describe('ShellComponent — navigation par rôle', () => {
   let component: ShellComponent;
   let fixture: ComponentFixture<ShellComponent>;
   let roleSubject: BehaviorSubject<AppRole | null>;
   let mockWorkspace: { getMyProfile: jest.Mock; upsertProfile: jest.Mock; getWorkspaceSummaries: jest.Mock };
-  let mockRouter: { events: any; navigate: jest.Mock };
+  let mockRouter: { events: any; navigate: jest.Mock; navigateByUrl: jest.Mock; url: string };
+  let mockRouteReuse: { triggerRefresh: jest.Mock };
   let mockWorkspaceContext: { activeWorkspaceId: jest.Mock; setActiveWorkspace: jest.Mock };
 
   const MOCK_WORKSPACES: WorkspaceSummary[] = [
@@ -27,7 +32,13 @@ describe('ShellComponent — navigation par rôle', () => {
     workspacesOverride?: WorkspaceSummary[],
   ): void {
     roleSubject = new BehaviorSubject<AppRole | null>(role);
-    mockRouter = { events: EMPTY, navigate: jest.fn() };
+    mockRouter = {
+      events: EMPTY,
+      navigate: jest.fn(),
+      navigateByUrl: jest.fn().mockResolvedValue(true),
+      url: '/dashboard',
+    };
+    mockRouteReuse = { triggerRefresh: jest.fn() };
     mockWorkspace = {
       getMyProfile: jest.fn().mockReturnValue(
         of(profileOverride ?? { full_name: 'Test User', phone: null, avatar_url: null }),
@@ -68,6 +79,24 @@ describe('ShellComponent — navigation par rôle', () => {
           provide: NotificationService,
           useValue: { unreadCount: jest.fn().mockReturnValue(of(3)) },
         },
+        {
+          provide: SupabaseService,
+          useValue: {
+            updatePassword: jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
+            markPasswordSet: jest.fn(),
+            hasPasswordSet: jest.fn().mockResolvedValue(false),
+          },
+        },
+        {
+          provide: SearchService,
+          useValue: {
+            search: jest.fn().mockReturnValue(of({ events: [], campaigns: [], companies: [], calendars: [] } as SearchResults)),
+          },
+        },
+        {
+          provide: RefreshRouteReuseStrategy,
+          useValue: mockRouteReuse,
+        },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     });
@@ -82,9 +111,12 @@ describe('ShellComponent — navigation par rôle', () => {
 
   // ── owner ──────────────────────────────────────────────────────────────────
 
-  it('affiche les 6 navItems pour le rôle owner', () => {
+  it('affiche les 8 navItems pour le rôle owner (recommandations + compagnies inclus)', () => {
     createComponent('owner');
-    expect(component.visibleNavItems().length).toBe(6);
+    expect(component.visibleNavItems().length).toBe(8);
+    const paths = component.visibleNavItems().map(i => i.path);
+    expect(paths).toContain('/recommandations');
+    expect(paths).toContain('/compagnies');
   });
 
   it('affiche les 3 adminItems pour le rôle owner', () => {
@@ -161,6 +193,39 @@ describe('ShellComponent — navigation par rôle', () => {
   it("charge_communication ne voit pas 'workspace'", () => {
     createComponent('charge_communication');
     expect(component.visibleAdminItems().map((i) => i.path)).not.toContain('/espaces');
+  });
+
+  // ── presidence ─────────────────────────────────────────────────────────────
+
+  it("presidence voit 'recommandations' mais pas evenements/campagnes/utilisateurs", () => {
+    createComponent('presidence');
+    const paths = component.visibleNavItems().map(i => i.path);
+    expect(paths).toContain('/recommandations');
+    expect(paths).not.toContain('/evenements');
+    expect(paths).not.toContain('/campagnes');
+    expect(paths).not.toContain('/utilisateurs');
+  });
+
+  it("editeur ne voit pas 'recommandations'", () => {
+    createComponent('editeur');
+    expect(component.visibleNavItems().map(i => i.path)).not.toContain('/recommandations');
+  });
+
+  // ── chef_equipe_commerciale ───────────────────────────────────────────────
+
+  it("chef_equipe_commerciale voit 'campagnes' et 'compagnies'", () => {
+    createComponent('chef_equipe_commerciale');
+    const paths = component.visibleNavItems().map(i => i.path);
+    expect(paths).toContain('/campagnes');
+    expect(paths).toContain('/compagnies');
+    expect(paths).not.toContain('/evenements');
+    expect(paths).not.toContain('/utilisateurs');
+    expect(paths).not.toContain('/recommandations');
+  });
+
+  it("editeur ne voit pas 'compagnies'", () => {
+    createComponent('editeur');
+    expect(component.visibleNavItems().map(i => i.path)).not.toContain('/compagnies');
   });
 
   // ── réactivité ─────────────────────────────────────────────────────────────
@@ -247,6 +312,190 @@ describe('ShellComponent — navigation par rôle', () => {
       await component.saveProfile();
 
       expect(component.showProfileSetup()).toBe(false);
+    });
+
+    // ── Password optional field ──────────────────────────────────────────
+
+    it("saveProfile n'appelle PAS updatePassword si le champ est vide", async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+
+      await component.saveProfile();
+
+      expect(supabase.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('saveProfile appelle updatePassword quand un mot de passe est saisi', async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+      component.profilePassword.set('motdepasse123');
+
+      await component.saveProfile();
+
+      expect(supabase.updatePassword).toHaveBeenCalledWith('motdepasse123');
+      expect(supabase.markPasswordSet).toHaveBeenCalled();
+      expect(component.showProfileSetup()).toBe(false);
+    });
+
+    it('saveProfile rejette un mot de passe trop court', async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+      component.profilePassword.set('court');
+
+      await component.saveProfile();
+
+      expect(supabase.updatePassword).not.toHaveBeenCalled();
+      expect(component.profilePasswordError()).toContain('8 caractères');
+      expect(component.showProfileSetup()).toBe(true);
+    });
+  });
+
+  // ── visibilité du mot de passe (modal setup) ──────────────────────────────
+
+  describe('visibilité du mot de passe de configuration', () => {
+    it('showProfilePassword démarre à false', () => {
+      createComponent('editeur');
+      expect(component.showProfilePassword()).toBe(false);
+    });
+
+    it('toggleShowProfilePassword bascule la visibilité', () => {
+      createComponent('editeur');
+      component.toggleShowProfilePassword();
+      expect(component.showProfilePassword()).toBe(true);
+      component.toggleShowProfilePassword();
+      expect(component.showProfilePassword()).toBe(false);
+    });
+  });
+
+  // ── bannière mot de passe non défini ──────────────────────────────────────
+
+  describe('bannière mot de passe non défini', () => {
+    it('showPasswordBanner est vrai quand hasPasswordSet retourne false', async () => {
+      createComponent('editeur');
+      await component.ngOnInit();
+      expect(component.showPasswordBanner()).toBe(true);
+    });
+
+    it('showPasswordBanner est faux quand hasPasswordSet retourne true', async () => {
+      createComponent('editeur');
+      const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true);
+      await component.ngOnInit();
+      expect(component.showPasswordBanner()).toBe(false);
+    });
+
+    it('dismissPasswordBanner masque la bannière', async () => {
+      createComponent('editeur');
+      await component.ngOnInit();
+      component.dismissPasswordBanner();
+      expect(component.showPasswordBanner()).toBe(false);
+    });
+  });
+
+  // ── recherche dans la topbar ──────────────────────────────────────────────
+
+  describe('recherche topbar', () => {
+    it('searchTerm démarre vide', () => {
+      createComponent('owner');
+      expect(component.searchTerm()).toBe('');
+    });
+
+    it('searchOpen démarre à false', () => {
+      createComponent('owner');
+      expect(component.searchOpen()).toBe(false);
+    });
+
+    it('onSearchInput met à jour searchTerm', () => {
+      createComponent('owner');
+      component.onSearchInput('indep');
+      expect(component.searchTerm()).toBe('indep');
+    });
+
+    it('closeSearchDropdown ferme la dropdown', () => {
+      createComponent('owner');
+      component.searchOpen.set(true);
+      component.closeSearchDropdown();
+      expect(component.searchOpen()).toBe(false);
+    });
+
+    it('submitSearch navigue vers /recherche avec le terme', () => {
+      createComponent('owner');
+      component.searchTerm.set('indep');
+      component.submitSearch();
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/recherche'], { queryParams: { q: 'indep' } });
+    });
+
+    it('submitSearch ne navigue pas quand le terme est vide', () => {
+      createComponent('owner');
+      component.searchTerm.set('   ');
+      component.submitSearch();
+      expect(mockRouter.navigate).not.toHaveBeenCalledWith(['/recherche'], expect.anything());
+    });
+
+    it('goToResult navigue vers la page correspondant au type', () => {
+      createComponent('owner');
+      component.goToResult({ type: 'event', id: 'e1', label: 'Test' });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/evenements'], { queryParams: { q: 'Test' } });
+
+      component.goToResult({ type: 'campaign', id: 'c1', label: 'Test' });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/campagnes'], { queryParams: { q: 'Test' } });
+
+      component.goToResult({ type: 'company', id: 'co1', label: 'Test' });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/compagnies'], { queryParams: { q: 'Test' } });
+
+      component.goToResult({ type: 'calendar', id: 'ca1', label: 'Test' });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/calendrier'], { queryParams: { q: 'Test' } });
+    });
+
+    it('goToResult ferme la dropdown et efface le terme', () => {
+      createComponent('owner');
+      component.searchTerm.set('test');
+      component.searchOpen.set(true);
+      component.goToResult({ type: 'event', id: 'e1', label: 'Test' });
+      expect(component.searchOpen()).toBe(false);
+      expect(component.searchTerm()).toBe('');
+    });
+  });
+
+  // ── switchWorkspace (in-place refresh) ────────────────────────────────────
+
+  describe('switchWorkspace', () => {
+    it("ne fait rien quand l'id correspond au workspace courant", async () => {
+      createComponent('owner');
+      // Let ngOnInit's async work (which calls setActiveWorkspace('ws-1') for seeding) settle.
+      await component.ngOnInit();
+      mockWorkspaceContext.setActiveWorkspace.mockClear();
+      mockRouter.navigateByUrl.mockClear();
+      await component.switchWorkspace('ws-1'); // current
+      expect(mockWorkspaceContext.setActiveWorkspace).not.toHaveBeenCalled();
+      expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    it('met à jour le workspace actif et déclenche un refresh', async () => {
+      createComponent('owner');
+      await component.switchWorkspace('ws-2');
+      expect(mockWorkspaceContext.setActiveWorkspace).toHaveBeenCalledWith('ws-2');
+      expect(mockRouteReuse.triggerRefresh).toHaveBeenCalled();
+    });
+
+    it("re-navigue vers l'URL courante pour forcer le re-init des composants", async () => {
+      createComponent('owner');
+      mockRouter.url = '/calendrier';
+      await component.switchWorkspace('ws-2');
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/calendrier');
+    });
+
+    it('ferme le menu workspace après le switch', async () => {
+      createComponent('owner');
+      component.workspaceMenuOpen.set(true);
+      await component.switchWorkspace('ws-2');
+      expect(component.workspaceMenuOpen()).toBe(false);
     });
   });
 

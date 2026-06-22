@@ -51,7 +51,7 @@
               <span class="step__workspace-meta">
                 {{ ws.member_count }}&nbsp;membre{{ ws.member_count !== 1 ? 's' : '' }}
                 @if (ws.last_accessed_at) {
-                  &nbsp;·&nbsp;Dernière connexion le {{ ws.last_accessed_at | date: 'd MMM yyyy' }}
+                  &nbsp;·&nbsp;Dernière connexion le {{ ws.last_accessed_at | date: 'd MMM yyyy' : '' : 'fr' }}
                 }
               </span>
             </div>
@@ -186,6 +186,8 @@
               <option value="chef_equipe">Chef d'équipe</option>
               <option value="editeur">Éditeur</option>
               <option value="charge_communication">Chargé de communication</option>
+              <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
+              <option value="presidence">Présidence</option>
             </select>
             <button
               class="modal__btn-secondary"

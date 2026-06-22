@@ -9,13 +9,17 @@ const MOCK_DEVICES = [
 ];
 
 const MOCK_LOGS = [
-  { action: 'device_register_permission', outcome: 'success', logged_at: '2026-05-07T10:00:00Z' },
-  { action: 'device_register_expo_token', outcome: 'success', logged_at: '2026-05-07T10:01:00Z' },
+  { action: 'device_register_permission', outcome: 'success', created_at: '2026-05-07T10:00:00Z' },
+  { action: 'device_register_expo_token', outcome: 'success', created_at: '2026-05-07T10:01:00Z' },
 ];
 
 const MOCK_TAPS = [
-  { campaign_id: 'c1', ad_campaigns: { name: 'Forfait ya sika', advertiser: 'AIRTEL' } },
-  { campaign_id: 'c1', ad_campaigns: { name: 'Forfait ya sika', advertiser: 'AIRTEL' } },
+  { campaign_id: 'c1', ad_campaigns: { name: 'Forfait ya sika', company: { name: 'AIRTEL' } } },
+  { campaign_id: 'c1', ad_campaigns: { name: 'Forfait ya sika', company: { name: 'AIRTEL' } } },
+];
+
+const MOCK_CLICKS = [
+  { campaign_id: 'c1' },
 ];
 
 const MOCK_ACTIVITY = [
@@ -49,6 +53,7 @@ function makeClientMock() {
     if (table === 'devices')   return buildSelectChain({ data: MOCK_DEVICES, error: null });
     if (table === 'devices_logs') return buildSelectChain({ data: MOCK_LOGS, error: null });
     if (table === 'ad_campaign_device_views') return buildSelectChain({ data: MOCK_TAPS, error: null });
+    if (table === 'ad_campaign_device_clicks') return buildSelectChain({ data: MOCK_CLICKS, error: null });
     return buildSelectChain({ data: [], error: null });
   });
 
@@ -91,10 +96,42 @@ describe('MetriquesService', () => {
   });
 
   describe('getCampaignTaps()', () => {
-    it('devrait agréger les taps par campagne', async () => {
+    it('devrait agréger les impressions par campagne', async () => {
       const result = await firstValueFrom(service.getCampaignTaps());
       expect(result[0].tap_count).toBe(2);
       expect(result[0].campaign_name).toBe('Forfait ya sika');
+      expect(result[0].advertiser).toBe('AIRTEL');
+    });
+
+    it('agrège les clicks et calcule le CTR', async () => {
+      const result = await firstValueFrom(service.getCampaignTaps());
+      expect(result[0].click_count).toBe(1);
+      expect(result[0].ctr).toBeCloseTo(0.5);
+    });
+
+    it('retourne ctr=null quand tap_count=0', async () => {
+      // Simulate clicks against a campaign with no recorded views.
+      clientMock.from = jest.fn((table: string) => {
+        if (table === 'ad_campaign_device_views')  return buildSelectChain({ data: [], error: null });
+        if (table === 'ad_campaign_device_clicks') return buildSelectChain({ data: [{ campaign_id: 'orphan' }], error: null });
+        return buildSelectChain({ data: [], error: null });
+      });
+      const result = await firstValueFrom(service.getCampaignTaps());
+      expect(result[0].tap_count).toBe(0);
+      expect(result[0].click_count).toBe(1);
+      expect(result[0].ctr).toBeNull();
+    });
+
+    it('survit à une erreur sur la lecture des clicks (renvoie 0)', async () => {
+      clientMock.from = jest.fn((table: string) => {
+        if (table === 'ad_campaign_device_views')  return buildSelectChain({ data: MOCK_TAPS, error: null });
+        if (table === 'ad_campaign_device_clicks') return buildSelectChain({ data: null, error: { message: 'boom' } });
+        return buildSelectChain({ data: [], error: null });
+      });
+      const result = await firstValueFrom(service.getCampaignTaps());
+      expect(result[0].tap_count).toBe(2);
+      expect(result[0].click_count).toBe(0);
+      expect(result[0].ctr).toBe(0);
     });
   });
 

@@ -26,8 +26,8 @@ const fakeEvents: Event[] = [
 ];
 
 const fakeCalendars = [
-  { id: 'cal-1', year: 2025, name: 'Calendrier 2025', status: 'published', eventCount: 0, campaignCount: 0 },
-  { id: 'cal-2', year: 2024, name: 'Calendrier 2024', status: 'archived',  eventCount: 0, campaignCount: 0 },
+  { id: 'cal-1', year: 2025, name: 'Calendrier 2025', status: 'published', eventCount: 0 },
+  { id: 'cal-2', year: 2024, name: 'Calendrier 2024', status: 'archived',  eventCount: 0 },
 ];
 
 describe('EventsComponent', () => {

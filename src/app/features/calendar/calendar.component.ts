@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
@@ -7,7 +8,10 @@ import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calenda
 import { EventService } from '../../core/events/event.service';
 import { CampaignService } from '../../core/campaigns/campaign.service';
 import { ToastService } from '../../core/services/toast.service';
+import { RecommendationService } from '../../core/presidency/recommendation.service';
+import { AuthService } from '../../core/auth/auth.service';
 import { AdCampaign, Event as HistoricalEvent, EventPosition } from '../../models';
+import { MONTHS_FR_LONG as MONTHS_FR, MONTHS_FR_LONG_CAP as MONTHS_FR_CAP } from '../../core/utils/date.utils';
 
 type CalendarView = 'year' | 'month' | 'list';
 export type CalendarFilter = 'all' | 'full' | 'partial' | 'empty' | 'has_campaign';
@@ -71,8 +75,9 @@ export interface DayDetailData {
   campaigns: DayCampaign[];
 }
 
-const MONTHS_FR       = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-const MONTHS_FR_CAP   = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+// MONTHS_FR_SHORT here is the 3-letter heatmap variant ('Jan', 'Fév', …),
+// distinct from the formal abbreviations in date.utils.ts ('janv.', 'févr.', …).
+// MONTHS_FR / MONTHS_FR_CAP come from the shared utility.
 const MONTHS_FR_SHORT = ['Jan','Fév','Mar','Avr','Mai','Jun','Juil','Aoû','Sep','Oct','Nov','Déc'];
 const DOW_SHORT       = ['L','M','M','J','V','S','D'];
 const DOW_LONG        = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
@@ -102,7 +107,28 @@ export class CalendarComponent implements OnInit {
   private readonly calendarEntryService = inject(CalendarEntryService);
   private readonly eventService = inject(EventService);
   private readonly campaignService = inject(CampaignService);
+  private readonly recommendationService = inject(RecommendationService);
+  private readonly authService = inject(AuthService);
   private readonly toast = inject(ToastService);
+
+  /**
+   * Editorial-tier visibility for the "Appliquer la recommandation" button.
+   * Mirrors the RPC's `has_role_at_least('editeur')` check so we don't show
+   * a button that would return `42501 insufficient_privilege` for
+   * `charge_communication` or `presidence` users who also reach /calendrier.
+   */
+  readonly canApplyRecommendations = toSignal(
+    this.authService.hasRoleAtLeast('editeur'),
+    { initialValue: false },
+  );
+
+  // Pending Presidence recommendations for the selected calendar (count only).
+  readonly pendingRecommendationsCount = signal(0);
+  readonly recommendationsApplying = signal(false);
+
+  // Confirm dialog state for the apply flow.
+  readonly applyDialogVisible = signal(false);
+  readonly applyConflicts = signal<import('../../core/presidency/recommendation.service').RecommendationConflict[]>([]);
 
   readonly monthsFr      = MONTHS_FR;
   readonly monthsFrCap   = MONTHS_FR_CAP;
@@ -229,6 +255,8 @@ export class CalendarComponent implements OnInit {
     if (cal) this.selectedYear.set(cal.year);
     this.selectedDay.set(null);
     this.currentPage.set(0);
+    // Refresh the Presidence apply-button badge for the new selection.
+    this.refreshPendingCount();
 
     const cached = this._entriesCache.get(id);
     if (cached) {
@@ -485,6 +513,51 @@ export class CalendarComponent implements OnInit {
 
   readonly canPublish = computed(() => this.selectedCalendar()?.status === 'draft');
 
+  // ── Presidency apply flow ──────────────────────────────────────────────
+  /** Refresh the pending-count badge for the currently selected calendar. */
+  async refreshPendingCount(): Promise<void> {
+    const id = this.selectedCalendarId();
+    if (!id) { this.pendingRecommendationsCount.set(0); return; }
+    const count = await firstValueFrom(this.recommendationService.countPending(id));
+    this.pendingRecommendationsCount.set(count);
+  }
+
+  /** Compute conflict list and open the confirm dialog. */
+  async openApplyDialog(): Promise<void> {
+    const id = this.selectedCalendarId();
+    if (!id) return;
+    if (!this.canApplyRecommendations()) return;
+    const [recs, entries] = await Promise.all([
+      firstValueFrom(this.recommendationService.listByCalendar(id)),
+      firstValueFrom(this.calendarEntryService.getEntriesForCalendar(id)),
+    ]);
+    const conflicts = this.recommendationService.getConflicts(recs, entries);
+    this.applyConflicts.set(conflicts);
+    this.applyDialogVisible.set(true);
+  }
+
+  cancelApply(): void {
+    this.applyDialogVisible.set(false);
+    this.applyConflicts.set([]);
+  }
+
+  async confirmApply(): Promise<void> {
+    const id = this.selectedCalendarId();
+    if (!id || this.recommendationsApplying()) return;
+    if (!this.canApplyRecommendations()) return;
+    this.recommendationsApplying.set(true);
+    const result = await firstValueFrom(this.recommendationService.applyAll(id, true));
+    this.recommendationsApplying.set(false);
+    this.applyDialogVisible.set(false);
+    this.applyConflicts.set([]);
+    if (!result.success) {
+      this.toast.error(result.error ?? 'Échec de l\'application des recommandations.');
+      return;
+    }
+    this.toast.success(`${result.applied ?? 0} recommandation(s) appliquée(s).`);
+    await this.refreshPendingCount();
+  }
+
   async publishCalendar(): Promise<void> {
     if (this.publishing()) return;
     const calId = this.selectedCalendarId();
@@ -632,7 +705,6 @@ export class CalendarComponent implements OnInit {
   readonly showDupModal        = signal(false);
   readonly dupSourceId         = signal('');
   readonly dupIncludeEvents    = signal(true);
-  readonly dupIncludeCampaigns = signal(true);
   readonly dupTargetType       = signal<'existing' | 'new'>('existing');
   readonly dupTargetId         = signal('');
   readonly dupNewYear          = signal(0);
@@ -652,7 +724,6 @@ export class CalendarComponent implements OnInit {
     const selId = this.selectedCalendarId();
     this.dupSourceId.set(selId);
     this.dupIncludeEvents.set(true);
-    this.dupIncludeCampaigns.set(true);
     this.dupTargetType.set('existing');
     const targets = this.sortedCalendars().filter(c => c.id !== selId && c.status !== 'archived');
     this.dupTargetId.set(targets[0]?.id ?? '');
@@ -675,15 +746,14 @@ export class CalendarComponent implements OnInit {
   confirmDuplicate(): void {
     const src = this.dupSourceCalendar();
     if (!src) return;
-    const evCount   = this.dupIncludeEvents()    ? src.eventCount    : 0;
-    const campCount = this.dupIncludeCampaigns() ? src.campaignCount : 0;
+    const evCount = this.dupIncludeEvents() ? src.eventCount : 0;
     if (this.dupTargetType() === 'new') {
       const year = this.dupNewYear(), name = this.dupNewName().trim() || `Calendrier ${year}`;
       const newId = `cal-${Date.now()}`;
       this.calendars.update(cals => [...cals, {
         id: newId, year, name, status: 'draft' as const,
         createdBy: null, publishedAt: null,
-        eventCount: evCount, campaignCount: campCount,
+        eventCount: evCount,
         fillPct: this.dupIncludeEvents() ? src.fillPct : 0,
       }]);
       this.dupResultCalId.set(newId);
@@ -691,7 +761,7 @@ export class CalendarComponent implements OnInit {
       const targetId = this.dupTargetId();
       this.calendars.update(cals => cals.map(c =>
         c.id !== targetId ? c : {
-          ...c, eventCount: c.eventCount + evCount, campaignCount: c.campaignCount + campCount,
+          ...c, eventCount: c.eventCount + evCount,
           fillPct: this.dupIncludeEvents()
             ? Math.min(100, Math.round((c.fillPct + src.fillPct) / 2)) : c.fillPct,
         }

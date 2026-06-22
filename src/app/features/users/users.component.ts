@@ -21,6 +21,8 @@ const ROLE_LABELS: Record<AppRole, string> = {
   chef_equipe: "Chef d'équipe",
   editeur: 'Éditeur',
   charge_communication: 'Chargé comm.',
+  presidence: 'Présidence',
+  chef_equipe_commerciale: 'Chef d\'équipe comm.',
 };
 
 @Component({
@@ -46,10 +48,12 @@ export class UsersComponent implements OnInit {
 
   readonly isEmpty = computed(() => !this.loading() && this.users().length === 0);
 
-  readonly kpiTotal    = computed(() => this.users().length);
-  readonly kpiOwners   = computed(() => this.users().filter(u => u.role === 'owner').length);
-  readonly kpiEditors  = computed(() => this.users().filter(u => u.role === 'editeur').length);
-  readonly kpiComm     = computed(() => this.users().filter(u => u.role === 'charge_communication').length);
+  readonly kpiTotal      = computed(() => this.users().length);
+  readonly kpiOwners     = computed(() => this.users().filter(u => u.role === 'owner').length);
+  readonly kpiEditors    = computed(() => this.users().filter(u => u.role === 'editeur').length);
+  readonly kpiComm       = computed(() => this.users().filter(u => u.role === 'charge_communication').length);
+  readonly kpiPresidence     = computed(() => this.users().filter(u => u.role === 'presidence').length);
+  readonly kpiCommercialLead = computed(() => this.users().filter(u => u.role === 'chef_equipe_commerciale').length);
 
   readonly searchQuery = signal('');
 
@@ -73,20 +77,35 @@ export class UsersComponent implements OnInit {
   readonly confirmModalUserId = signal<string | null>(null);
   readonly confirmModalAction = signal<'block' | 'unblock' | 'remove' | null>(null);
 
+  readonly showPasswordModal     = signal(false);
+  readonly passwordModalUserId   = signal<string | null>(null);
+  readonly passwordModalValue    = signal('');
+  readonly passwordModalShow     = signal(false);
+  readonly passwordModalLoading  = signal(false);
+  readonly passwordModalError    = signal('');
+
+  readonly passwordModalUser = computed(() =>
+    this.users().find(u => u.userId === this.passwordModalUserId()) ?? null,
+  );
+
   readonly confirmModalUser = computed(() =>
     this.users().find(u => u.userId === this.confirmModalUserId()) ?? null
   );
 
+  // Columns (after the label): Propriétaire | Chef d'équipe | Éditeur | Chargé comm. | Présidence | Chef d'équipe comm.
   readonly permissionsMatrix: (string | number)[][] = [
-    ["Créer / configurer l'espace",         1, 0, 0, 0],
-    ['Inviter / bloquer un membre',         1, 0, 0, 0],
-    ['Gérer les rôles',                     1, 0, 0, 0],
-    ['CRUD calendriers',                    1, 1, 1, 0],
-    ['Dupliquer un calendrier',             1, 1, 1, 0],
-    ['CRUD événements historiques',         1, 1, 1, 0],
-    ['CRUD campagnes publicitaires',        1, 1, 0, 1],
-    ['Assigner / répéter une campagne',     1, 1, 0, 1],
-    ['Tableaux de bord (lecture seule)',    1, 1, 1, 1],
+    ["Créer / configurer l'espace",                       1, 0, 0, 0, 0, 0],
+    ['Inviter / bloquer un membre',                       1, 0, 0, 0, 0, 0],
+    ['Gérer les rôles',                                   1, 0, 0, 0, 0, 0],
+    ['CRUD calendriers',                                  1, 1, 0, 0, 0, 0],
+    ['Dupliquer un calendrier',                           1, 1, 0, 0, 0, 0],
+    ['CRUD événements historiques',                       1, 1, 1, 0, 0, 0],
+    ['Assigner un événement à un jour (calendrier)',      1, 1, 0, 0, 0, 0],
+    ['Recommander un événement à un jour (Présidence)',   1, 0, 0, 0, 1, 0],
+    ['Appliquer une recommandation Présidence',           1, 1, 1, 0, 0, 0],
+    ['CRUD compagnies (annonceurs)',                      1, 0, 0, 0, 0, 1],
+    ['CRUD campagnes publicitaires',                      1, 1, 0, 1, 0, 1],
+    ['Tableaux de bord (lecture seule)',                  1, 1, 1, 1, 1, 1],
   ];
 
   initials(user: UserRow): string {
@@ -187,6 +206,45 @@ export class UsersComponent implements OnInit {
     if (!userId || !action) return;
     await this.handleAction(userId, action);
     this.closeConfirmModal();
+  }
+
+  openPasswordModal(userId: string): void {
+    this.passwordModalUserId.set(userId);
+    this.passwordModalValue.set('');
+    this.passwordModalShow.set(false);
+    this.passwordModalError.set('');
+    this.showPasswordModal.set(true);
+  }
+
+  closePasswordModal(): void {
+    this.showPasswordModal.set(false);
+  }
+
+  togglePasswordModalShow(): void { this.passwordModalShow.update(v => !v); }
+
+  async submitSetPassword(): Promise<void> {
+    if (this.passwordModalLoading()) return;
+    const userId = this.passwordModalUserId();
+    const password = this.passwordModalValue();
+    if (!userId) return;
+    if (password.length < 8) {
+      this.passwordModalError.set('Le mot de passe doit comporter au moins 8 caractères.');
+      return;
+    }
+
+    this.passwordModalLoading.set(true);
+    this.passwordModalError.set('');
+    const result = await firstValueFrom(
+      this.workspaceService.manageUser(userId, 'set_password', undefined, password),
+    );
+    this.passwordModalLoading.set(false);
+
+    if (!result.success) {
+      this.passwordModalError.set(result.error ?? 'Échec de la mise à jour du mot de passe.');
+      return;
+    }
+
+    this.closePasswordModal();
   }
 
   openInviteModal(): void {
