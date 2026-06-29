@@ -5,14 +5,19 @@ describe('SupabaseService', () => {
   let service: SupabaseService;
   let signInWithOtpSpy: jest.Mock;
   let verifyOtpSpy: jest.Mock;
+  let signInWithPasswordSpy: jest.Mock;
+  let updateUserSpy: jest.Mock;
   let rpcSpy: jest.Mock;
   let onAuthStateChangeSpy: jest.Mock;
 
   beforeEach(() => {
     signInWithOtpSpy = jest.fn().mockResolvedValue({ data: {}, error: null });
     verifyOtpSpy = jest.fn().mockResolvedValue({ data: { user: {} }, error: null });
+    signInWithPasswordSpy = jest.fn().mockResolvedValue({ data: { user: { id: 'u1' }, session: {} }, error: null });
+    updateUserSpy = jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
     rpcSpy = jest.fn().mockResolvedValue({ data: true, error: null });
     onAuthStateChangeSpy = jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } });
+    localStorage.clear();
 
     jest.mock('../../../environments/environment', () => ({
       environment: {
@@ -31,6 +36,8 @@ describe('SupabaseService', () => {
       auth: {
         signInWithOtp: signInWithOtpSpy,
         verifyOtp: verifyOtpSpy,
+        signInWithPassword: signInWithPasswordSpy,
+        updateUser: updateUserSpy,
         onAuthStateChange: onAuthStateChangeSpy,
       },
       rpc: rpcSpy,
@@ -45,16 +52,8 @@ describe('SupabaseService', () => {
   // ── sendOtp() ──────────────────────────────────────────────────────────────
 
   describe('sendOtp()', () => {
-    it("appelle signInWithOtp avec shouldCreateUser=true pour l'onboarding", async () => {
-      await service.sendOtp('test@exemple.com', true);
-      expect(signInWithOtpSpy).toHaveBeenCalledWith({
-        email: 'test@exemple.com',
-        options: { shouldCreateUser: true },
-      });
-    });
-
-    it("appelle signInWithOtp avec shouldCreateUser=false pour le login", async () => {
-      await service.sendOtp('test@exemple.com', false);
+    it("appelle toujours signInWithOtp avec shouldCreateUser=false (les comptes sont créés par invitation system_admin)", async () => {
+      await service.sendOtp('test@exemple.com');
       expect(signInWithOtpSpy).toHaveBeenCalledWith({
         email: 'test@exemple.com',
         options: { shouldCreateUser: false },
@@ -106,6 +105,43 @@ describe('SupabaseService', () => {
     it("retourne false si la RPC retourne une erreur", async () => {
       rpcSpy.mockResolvedValue({ data: null, error: { message: 'DB error' } });
       expect(await service.isAppInitialized()).toBe(false);
+    });
+  });
+
+  // ── signInWithPassword() ───────────────────────────────────────────────────
+
+  describe('signInWithPassword()', () => {
+    it('appelle supabase.auth.signInWithPassword avec email et mot de passe', async () => {
+      await service.signInWithPassword('a@b.cg', 'secret123');
+      expect(signInWithPasswordSpy).toHaveBeenCalledWith({ email: 'a@b.cg', password: 'secret123' });
+    });
+
+    it("propage l'erreur Supabase telle quelle", async () => {
+      signInWithPasswordSpy.mockResolvedValue({ data: null, error: { message: 'Invalid login credentials' } });
+      const res = await service.signInWithPassword('a@b.cg', 'wrong');
+      expect(res.error?.message).toBe('Invalid login credentials');
+    });
+  });
+
+  // ── updatePassword() ───────────────────────────────────────────────────────
+
+  describe('updatePassword()', () => {
+    it('appelle supabase.auth.updateUser avec le nouveau mot de passe', async () => {
+      await service.updatePassword('nouveau-mdp-456');
+      expect(updateUserSpy).toHaveBeenCalledWith({ password: 'nouveau-mdp-456' });
+    });
+  });
+
+  // ── password presence flag ────────────────────────────────────────────────
+
+  describe('hasPasswordSet() / markPasswordSet()', () => {
+    it('retourne false par défaut', async () => {
+      expect(await service.hasPasswordSet()).toBe(false);
+    });
+
+    it('retourne true après markPasswordSet()', async () => {
+      service.markPasswordSet();
+      expect(await service.hasPasswordSet()).toBe(true);
     });
   });
 });

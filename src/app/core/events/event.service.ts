@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Observable, from } from 'rxjs';
+import { Observable, from, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { CreateEventDto, Event } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -12,18 +12,42 @@ export class EventService {
     private workspaceContext: WorkspaceContextService,
   ) {}
 
-  /** Returns all non-deleted events for the active workspace. */
+  /**
+   * Returns all non-deleted events for the active workspace.
+   * Paginates with `.range()` to work around Supabase's default
+   * `max-rows=1000` PostgREST limit — keeps fetching until a page
+   * comes back with fewer than PAGE_SIZE rows.
+   */
   listEvents(): Observable<Event[]> {
     const wsId = this.workspaceContext.activeWorkspaceId();
-    let query = this.supabase.client
-      .from('events')
-      .select('*')
-      .is('deleted_at', null)
-      .order('event_date', { ascending: true });
-    if (wsId) query = (query as any).eq('workspace_id', wsId);
-    return from(query).pipe(
-      map(({ data, error }: any) => (error || !data ? [] : data as Event[])),
-    );
+    const PAGE_SIZE = 1000;
+
+    const fetchPage = (offset: number): Promise<Event[]> => {
+      let query = this.supabase.client
+        .from('events')
+        .select('*')
+        .is('deleted_at', null)
+        .order('event_date', { ascending: true });
+      if (wsId) query = (query as any).eq('workspace_id', wsId);
+      return (query as any)
+        .range(offset, offset + PAGE_SIZE - 1)
+        .then(({ data, error }: any) => (error || !data ? [] : data as Event[]));
+    };
+
+    const fetchAll = async (): Promise<Event[]> => {
+      const all: Event[] = [];
+      let offset = 0;
+      // Cap the loop at 50 pages (50k events) as a defensive guard.
+      for (let i = 0; i < 50; i++) {
+        const page = await fetchPage(offset);
+        all.push(...page);
+        if (page.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
+      return all;
+    };
+
+    return from(fetchAll());
   }
 
   /** Returns all non-deleted events whose MM-DD matches the given string (e.g. '08-15'). */
@@ -45,6 +69,8 @@ export class EventService {
             title: dto.title,
             description: dto.description ?? null,
             image_path: dto.image_path ?? null,
+            source: dto.source ?? null,
+            historian: dto.historian ?? null,
             status: 'draft',
             workspace_id: wsId,
             created_by: user?.id ?? null,
@@ -61,7 +87,7 @@ export class EventService {
     );
   }
 
-  updateEvent(id: string, patch: Partial<Pick<Event, 'title' | 'description' | 'image_path' | 'status' | 'event_date'>>): Observable<{ success: boolean; error?: string }> {
+  updateEvent(id: string, patch: Partial<Pick<Event, 'title' | 'description' | 'image_path' | 'status' | 'event_date' | 'source' | 'historian'>>): Observable<{ success: boolean; error?: string }> {
     return from(
       this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
         this.supabase.client
@@ -96,6 +122,36 @@ export class EventService {
     return this.supabase.client.storage
       .from('historical-images')
       .getPublicUrl(storagePath).data.publicUrl;
+  }
+
+  /**
+   * Inserts a batch of events in a single PostgREST call.
+   * Caller should chunk large arrays (≤200 per call) to stay within limits.
+   */
+  batchCreateEvents(dtos: CreateEventDto[]): Observable<{ inserted: number; error?: string }> {
+    if (!dtos.length) return of({ inserted: 0 });
+    const wsId = this.workspaceContext.activeWorkspaceId();
+    return from(
+      this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
+        this.supabase.client
+          .from('events')
+          .insert(dtos.map(dto => ({
+            event_date:  dto.event_date,
+            title:       dto.title,
+            description: dto.description ?? null,
+            image_path:  null,
+            source:      dto.source ?? null,
+            historian:   dto.historian ?? null,
+            status:      'draft' as const,
+            workspace_id: wsId,
+            created_by:  user?.id ?? null,
+          }))),
+      ),
+    ).pipe(
+      map(({ error }: any) =>
+        error ? { inserted: 0, error: error.message } : { inserted: dtos.length },
+      ),
+    );
   }
 
   deleteEvent(id: string): Observable<{ success: boolean; error?: string }> {

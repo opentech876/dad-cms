@@ -1,8 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { of } from 'rxjs';
 import { DashboardComponent } from './dashboard.component';
 import { SupabaseService } from '../../core/supabase/supabase.service';
+import { CampaignService } from '../../core/campaigns/campaign.service';
+import { CompanyService } from '../../core/companies/company.service';
+import { MetriquesService } from '../../core/metriques/metriques.service';
 
 const TODAY = new Date().toISOString().split('T')[0];
 const [, todayMonthStr, todayDayStr] = TODAY.split('-');
@@ -14,6 +18,7 @@ function buildClient(options: {
   calendarCount?: number;
   campaignCount?: number;
   yearEventCount?: number;
+  pendingValidationCount?: number;
   publishedCalendarId?: string | null;
   todayEvents?: any[];
 } = {}) {
@@ -22,6 +27,7 @@ function buildClient(options: {
     calendarCount = 2,
     campaignCount = 3,
     yearEventCount = 120,
+    pendingValidationCount = 0,
     publishedCalendarId = 'cal-pub-1',
     todayEvents = [
       {
@@ -51,6 +57,15 @@ function buildClient(options: {
   }
 
   const calendarForYear = publishedCalendarId ? { id: publishedCalendarId } : null;
+  const todayEntries = todayEvents.map((e: any) => ({
+    position: e.position,
+    event: {
+      title: e.title,
+      description: e.description,
+      event_date: e.event_date,
+      deleted_at: e.deleted_at ?? null,
+    },
+  }));
 
   return {
     from: (table: string) => {
@@ -58,8 +73,13 @@ function buildClient(options: {
         return {
           select: (_cols: string, opts?: any) => {
             if (opts?.head) return makeChain(null, eventCount);
-            return makeChain(todayEvents, todayEvents.length);
+            return makeChain([], 0);
           },
+        };
+      }
+      if (table === 'calendar_entries') {
+        return {
+          select: (_cols: string, _opts?: any) => makeChain(todayEntries, todayEntries.length),
         };
       }
       if (table === 'calendars') {
@@ -71,7 +91,34 @@ function buildClient(options: {
         };
       }
       if (table === 'ad_campaigns') {
-        return { select: (_cols: string, _opts?: any) => makeChain(null, campaignCount) };
+        // Two different ad_campaigns queries: head-count for active OR pending validation,
+        // and an `id IN (...)` lookup for top performers. Distinguish by checking opts.head.
+        return {
+          select: (_cols: string, opts?: any) => {
+            if (opts?.head) {
+              // Heuristic: the validation-pending query is the only one chaining .is('validated_at', null).
+              // We expose both counts via the same makeChain — last is() call wins. Tests pass
+              // pendingValidationCount via the option; we route head-count requests through a
+              // shared chain whose .is('validated_at', null) flips the count.
+              const c: any = { _count: campaignCount };
+              const q: any = {
+                then: (r: any, rj?: any) => Promise.resolve({ data: null, count: c._count, error: null }).then(r, rj),
+                eq:    (_col: string) => q,
+                is:    (col: string, _v: any) => {
+                  if (col === 'validated_at') c._count = pendingValidationCount;
+                  return q;
+                },
+              };
+              return q;
+            }
+            // Non-head: id-in() lookup for top performers.
+            return {
+              in: (_col: string, _vals: any[]) =>
+                Promise.resolve({ data: [], error: null }),
+              eq: (_col: string, _v: any) => makeChain([], 0),
+            };
+          },
+        };
       }
       return makeChain([], 0);
     },
@@ -82,12 +129,24 @@ describe('DashboardComponent', () => {
   let component: DashboardComponent;
   let mockSupabase: { client: any };
 
+  let mockCampaigns: { listCampaigns: jest.Mock };
+  let mockCompanies: { listCompanies: jest.Mock };
+  let mockMetriques: { getCampaignTaps: jest.Mock };
+
   beforeEach(() => {
     mockSupabase = { client: buildClient() };
+    mockCampaigns = { listCampaigns: jest.fn().mockReturnValue(of([])) };
+    mockCompanies = { listCompanies: jest.fn().mockReturnValue(of([])) };
+    mockMetriques = { getCampaignTaps: jest.fn().mockReturnValue(of([])) };
 
     TestBed.configureTestingModule({
       imports: [DashboardComponent],
-      providers: [{ provide: SupabaseService, useValue: mockSupabase }],
+      providers: [
+        { provide: SupabaseService,   useValue: mockSupabase },
+        { provide: CampaignService,   useValue: mockCampaigns },
+        { provide: CompanyService,    useValue: mockCompanies },
+        { provide: MetriquesService,  useValue: mockMetriques },
+      ],
       schemas: [NO_ERRORS_SCHEMA],
     });
 
@@ -153,19 +212,44 @@ describe('DashboardComponent', () => {
       expect(component.featuredEvent().excerpt).toBe('e Congo accède.');
     });
 
-    it('extrait le jour et le mois depuis event_date', async () => {
+    it("affiche le jour d'aujourd'hui (pas la date historique de l'événement)", async () => {
+      // Event historically happened on 1960-08-15 but is assigned to today's mmdd slot.
+      // The right-side preview must show today (matching what mobile renders),
+      // not the historical event_date — otherwise the date on the right contradicts the left.
       mockSupabase.client = buildClient({
         todayEvents: [{
-          title: 'Test',
+          title: 'Indépendance du Congo',
           description: 'Desc.',
-          event_date: TODAY,
+          event_date: '1960-08-15',
           position: 1,
         }],
       });
 
       await component.ngOnInit();
 
-      expect(component.featuredEvent().day).toBe(TODAY_DAY);
+      // Compute TODAY_DAY at the time of the assertion, not at module load —
+      // protects the spec against the (rare) day rollover happening between
+      // suite startup and the test running.
+      const todayNow = String(new Date().getDate()).padStart(2, '0');
+      expect(component.featuredEvent().day).toBe(todayNow);
+      expect(component.featuredEvent().day).not.toBe('15');
+    });
+
+    it("ignore les événements doux-supprimés (mirroring get_today_content)", async () => {
+      // Mirror mobile's RPC behavior: events with deleted_at != null must not surface.
+      mockSupabase.client = buildClient({
+        todayEvents: [{
+          title: 'Événement supprimé',
+          description: 'Ne devrait pas apparaître.',
+          event_date: TODAY,
+          position: 1,
+          deleted_at: '2026-06-20T10:00:00Z',
+        }],
+      });
+
+      await component.ngOnInit();
+
+      expect(component.featuredEvent().title).toBe('');
     });
 
     it("affiche le titre de l'événement de position 2 dans 'also'", async () => {
@@ -208,10 +292,63 @@ describe('DashboardComponent', () => {
 
   describe('fillRate', () => {
     it('calcule fillRate à 50% pour 365 yearEvents sur 730 slots', () => {
-      component.stats.set({ totalEvents: 0, publishedCalendars: 0, activeCampaigns: 0, yearEvents: 365 });
+      component.stats.set({
+        totalEvents: 0, publishedCalendars: 0, activeCampaigns: 0, yearEvents: 365,
+        pendingValidations: 0, activeCompanies: 0,
+      });
 
       expect(component.fillRate()).toBe(50);
     });
+  });
 
+  // ── Validation + Companies KPIs (Round 4) ────────────────────────────────
+
+  describe('Round 4 KPIs', () => {
+    it('charge pendingValidations depuis ad_campaigns.is("validated_at", null)', async () => {
+      mockSupabase.client = buildClient({ pendingValidationCount: 7 });
+      await component.ngOnInit();
+      expect(component.stats().pendingValidations).toBe(7);
+    });
+
+    it('charge activeCompanies depuis CompanyService.listCompanies()', async () => {
+      mockCompanies.listCompanies.mockReturnValue(of([{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }]));
+      await component.ngOnInit();
+      expect(mockCompanies.listCompanies).toHaveBeenCalled();
+      expect(component.stats().activeCompanies).toBe(3);
+    });
+  });
+
+  // ── Top ad performers (Round 4) ──────────────────────────────────────────
+
+  describe('topAdPerformers', () => {
+    it('garde au plus 5 lignes', async () => {
+      const taps = Array.from({ length: 8 }, (_, i) => ({
+        campaign_id: `c-${i}`, campaign_name: `Camp ${i}`, advertiser: 'A',
+        tap_count: 100 - i, click_count: 5, ctr: 0.05,
+      }));
+      mockMetriques.getCampaignTaps.mockReturnValue(of(taps));
+      await component.ngOnInit();
+      expect(component.topAdPerformers().length).toBe(5);
+    });
+
+    it('mappe campaign_name → name et tap_count → impressions', async () => {
+      mockMetriques.getCampaignTaps.mockReturnValue(of([
+        { campaign_id: 'c1', campaign_name: 'Forfait', advertiser: 'MTN',
+          tap_count: 1500, click_count: 30, ctr: 0.02 },
+      ]));
+      await component.ngOnInit();
+      const row = component.topAdPerformers()[0];
+      expect(row.name).toBe('Forfait');
+      expect(row.advertiser).toBe('MTN');
+      expect(row.impressions).toBe(1500);
+      expect(row.clicks).toBe(30);
+      expect(row.ctr).toBe(0.02);
+    });
+
+    it('retourne [] quand aucun tap', async () => {
+      mockMetriques.getCampaignTaps.mockReturnValue(of([]));
+      await component.ngOnInit();
+      expect(component.topAdPerformers()).toEqual([]);
+    });
   });
 });

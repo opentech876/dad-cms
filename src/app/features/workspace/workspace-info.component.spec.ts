@@ -1,9 +1,12 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { Router } from '@angular/router';
 import { of } from 'rxjs';
 import { WorkspaceInfoComponent } from './workspace-info.component';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { AdminService } from '../../core/admin/admin.service';
 import { ToastService } from '../../core/services/toast.service';
 import { Workspace } from '../../models';
 
@@ -16,13 +19,22 @@ const MOCK_WORKSPACE: Workspace = {
   updated_at: '2026-01-15T00:00:00Z',
 };
 
+const MOCK_WORKSPACE_2: Workspace = {
+  ...MOCK_WORKSPACE,
+  id: 'ws-2',
+  name: 'Autre tenant',
+};
+
 describe('WorkspaceInfoComponent', () => {
   let component: WorkspaceInfoComponent;
   let fixture: ComponentFixture<WorkspaceInfoComponent>;
   let mockWorkspace: jest.Mocked<Pick<WorkspaceService,
     'getWorkspaces' | 'updateWorkspace' | 'uploadLogo' | 'listUsers'>>;
-  let mockAuth: { currentRole$: any };
+  let mockAuth: { currentRole$: any; isSystemAdmin: jest.Mock };
+  let mockAdmin: jest.Mocked<Pick<AdminService, 'softDeleteWorkspace'>>;
   let mockToast: jest.Mocked<Pick<ToastService, 'success' | 'error'>>;
+  let mockContext: { activeWorkspaceId: jest.Mock };
+  let mockRouter: { navigate: jest.Mock };
 
   beforeEach(async () => {
     global.URL.createObjectURL = jest.fn().mockReturnValue('blob:fake-url');
@@ -34,15 +46,21 @@ describe('WorkspaceInfoComponent', () => {
       uploadLogo: jest.fn().mockReturnValue(of({ success: true, logoUrl: 'https://example.com/logo.jpg' })),
       listUsers: jest.fn().mockReturnValue(of([{ id: 'u1' }, { id: 'u2' }, { id: 'u3' }])),
     };
-    mockAuth  = { currentRole$: of('owner') };
+    mockAuth  = { currentRole$: of('owner'), isSystemAdmin: jest.fn().mockReturnValue(of(false)) };
+    mockAdmin = { softDeleteWorkspace: jest.fn().mockReturnValue(of({ success: true })) };
     mockToast = { success: jest.fn(), error: jest.fn() };
+    mockContext = { activeWorkspaceId: jest.fn().mockReturnValue('ws-1') };
+    mockRouter = { navigate: jest.fn() };
 
     await TestBed.configureTestingModule({
       imports: [WorkspaceInfoComponent],
       providers: [
-        { provide: WorkspaceService, useValue: mockWorkspace },
-        { provide: AuthService,      useValue: mockAuth },
-        { provide: ToastService,     useValue: mockToast },
+        { provide: WorkspaceService,        useValue: mockWorkspace },
+        { provide: WorkspaceContextService, useValue: mockContext },
+        { provide: AuthService,             useValue: mockAuth },
+        { provide: AdminService,            useValue: mockAdmin },
+        { provide: ToastService,            useValue: mockToast },
+        { provide: Router,                  useValue: mockRouter },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
@@ -226,6 +244,79 @@ describe('WorkspaceInfoComponent', () => {
       component.logoFile.set(file);
       await component.uploadLogo();
       expect(mockToast.error).toHaveBeenCalledWith('Bucket introuvable.');
+    });
+  });
+
+  // ── active workspace selection + system_admin ─────────────────────────────
+
+  describe('sélection du workspace actif et accès system_admin', () => {
+    it("charge le workspace dont l'id correspond à activeWorkspaceId, pas le premier", async () => {
+      mockWorkspace.getWorkspaces.mockReturnValueOnce(of([MOCK_WORKSPACE, MOCK_WORKSPACE_2]));
+      mockContext.activeWorkspaceId.mockReturnValueOnce('ws-2');
+      await component.ngOnInit();
+      expect(component.workspaceId()).toBe('ws-2');
+      expect(component.workspaceName()).toBe('Autre tenant');
+    });
+
+    it("retombe sur le premier workspace quand activeWorkspaceId est null", async () => {
+      mockWorkspace.getWorkspaces.mockReturnValueOnce(of([MOCK_WORKSPACE]));
+      mockContext.activeWorkspaceId.mockReturnValueOnce(null);
+      await component.ngOnInit();
+      expect(component.workspaceId()).toBe('ws-1');
+    });
+
+    it("canManage est vrai pour le rôle owner", () => {
+      expect(component.canManage()).toBe(true);
+    });
+
+    it("canManage est vrai pour un system_admin même non-owner", async () => {
+      mockAuth.currentRole$ = of('editeur');
+      mockAuth.isSystemAdmin.mockReturnValueOnce(of(true));
+      await component.ngOnInit();
+      expect(component.canManage()).toBe(true);
+    });
+
+    it("canManage est faux pour un éditeur non system_admin", async () => {
+      mockAuth.currentRole$ = of('editeur');
+      mockAuth.isSystemAdmin.mockReturnValueOnce(of(false));
+      await component.ngOnInit();
+      expect(component.canManage()).toBe(false);
+    });
+  });
+
+  // ── soft-delete (system_admin only) ───────────────────────────────────────
+
+  describe('suppression de workspace (system_admin)', () => {
+    beforeEach(async () => {
+      mockAuth.isSystemAdmin.mockReturnValue(of(true));
+      await component.ngOnInit();
+    });
+
+    it("openDeleteModal n'ouvre rien si l'utilisateur n'est pas system_admin", async () => {
+      mockAuth.isSystemAdmin.mockReturnValueOnce(of(false));
+      await component.ngOnInit();
+      component.openDeleteModal();
+      expect(component.showDeleteModal()).toBe(false);
+    });
+
+    it('openDeleteModal ouvre le modal pour un system_admin', () => {
+      component.openDeleteModal();
+      expect(component.showDeleteModal()).toBe(true);
+    });
+
+    it("confirmDelete appelle adminService.softDeleteWorkspace et redirige vers /admin", async () => {
+      component.openDeleteModal();
+      await component.confirmDelete();
+      expect(mockAdmin.softDeleteWorkspace).toHaveBeenCalledWith('ws-1');
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/admin']);
+    });
+
+    it("affiche un toast d'erreur quand la suppression échoue", async () => {
+      mockAdmin.softDeleteWorkspace.mockReturnValueOnce(of({ success: false, error: 'Boom' }));
+      component.openDeleteModal();
+      await component.confirmDelete();
+      expect(mockToast.error).toHaveBeenCalledWith('Boom');
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
     });
   });
 });

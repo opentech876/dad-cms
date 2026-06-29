@@ -1,126 +1,267 @@
 @if (editorView()) {
-
   <!-- ══ EDITOR ══ -->
   <div class="campaigns-page">
-    <button class="btn btn-flat btn-sm" style="align-self:flex-start; display:inline-flex; align-items:center; gap:4px; margin-bottom:16px;" type="button" (click)="closeEditor()">
-      <tui-icon icon="@tui.chevron-left" style="font-size:14px;" />
-      Retour aux campagnes
+    <button
+      class="btn btn-flat btn-sm"
+      style="
+        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 16px;
+      "
+      type="button"
+      (click)="closeEditor()"
+    >
+      <tui-icon icon="@tui.chevron-left" style="font-size: 14px" />
+      Retour aux encarts
     </button>
 
     <div class="campaign-editor-grid">
-
       <!-- ── Left: Form ── -->
       <div class="campaign-editor-col">
         <div class="card">
           <div class="card-header">
             <div>
-              <div class="card-title">Campagne publicitaire</div>
-              <div class="card-subtitle">Bannière · {{ editorPosition() === 'header' ? 'Entête' : 'Pied de page' }}</div>
+              <div class="card-title">Encart publicitaire</div>
+              <div class="card-subtitle">Bannière</div>
             </div>
             @switch (editorCurrentStatus()) {
-              @case ('active')    { <span class="badge badge-success badge-dot">Active</span> }
-              @case ('scheduled') { <span class="badge badge-info badge-dot">Planifiée</span> }
-              @case ('ended')     { <span class="badge badge-dot">Terminée</span> }
-              @default            { <span class="badge badge-warning">Inactive</span> }
+              @case ('active') {
+                <span class="badge badge-success badge-dot">Active</span>
+              }
+              @case ('planifiee') {
+                <span class="badge badge-info badge-dot">Planifiée</span>
+              }
+              @case ('terminee') {
+                <span class="badge badge-dot">Terminée</span>
+              }
             }
           </div>
 
-          <div class="card-body" style="display:flex; flex-direction:column; gap:16px;">
-
+          <div class="card-body" style="display: flex; flex-direction: column; gap: 16px">
             <!-- Nom -->
             <div class="field required">
               <label class="field-label">Nom de la campagne</label>
-              <input class="input" placeholder="MTN Congo — Forfait étudiant"
-                     [value]="editorName()" (input)="editorName.set($any($event.target).value)" />
+              <input
+                class="input"
+                placeholder="MTN Congo — Forfait étudiant"
+                [value]="editorName()"
+                (input)="editorName.set($any($event.target).value)"
+              />
             </div>
 
-            <!-- Annonceur -->
+            <!-- Annonceur (Compagnie) -->
             <div class="field required">
-              <label class="field-label">Annonceur</label>
-              <input class="input" placeholder="MTN Congo"
-                     [value]="editorAdvertiser()" (input)="editorAdvertiser.set($any($event.target).value)" />
+              <label class="field-label">Compagnie annonceuse</label>
+              @if (companies().length === 0) {
+                <div style="font-size: 12.5px; color: var(--fg-3); font-style: italic; padding: 8px 0;">
+                  Aucune compagnie enregistrée.
+                  <a routerLink="/compagnies" style="color: var(--accent);">Créer une compagnie d'abord →</a>
+                </div>
+              } @else {
+                <select
+                  class="select"
+                  (change)="editorCompanyId.set($any($event.target).value || null)"
+                >
+                  <option value="" [selected]="!editorCompanyId()">— Choisir une compagnie —</option>
+                  @for (co of companies(); track co.id) {
+                    <option [value]="co.id" [selected]="co.id === editorCompanyId()">
+                      {{ co.name }}@if (co.business_domain) { · {{ co.business_domain }} }
+                    </option>
+                  }
+                </select>
+                <span class="field-hint">
+                  Gérez la liste des compagnies sur la page <a routerLink="/compagnies" style="color: var(--accent);">Compagnies</a>.
+                </span>
+              }
             </div>
 
             <!-- Période -->
             <div class="field required">
               <label class="field-label">Période de validité</label>
-              <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px;">
-                <input class="input" type="date"
-                       [value]="editorStartDate()" (change)="editorStartDate.set($any($event.target).value)" />
-                <span style="font-size:13px; color:var(--fg-3);">→</span>
-                <input class="input" type="date"
-                       [value]="editorEndDate()" (change)="editorEndDate.set($any($event.target).value)" />
-              </div>
-            </div>
-
-            <!-- Position -->
-            <div class="field required">
-              <label class="field-label">Position de la bannière</label>
-              <div style="display:flex; gap:10px;">
-                <label class="campaign-position-option" [class.campaign-position-option--active]="editorPosition() === 'header'">
-                  <input type="radio" name="position" value="header"
-                         [checked]="editorPosition() === 'header'"
-                         (change)="editorPosition.set('header')" style="display:none;" />
-                  <tui-icon icon="@tui.arrow-up" style="font-size:14px;" />
-                  Entête
-                </label>
-                <label class="campaign-position-option" [class.campaign-position-option--active]="editorPosition() === 'footer'">
-                  <input type="radio" name="position" value="footer"
-                         [checked]="editorPosition() === 'footer'"
-                         (change)="editorPosition.set('footer')" style="display:none;" />
-                  <tui-icon icon="@tui.arrow-down" style="font-size:14px;" />
-                  Pied de page
-                </label>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 1fr auto 1fr;
+                  align-items: center;
+                  gap: 10px;
+                "
+              >
+                <input
+                  class="input"
+                  type="date" lang="fr-FR"
+                  [value]="editorStartDate()"
+                  (change)="editorStartDate.set($any($event.target).value)"
+                />
+                <span style="font-size: 13px; color: var(--fg-3)">→</span>
+                <input
+                  class="input"
+                  type="date" lang="fr-FR"
+                  [value]="editorEndDate()"
+                  (change)="editorEndDate.set($any($event.target).value)"
+                />
               </div>
             </div>
 
             <!-- URL destination -->
             <div class="field">
               <label class="field-label">URL de destination (optionnel)</label>
-              <input class="input" type="url" placeholder="https://mtn.cg/offre-etudiant"
-                     [value]="editorLinkUrl()" (input)="editorLinkUrl.set($any($event.target).value)" />
-              <span class="field-hint">Lien ouvert dans l'application mobile au clic sur la bannière.</span>
+              <input
+                class="input"
+                type="url"
+                placeholder="https://mtn.cg/offre-etudiant"
+                [value]="editorLinkUrl()"
+                (input)="editorLinkUrl.set($any($event.target).value)"
+              />
+              <span class="field-hint"
+                >Lien ouvert dans l'application mobile au clic sur la bannière.</span
+              >
             </div>
 
             <!-- Activer -->
-            <div style="display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--border-1);">
-              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
-                <input type="checkbox" [checked]="editorActive()" (change)="editorActive.set($any($event.target).checked)" />
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 0;
+                border-top: 1px solid var(--border-1);
+              "
+            >
+              <label
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  cursor: pointer;
+                  font-size: 13px;
+                "
+              >
+                <input
+                  type="checkbox"
+                  [checked]="editorActive()"
+                  (change)="editorActive.set($any($event.target).checked)"
+                />
                 Campagne active
               </label>
-              <span style="font-size:12px; color:var(--fg-3);">S'affiche sur l'application mobile si la date du jour est dans la période.</span>
+              <span style="font-size: 12px; color: var(--fg-3)"
+                >S'affiche sur l'application mobile si la date du jour est dans la période.</span
+              >
             </div>
 
             <!-- Dates d'audit (mode édition uniquement) -->
             @if (editorCampaignId()) {
-              <div style="display:flex; gap:20px; padding-top:12px; border-top:1px solid var(--border-1); font-size:11.5px; color:var(--fg-3);">
+              <div
+                style="
+                  display: flex;
+                  gap: 20px;
+                  padding-top: 12px;
+                  border-top: 1px solid var(--border-1);
+                  font-size: 11.5px;
+                  color: var(--fg-3);
+                "
+              >
                 @if (editorCreatedAt()) {
-                  <span>Ajouté le {{ formatDate(editorCreatedAt()!.slice(0,10)) }}</span>
+                  <span>Ajouté le {{ formatDate(editorCreatedAt()!.slice(0, 10)) }}</span>
                 }
                 @if (editorUpdatedAt()) {
-                  <span>Mis à jour le {{ formatDate(editorUpdatedAt()!.slice(0,10)) }}</span>
+                  <span>Mis à jour le {{ formatDate(editorUpdatedAt()!.slice(0, 10)) }}</span>
                 }
               </div>
             }
 
+            @if (editorCampaignId()) {
+              <div style="margin-top: 16px; padding: 14px; border: 1px solid var(--border-1); border-radius: 8px; background: var(--bg-sunken);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <strong style="font-size: 13px;">Validation</strong>
+                  @switch (editorValidationState()) {
+                    @case ('validated') { <span class="badge badge-success">Validée</span> }
+                    @case ('paid')      { <span class="badge badge-info">Payée</span> }
+                    @case ('confirmed') { <span class="badge badge-info">Confirmée</span> }
+                    @case ('pending')   { <span class="badge badge-warning">À valider</span> }
+                  }
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12.5px; color: var(--fg-2);">
+                  <div>
+                    <div style="font-weight: 600; color: var(--fg-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Paiement</div>
+                    @if (editorPaidAt()) {
+                      <div>✓ Enregistré le {{ formatDate(editorPaidAt()!.slice(0,10)) }}</div>
+                    } @else {
+                      <div style="color: var(--fg-3); font-style: italic;">En attente</div>
+                      @if (canValidate()) {
+                        <button class="btn btn-secondary btn-sm" type="button"
+                                style="margin-top: 6px;"
+                                [disabled]="editorValidationBusy()"
+                                (click)="markPaidFromEditor()">
+                          <tui-icon icon="@tui.banknote" style="font-size: 13px" />
+                          Marquer payée
+                        </button>
+                      }
+                    }
+                  </div>
+                  <div>
+                    <div style="font-weight: 600; color: var(--fg-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Confirmation</div>
+                    @if (editorManagerConfirmedAt()) {
+                      <div>✓ Confirmée le {{ formatDate(editorManagerConfirmedAt()!.slice(0,10)) }}</div>
+                    } @else {
+                      <div style="color: var(--fg-3); font-style: italic;">En attente</div>
+                      @if (canValidate()) {
+                        <button class="btn btn-secondary btn-sm" type="button"
+                                style="margin-top: 6px;"
+                                [disabled]="editorValidationBusy()"
+                                (click)="confirmFromEditor()">
+                          <tui-icon icon="@tui.check-check" style="font-size: 13px" />
+                          Confirmer
+                        </button>
+                      }
+                    }
+                  </div>
+                </div>
+                @if (!editorValidatedAt()) {
+                  <div style="margin-top: 10px; padding: 8px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; font-size: 12px; color: var(--warning);">
+                    ⚠ Tant que la campagne n'est pas validée, le mobile ne la diffuse pas.
+                  </div>
+                }
+              </div>
+            }
           </div>
 
           <div class="card-footer">
             @if (editorCampaignId()) {
-              <button class="btn btn-flat btn-sm" style="color:var(--danger);" type="button" (click)="deleteCampaign()">
-                <tui-icon icon="@tui.trash-2" style="font-size:14px;" />
+              <button
+                class="btn btn-flat btn-sm"
+                style="color: var(--danger)"
+                type="button"
+                (click)="deleteCampaign()"
+              >
+                <tui-icon icon="@tui.trash-2" style="font-size: 14px" />
                 Supprimer
               </button>
             }
-            <div style="flex:1;"></div>
-            <button class="btn btn-flat btn-sm" type="button" (click)="closeEditor()">Annuler</button>
-            <button class="btn btn-secondary btn-sm" type="button" [disabled]="editorSaving()" (click)="save(false)">
-              @if (editorSaving()) { <span class="spinner"></span> }
+            <div style="flex: 1"></div>
+            <button class="btn btn-flat btn-sm" type="button" (click)="closeEditor()">
+              Annuler
+            </button>
+            <button
+              class="btn btn-secondary btn-sm"
+              type="button"
+              [disabled]="editorSaving() || isDurationExceeded()"
+              (click)="save(false)"
+            >
+              @if (editorSaving()) {
+                <span class="spinner"></span>
+              }
               Enregistrer
             </button>
-            <button class="btn btn-primary btn-sm" type="button" [disabled]="editorSaving()" (click)="save(true)">
+            <button
+              class="btn btn-primary btn-sm"
+              type="button"
+              [disabled]="editorSaving() || isDurationExceeded()"
+              (click)="save(true)"
+            >
               Activer
-              <tui-icon icon="@tui.check" style="font-size:14px;" />
+              <tui-icon icon="@tui.check" style="font-size: 14px" />
             </button>
           </div>
         </div>
@@ -128,7 +269,6 @@
 
       <!-- ── Right: Banner + Preview + Validation ── -->
       <div class="campaign-editor-col">
-
         <!-- Banner upload -->
         <div class="card">
           <div class="card-header">
@@ -136,40 +276,80 @@
           </div>
           <div class="card-body">
             @if (editorHasBanner()) {
-              <div style="display:flex; flex-direction:column; gap:12px;">
+              <div style="display: flex; flex-direction: column; gap: 12px">
                 <!-- Banner preview -->
-                <div class="campaign-banner-preview"
-                     [class.campaign-banner-preview--header]="editorPosition() === 'header'"
-                     [class.campaign-banner-preview--footer]="editorPosition() === 'footer'">
+                <div class="campaign-banner-preview campaign-banner-preview--footer">
                   @if (editorBannerUrl()) {
-                    <img [src]="editorBannerUrl()" alt=""
-                         style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />
+                    <img
+                      [src]="editorBannerUrl()"
+                      alt=""
+                      style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit"
+                    />
                   } @else {
-                    <span style="font-size:11px; color:rgba(255,255,255,0.6);">Bannière</span>
+                    <span
+                      style="
+                        font-size: 11px;
+                        color: var(--fg-3);
+                        letter-spacing: 0.08em;
+                        text-transform: uppercase;
+                      "
+                      >Bannière</span
+                    >
                   }
                 </div>
                 <!-- File info + replace -->
-                <div style="display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--fg-2);">
-                  <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px;">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    font-size: 12px;
+                    color: var(--fg-2);
+                  "
+                >
+                  <span
+                    style="
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      max-width: 160px;
+                    "
+                  >
                     {{ editorImageName() }}
                     @if (editorImageSizeKb() > 0) {
                       · {{ editorImageSizeKb() }} Ko
-                      @if (editorImageSizeKb() > 150) { <span style="color:var(--danger);"> ⚠ &gt; 150 Ko</span> }
+                      @if (editorImageSizeKb() > 150) {
+                        <span style="color: var(--danger)"> ⚠ &gt; 150 Ko</span>
+                      }
                     }
                   </span>
-                  <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
-                    <tui-icon icon="@tui.refresh-cw" style="font-size:13px;" />
+                  <label class="btn btn-secondary btn-sm" style="cursor: pointer">
+                    <tui-icon icon="@tui.refresh-cw" style="font-size: 13px" />
                     Remplacer
-                    <input type="file" accept="image/*" style="display:none;" (change)="onBannerChange($event)" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style="display: none"
+                      (change)="onBannerChange($event)"
+                    />
                   </label>
                 </div>
               </div>
             } @else {
               <label class="campaign-upload-zone">
-                <tui-icon icon="@tui.image" style="font-size:28px; color:var(--fg-3);" />
-                <span style="font-size:13px; color:var(--fg-2); margin-top:8px;">Cliquer pour ajouter une bannière</span>
-                <span class="field-hint" style="margin-top:2px;">Format paysage recommandé · ≤ 150 Ko · JPEG ou PNG</span>
-                <input type="file" accept="image/*" style="display:none;" (change)="onBannerChange($event)" />
+                <tui-icon icon="@tui.image" style="font-size: 28px; color: var(--fg-3)" />
+                <span style="font-size: 13px; color: var(--fg-2); margin-top: 8px"
+                  >Cliquer pour ajouter une bannière</span
+                >
+                <span class="field-hint" style="margin-top: 2px"
+                  >Format paysage recommandé · ≤ 150 Ko · JPEG ou PNG</span
+                >
+                <input
+                  type="file"
+                  accept="image/*"
+                  style="display: none"
+                  (change)="onBannerChange($event)"
+                />
               </label>
             }
           </div>
@@ -180,28 +360,23 @@
           <div class="card-header">
             <div class="card-title">Aperçu de position</div>
           </div>
-          <div style="padding:16px; display:flex; justify-content:center;">
+          <div style="padding: 16px; display: flex; justify-content: center">
             <div class="mobile-preview">
               <div class="mobile-preview__inner">
-                @if (editorPosition() === 'header') {
-                  <div class="mobile-preview__banner mobile-preview__banner--header">
-                    @if (editorBannerUrl()) {
-                      <img [src]="editorBannerUrl()" alt="" style="width:100%; height:100%; object-fit:cover;" />
-                    } @else {
-                      <span style="font-size:8px; font-weight:700; letter-spacing:0.04em;">BANNIÈRE ENTÊTE</span>
-                    }
-                  </div>
-                }
                 <div class="mobile-preview__content"></div>
-                @if (editorPosition() === 'footer') {
-                  <div class="mobile-preview__banner mobile-preview__banner--footer">
-                    @if (editorBannerUrl()) {
-                      <img [src]="editorBannerUrl()" alt="" style="width:100%; height:100%; object-fit:cover;" />
-                    } @else {
-                      <span style="font-size:8px; font-weight:700; letter-spacing:0.04em;">BANNIÈRE PIED</span>
-                    }
-                  </div>
-                }
+                <div class="mobile-preview__banner mobile-preview__banner--footer">
+                  @if (editorBannerUrl()) {
+                    <img
+                      [src]="editorBannerUrl()"
+                      alt=""
+                      style="width: 100%; height: 100%; object-fit: cover"
+                    />
+                  } @else {
+                    <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.04em"
+                      >BANNIÈRE PIED</span
+                    >
+                  }
+                </div>
               </div>
             </div>
           </div>
@@ -214,81 +389,330 @@
           </div>
           <div>
             @for (item of validationItems(); track item.label; let i = $index) {
-              @let isDurationWarn = !item.ok && item.label.startsWith('Durée');
               <div class="campaign-validation-row" [class.campaign-validation-row--first]="i === 0">
-                <span class="campaign-validation-dot"
-                      [class.campaign-validation-dot--ok]="item.ok"
-                      [class.campaign-validation-dot--warn]="!item.ok && !isDurationWarn"
-                      [class.campaign-validation-dot--duration]="isDurationWarn">
-                  @if (item.ok) { <tui-icon icon="@tui.check" style="font-size:11px;" /> }
-                  @else         { <tui-icon icon="@tui.clock" style="font-size:11px;" /> }
+                <span
+                  class="campaign-validation-dot"
+                  [class.campaign-validation-dot--ok]="item.ok && !item.kind"
+                  [class.campaign-validation-dot--warn]="item.ok && item.kind === 'warn'"
+                  [class.campaign-validation-dot--pending]="!item.ok && item.kind !== 'error'"
+                  [class.campaign-validation-dot--error]="item.kind === 'error'"
+                >
+                  @if (item.ok && !item.kind) {
+                    <tui-icon icon="@tui.check" style="font-size: 11px" />
+                  } @else if (item.kind === 'warn') {
+                    <tui-icon icon="@tui.alert-triangle" style="font-size: 11px" />
+                  } @else if (item.kind === 'error') {
+                    <tui-icon icon="@tui.x" style="font-size: 11px" />
+                  } @else {
+                    <tui-icon icon="@tui.clock" style="font-size: 11px" />
+                  }
                 </span>
-                <span [style.color]="item.ok ? 'var(--fg-1)' : isDurationWarn ? 'var(--warning)' : 'var(--fg-2)'">{{ item.label }}</span>
+                <span
+                  [style.color]="
+                    item.kind === 'error'
+                      ? 'var(--danger)'
+                      : item.kind === 'warn'
+                        ? 'var(--warning)'
+                        : item.ok
+                          ? 'var(--fg-1)'
+                          : 'var(--fg-2)'
+                  "
+                >
+                  {{ item.label }}
+                </span>
               </div>
             }
           </div>
         </div>
-
       </div>
     </div>
   </div>
-
 } @else {
-
   <!-- ══ LIST VIEW ══ -->
   <div class="campaigns-page">
-
     <!-- ── KPI strip ── -->
-    <div class="kpi-grid" style="margin-bottom:16px;">
-      <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Campagnes actives</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--success);">{{ stats().active }}</div>
-        <div style="margin-top:10px; font-size:12px; color:var(--fg-3);">{{ stats().header }} entête · {{ stats().footer }} pied</div>
+    <div class="kpi-grid" style="margin-bottom: 16px">
+      <div class="card" style="padding: 18px 20px">
+        <div
+          style="
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Actives
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 34px;
+            font-weight: 600;
+            margin-top: 6px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: var(--success);
+          "
+        >
+          {{ stats().active }}
+        </div>
+        <div style="margin-top: 10px">
+          <span class="badge badge-success badge-dot">en cours</span>
+        </div>
       </div>
-      <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Planifiées</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--info);">{{ stats().scheduled }}</div>
-        <div style="margin-top:10px;"><span class="badge badge-info">à venir</span></div>
+      <div class="card" style="padding: 18px 20px">
+        <div
+          style="
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Planifiées
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 34px;
+            font-weight: 600;
+            margin-top: 6px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: var(--info);
+          "
+        >
+          {{ stats().planifiee }}
+        </div>
+        <div style="margin-top: 10px"><span class="badge badge-info">à venir</span></div>
       </div>
-      <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Terminées</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--fg-3);">{{ stats().ended }}</div>
-        <div style="margin-top:10px;"><span class="badge">archivées</span></div>
+      <div class="card" style="padding: 18px 20px">
+        <div
+          style="
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Terminées
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 34px;
+            font-weight: 600;
+            margin-top: 6px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: var(--fg-3);
+          "
+        >
+          {{ stats().terminee }}
+        </div>
+        <div style="margin-top: 10px"><span class="badge">archivées</span></div>
       </div>
-      <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Jours couverts</div>
-        <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1;">{{ stats().totalDays }}</div>
-        <div style="margin-top:10px; font-size:12px; color:var(--fg-3);">campagnes actives uniquement</div>
+      <div class="card" style="padding: 18px 20px">
+        <div
+          style="
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Jours couverts
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 34px;
+            font-weight: 600;
+            margin-top: 6px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: var(--accent);
+          "
+        >
+          {{ stats().totalDays }}
+        </div>
+        <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">
+          campagnes actives uniquement
+        </div>
       </div>
     </div>
 
-    <!-- ── Toolbar ── -->
-    <div class="card" style="padding:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-      <div class="input-group" style="width:300px;">
-        <span class="input-icon">&#128269;</span>
-        <input class="input has-icon" placeholder="Rechercher une campagne, un annonceur…"
-               [value]="searchQuery()" (input)="setSearchQuery($any($event.target).value)"
-               style="height:36px; font-size:13px;">
+    @if (stats().startingSoonUnvalidated > 0) {
+      <div class="card" style="padding: 14px 18px; margin-bottom: 16px; border-left: 3px solid var(--warning); background: rgba(245, 158, 11, 0.06);">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <strong style="font-size: 13px; color: var(--warning);">
+            ⚠ {{ stats().startingSoonUnvalidated }} campagne(s) démarrent dans ≤ 10 jours et ne sont pas validées
+          </strong>
+          <span style="font-size: 12px; color: var(--fg-3);">
+            Sans validation (paiement + confirmation managériale), elles ne seront pas diffusées sur mobile.
+          </span>
+          <div style="flex: 1;"></div>
+          <button class="btn btn-secondary btn-sm" type="button" (click)="setFilterValidation('pending')">
+            Voir les non validées
+          </button>
+        </div>
       </div>
-      <select class="select" style="width:160px; height:36px; font-size:13px;"
-              [value]="selectedPosition()" (change)="setSelectedPosition($any($event.target).value)">
-        <option value="all">Toutes positions</option>
-        <option value="header">Entête</option>
-        <option value="footer">Pied de page</option>
-      </select>
-      <select class="select" style="width:140px; height:36px; font-size:13px;"
-              [value]="selectedStatus()" (change)="setSelectedStatus($any($event.target).value)">
-        <option value="all">Tous statuts</option>
-        <option value="active">Active</option>
-        <option value="scheduled">Planifiée</option>
-        <option value="ended">Terminée</option>
-        <option value="inactive">Inactive</option>
-      </select>
-      <div style="flex:1;"></div>
-      <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
-        <tui-icon icon="@tui.plus" style="font-size:14px;" />
-        Nouvelle campagne
-      </button>
+    }
+
+    <!-- ── Toolbar ── -->
+    <div
+      class="card"
+      style="padding: 14px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px"
+    >
+      <!-- Row 1: search + status + add button -->
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <div class="input-group" style="width: 280px">
+          <span class="input-icon">&#128269;</span>
+          <input
+            class="input has-icon"
+            placeholder="Campagne, annonceur…"
+            [value]="searchQuery()"
+            (input)="setSearchQuery($any($event.target).value)"
+            style="height: 36px; font-size: 13px"
+          />
+        </div>
+        <select
+          class="select"
+          style="width: 130px; height: 36px; font-size: 13px"
+          (change)="setSelectedStatus($any($event.target).value)"
+        >
+          <option value="all" [selected]="selectedStatus() === 'all'">Tous statuts</option>
+          <option value="active" [selected]="selectedStatus() === 'active'">Active</option>
+          <option value="planifiee" [selected]="selectedStatus() === 'planifiee'">Planifiée</option>
+          <option value="terminee" [selected]="selectedStatus() === 'terminee'">Terminée</option>
+        </select>
+        <select
+          class="select"
+          style="width: 170px; height: 36px; font-size: 13px"
+          (change)="setFilterCompanyId($any($event.target).value)"
+        >
+          <option value="all" [selected]="filterCompanyId() === 'all'">Toutes compagnies</option>
+          @for (co of companies(); track co.id) {
+            <option [value]="co.id" [selected]="filterCompanyId() === co.id">{{ co.name }}</option>
+          }
+        </select>
+        <select
+          class="select"
+          style="width: 170px; height: 36px; font-size: 13px"
+          (change)="setFilterDomain($any($event.target).value)"
+        >
+          <option value="all" [selected]="filterDomain() === 'all'">Tous domaines</option>
+          @for (d of availableDomains(); track d) {
+            <option [value]="d" [selected]="filterDomain() === d">{{ d }}</option>
+          }
+        </select>
+        <select
+          class="select"
+          style="width: 110px; height: 36px; font-size: 13px"
+          (change)="setFilterMonth($any($event.target).value)"
+        >
+          <option value="all" [selected]="filterMonth() === 'all'">Tous mois</option>
+          <option value="01" [selected]="filterMonth() === '01'">Janvier</option>
+          <option value="02" [selected]="filterMonth() === '02'">Février</option>
+          <option value="03" [selected]="filterMonth() === '03'">Mars</option>
+          <option value="04" [selected]="filterMonth() === '04'">Avril</option>
+          <option value="05" [selected]="filterMonth() === '05'">Mai</option>
+          <option value="06" [selected]="filterMonth() === '06'">Juin</option>
+          <option value="07" [selected]="filterMonth() === '07'">Juillet</option>
+          <option value="08" [selected]="filterMonth() === '08'">Août</option>
+          <option value="09" [selected]="filterMonth() === '09'">Septembre</option>
+          <option value="10" [selected]="filterMonth() === '10'">Octobre</option>
+          <option value="11" [selected]="filterMonth() === '11'">Novembre</option>
+          <option value="12" [selected]="filterMonth() === '12'">Décembre</option>
+        </select>
+        <select
+          class="select"
+          style="width: 100px; height: 36px; font-size: 13px"
+          (change)="setFilterYear($any($event.target).value)"
+        >
+          <option value="all" [selected]="filterYear() === 'all'">Toutes années</option>
+          @for (y of availableFilterYears(); track y) {
+            <option [value]="y" [selected]="filterYear() === y">{{ y }}</option>
+          }
+        </select>
+        <select
+          class="select"
+          style="width: 150px; height: 36px; font-size: 13px"
+          (change)="setFilterValidation($any($event.target).value)"
+        >
+          <option value="all"       [selected]="filterValidation() === 'all'">Toutes validations</option>
+          <option value="pending"   [selected]="filterValidation() === 'pending'">À valider</option>
+          <option value="paid"      [selected]="filterValidation() === 'paid'">Payées</option>
+          <option value="confirmed" [selected]="filterValidation() === 'confirmed'">Confirmées</option>
+          <option value="validated" [selected]="filterValidation() === 'validated'">Validées</option>
+        </select>
+        <div style="flex: 1"></div>
+        <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
+          <tui-icon icon="@tui.plus" style="font-size: 14px" />
+          Nouvel encart
+        </button>
+      </div>
+      <!-- Row 2: date range filters -->
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+        <span style="font-size: 12px; font-weight: 600; color: var(--fg-3); white-space: nowrap"
+          >Activation :</span
+        >
+        <input
+          class="input"
+          type="date" lang="fr-FR"
+          style="height: 32px; font-size: 12px; width: 140px"
+          [value]="filterActivationFrom()"
+          (change)="setActivationFrom($any($event.target).value)"
+        />
+        <span style="font-size: 12px; color: var(--fg-3)">→</span>
+        <input
+          class="input"
+          type="date" lang="fr-FR"
+          style="height: 32px; font-size: 12px; width: 140px"
+          [value]="filterActivationTo()"
+          (change)="setActivationTo($any($event.target).value)"
+        />
+        <span
+          style="
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--fg-3);
+            white-space: nowrap;
+            margin-left: 8px;
+          "
+          >Création :</span
+        >
+        <input
+          class="input"
+          type="date" lang="fr-FR"
+          style="height: 32px; font-size: 12px; width: 140px"
+          [value]="filterCreatedFrom()"
+          (change)="setCreatedFrom($any($event.target).value)"
+        />
+        <span style="font-size: 12px; color: var(--fg-3)">→</span>
+        <input
+          class="input"
+          type="date" lang="fr-FR"
+          style="height: 32px; font-size: 12px; width: 140px"
+          [value]="filterCreatedTo()"
+          (change)="setCreatedTo($any($event.target).value)"
+        />
+        @if (hasDateFilters()) {
+          <button
+            class="btn btn-flat btn-sm"
+            type="button"
+            (click)="clearDateFilters()"
+            style="font-size: 12px; color: var(--fg-3)"
+          >
+            <tui-icon icon="@tui.x" style="font-size: 12px" />
+            Effacer
+          </button>
+        }
+      </div>
     </div>
 
     <!-- ── Campaigns table ── -->
@@ -297,63 +721,167 @@
         <thead>
           <tr>
             <th>Campagne</th>
-            <th style="width:100px;">Position</th>
-            <th style="width:200px;">Période</th>
-            <th style="width:80px; text-align:center;">Durée</th>
-            <th style="width:110px;">Statut</th>
-            <th style="width:60px;"></th>
+            <th style="width: 200px">Période</th>
+            <th style="width: 80px; text-align: center">Durée</th>
+            <th style="width: 110px">Statut</th>
+            <th style="width: 140px">Validation</th>
+            <th style="width: 60px"></th>
           </tr>
         </thead>
         <tbody>
           @if (loading()) {
-            <tr><td colspan="6" style="text-align:center; color:var(--fg-3); padding:32px;">Chargement…</td></tr>
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--fg-3); padding: 32px">
+                Chargement…
+              </td>
+            </tr>
           } @else if (listRows().length === 0) {
-            <tr><td colspan="6" style="text-align:center; color:var(--fg-3); padding:32px; font-style:italic;">Aucune campagne trouvée</td></tr>
+            <tr>
+              <td
+                colspan="6"
+                style="text-align: center; color: var(--fg-3); padding: 32px; font-style: italic"
+              >
+                Aucune campagne trouvée
+              </td>
+            </tr>
           } @else {
             @for (row of paginatedRows(); track row.id) {
-              <tr style="cursor:pointer;" (click)="openEditor(row.id)">
+              <tr style="cursor: pointer" (click)="openEditor(row.id)">
                 <td>
-                  <div style="display:flex; align-items:center; gap:12px;">
+                  <div style="display: flex; align-items: center; gap: 12px">
                     @if (row.imagePath) {
-                      <img [src]="campaignService.getBannerUrl(row.imagePath)" alt=""
-                           style="width:48px; height:28px; object-fit:cover; border-radius:4px; flex:none;" />
+                      <img
+                        [src]="campaignService.getBannerUrl(row.imagePath!)"
+                        alt=""
+                        style="
+                          width: 48px;
+                          height: 28px;
+                          object-fit: cover;
+                          border-radius: 4px;
+                          flex: none;
+                        "
+                      />
                     } @else {
-                      <div style="width:48px; height:28px; border-radius:4px; background:var(--bg-sunken); display:flex; align-items:center; justify-content:center; flex:none;">
-                        <tui-icon icon="@tui.image-off" style="font-size:14px; color:var(--fg-4);" />
+                      <div
+                        style="
+                          width: 48px;
+                          height: 28px;
+                          border-radius: 4px;
+                          background: var(--bg-sunken);
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          flex: none;
+                        "
+                      >
+                        <tui-icon
+                          icon="@tui.image-off"
+                          style="font-size: 14px; color: var(--fg-4)"
+                        />
                       </div>
                     }
                     <div>
-                      <div style="font-weight:500;">{{ row.name }}</div>
-                      <div style="font-size:12px; color:var(--fg-3);">{{ row.advertiser }}</div>
+                      <div style="font-weight: 500">{{ row.name }}</div>
+                      <div style="font-size: 12px; color: var(--fg-3)">
+                        {{ row.companyName }}@if (row.businessDomain) { <span style="opacity: 0.7"> · {{ row.businessDomain }}</span> }
+                      </div>
                     </div>
                   </div>
                 </td>
-                <td>
-                  @if (row.position === 'header') {
-                    <span class="badge"><tui-icon icon="@tui.arrow-up" style="font-size:11px;" /> Entête</span>
-                  } @else {
-                    <span class="badge"><tui-icon icon="@tui.arrow-down" style="font-size:11px;" /> Pied</span>
-                  }
-                </td>
-                <td style="font-size:12.5px; color:var(--fg-2); font-variant-numeric:tabular-nums;">
+                <td
+                  style="font-size: 12.5px; color: var(--fg-2); font-variant-numeric: tabular-nums"
+                >
                   {{ formatDate(row.startDate) }} → {{ formatDate(row.endDate) }}
                 </td>
-                <td style="text-align:center; font-weight:600; font-variant-numeric:tabular-nums;">
-                  {{ row.startDate && row.endDate ? durationDays(row.startDate, row.endDate) : '—' }} j
+                <td
+                  style="text-align: center; font-weight: 600; font-variant-numeric: tabular-nums"
+                >
+                  {{
+                    row.startDate && row.endDate ? durationDays(row.startDate, row.endDate) : '—'
+                  }}
+                  j
                 </td>
                 <td>
                   @switch (row.status) {
-                    @case ('active')    { <span class="badge badge-success badge-dot">Active</span> }
-                    @case ('scheduled') { <span class="badge badge-info badge-dot">Planifiée</span> }
-                    @case ('ended')     { <span class="badge badge-dot">Terminée</span> }
-                    @default            { <span class="badge badge-warning">Inactive</span> }
+                    @case ('active') {
+                      <span class="badge badge-success badge-dot">Active</span>
+                    }
+                    @case ('planifiee') {
+                      <span class="badge badge-info badge-dot">Planifiée</span>
+                    }
+                    @case ('terminee') {
+                      <span class="badge badge-dot">Terminée</span>
+                    }
                   }
                 </td>
                 <td>
-                  <button class="btn btn-flat btn-icon btn-sm" type="button"
-                          (click)="$event.stopPropagation(); openEditor(row.id)">
-                    <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
-                  </button>
+                  <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+                    @switch (row.validation) {
+                      @case ('validated') {
+                        <span class="badge badge-success" title="Paiement + confirmation managériale enregistrés">
+                          <tui-icon icon="@tui.check" style="font-size: 11px" />
+                          Validée
+                        </span>
+                      }
+                      @case ('paid') {
+                        <span class="badge badge-info" title="Payée — en attente de confirmation managériale">
+                          Payée
+                        </span>
+                      }
+                      @case ('confirmed') {
+                        <span class="badge badge-info" title="Confirmée — en attente de paiement">
+                          Confirmée
+                        </span>
+                      }
+                      @case ('pending') {
+                        <span class="badge badge-warning" title="Ni payée ni confirmée — mobile ne diffusera pas">
+                          À valider
+                        </span>
+                      }
+                    }
+                    @if (row.validation !== 'validated' && row.daysUntilStart >= 0 && row.daysUntilStart <= 10) {
+                      <span
+                        class="badge badge-warning"
+                        [title]="'Démarre dans ' + row.daysUntilStart + ' j et n\'est pas validée'"
+                        style="font-size: 10.5px"
+                      >
+                        ⏰ J-{{ row.daysUntilStart }}
+                      </span>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <div style="display: flex; gap: 4px; justify-content: flex-end">
+                    @if (canValidate() && row.validation !== 'validated') {
+                      @if (row.validation === 'pending' || row.validation === 'confirmed') {
+                        <button
+                          class="btn btn-flat btn-icon btn-sm"
+                          type="button"
+                          title="Marquer payée"
+                          (click)="$event.stopPropagation(); markPaidRow(row.id)"
+                        >
+                          <tui-icon icon="@tui.banknote" style="font-size: 14px" />
+                        </button>
+                      }
+                      @if (row.validation === 'pending' || row.validation === 'paid') {
+                        <button
+                          class="btn btn-flat btn-icon btn-sm"
+                          type="button"
+                          title="Confirmer (manager)"
+                          (click)="$event.stopPropagation(); confirmRow(row.id)"
+                        >
+                          <tui-icon icon="@tui.check-check" style="font-size: 14px" />
+                        </button>
+                      }
+                    }
+                    <button
+                      class="btn btn-flat btn-icon btn-sm"
+                      type="button"
+                      (click)="$event.stopPropagation(); openEditor(row.id)"
+                    >
+                      <tui-icon icon="@tui.chevron-right" style="font-size: 14px" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             }
@@ -363,22 +891,76 @@
 
       <!-- Pagination -->
       @if (totalPages() > 1) {
-        <div style="display:flex; align-items:center; justify-content:flex-end; gap:12px; padding:12px 16px; border-top:1px solid var(--border);">
-          <span style="font-size:13px; color:var(--fg-3);">
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+          "
+        >
+          <span style="font-size: 13px; color: var(--fg-3)">
             Page {{ currentPage() + 1 }} / {{ totalPages() }} · {{ listRows().length }} campagnes
           </span>
-          <button class="btn btn-flat btn-sm" type="button" [disabled]="currentPage() === 0" (click)="prevPage()">
-            <tui-icon icon="@tui.chevron-left" style="font-size:14px;" />
+          <button
+            class="btn btn-flat btn-sm"
+            type="button"
+            [disabled]="currentPage() === 0"
+            (click)="prevPage()"
+          >
+            <tui-icon icon="@tui.chevron-left" style="font-size: 14px" />
             Précédent
           </button>
-          <button class="btn btn-flat btn-sm" type="button" [disabled]="currentPage() >= totalPages() - 1" (click)="nextPage()">
+          <button
+            class="btn btn-flat btn-sm"
+            type="button"
+            [disabled]="currentPage() >= totalPages() - 1"
+            (click)="nextPage()"
+          >
             Suivant
-            <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+            <tui-icon icon="@tui.chevron-right" style="font-size: 14px" />
           </button>
         </div>
       }
     </div>
-
   </div>
+}
 
+<!-- ── Overlap confirmation dialog ─────────────────────────────────────── -->
+@if (overlapDialogVisible()) {
+  <div class="modal-backdrop" (click)="cancelOverlap()">
+    <div class="modal" style="max-width:520px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin:0; font-size:16px;">Conflit de période détecté</h3>
+        <button class="btn btn-flat btn-sm" type="button" (click)="cancelOverlap()" aria-label="Fermer">
+          <tui-icon icon="@tui.x" style="font-size:14px;" />
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="margin:0 0 12px 0; font-size:13.5px; color:var(--fg-2);">
+          Cette campagne couvre des jours déjà occupés par
+          {{ overlapList().length }} campagne(s) active(s). La campagne la plus
+          récemment modifiée sera affichée sur les jours qui se chevauchent.
+        </p>
+        <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--fg-2);">
+          @for (c of overlapList(); track c.id) {
+            <li>
+              <strong>{{ c.name }}</strong> ({{ c.company?.name ?? '—' }}) —
+              {{ formatDate(c.start_date) }} → {{ formatDate(c.end_date) }}
+            </li>
+          }
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="cancelOverlap()">
+          Annuler
+        </button>
+        <button class="btn btn-primary btn-sm" type="button" (click)="confirmOverlap()">
+          Continuer quand même
+        </button>
+      </div>
+    </div>
+  </div>
 }

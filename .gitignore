@@ -64,7 +64,17 @@ Thumbs.db
 /CLAUDE.md
 /.claude
 /.vscode
+/repo-dump.txt
 /.gitignore
 /sprint1-lab
 /design
 /dad-cms-0.0.0.tgz
+/DayAfterDayBrazzaville Congo.xlsm
+
+# One-shot recovery / scratch artifacts from the Excel-import incident
+# (see EXCEL_IMPORT_INCIDENT.md). The scripts themselves stay in the repo,
+# but the data dumps they produced are local-only.
+/recovery-data.json
+/recovery-chunks.json
+/recovery-report.json
+/.recovery-tmp/

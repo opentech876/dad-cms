@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { roleGuard } from './core/auth/role.guard';
+import { systemAdminGuard } from './core/auth/system-admin.guard';
 import { onboardingGuard } from './core/onboarding/onboarding.guard';
 
 export const routes: Routes = [
@@ -12,11 +13,6 @@ export const routes: Routes = [
       import('./features/landing/landing.component').then((m) => m.LandingComponent),
   },
   {
-    path: 'demarrer',
-    loadComponent: () =>
-      import('./features/onboarding/email-step.component').then((m) => m.EmailStepComponent),
-  },
-  {
     path: 'verifier',
     loadComponent: () =>
       import('./features/onboarding/otp-step.component').then((m) => m.OtpStepComponent),
@@ -25,6 +21,34 @@ export const routes: Routes = [
     path: 'login',
     loadComponent: () =>
       import('./features/auth/login/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'mot-de-passe-oublie',
+    loadComponent: () =>
+      import('./features/auth/forgot-password/forgot-password.component').then(
+        (m) => m.ForgotPasswordComponent,
+      ),
+  },
+  {
+    path: 'reinitialiser-mot-de-passe',
+    loadComponent: () =>
+      import('./features/auth/reset-password/reset-password.component').then(
+        (m) => m.ResetPasswordComponent,
+      ),
+  },
+  {
+    path: 'email-confirme',
+    loadComponent: () =>
+      import('./features/auth/email-confirmed/email-confirmed.component').then(
+        (m) => m.EmailConfirmedComponent,
+      ),
+  },
+  {
+    path: 'verifier-2fa',
+    loadComponent: () =>
+      import('./features/auth/mfa-challenge/mfa-challenge.component').then(
+        (m) => m.MfaChallengeComponent,
+      ),
   },
 
   // ── Workspace (auth requise, pas d'onboardingGuard — c'est la destination) ─
@@ -72,11 +96,18 @@ export const routes: Routes = [
       {
         path: 'campagnes',
         canActivate: [roleGuard],
-        data: { requiredRoles: ['owner', 'chef_equipe', 'charge_communication'] },
+        data: { requiredRoles: ['owner', 'chef_equipe', 'charge_communication', 'chef_equipe_commerciale'] },
         loadComponent: () =>
           import('./features/ad-campaigns/ad-campaigns.component').then(
             (m) => m.AdCampaignsComponent,
           ),
+      },
+      {
+        path: 'compagnies',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['owner', 'chef_equipe_commerciale', 'charge_communication'] },
+        loadComponent: () =>
+          import('./features/companies/companies.component').then((m) => m.CompaniesComponent),
       },
       {
         path: 'utilisateurs',
@@ -86,9 +117,38 @@ export const routes: Routes = [
           import('./features/users/users.component').then((m) => m.UsersComponent),
       },
       {
+        path: 'recommandations',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['owner', 'presidence'] },
+        loadComponent: () =>
+          import('./features/presidence/recommandations.component').then((m) => m.RecommandationsComponent),
+      },
+      {
         path: 'metriques',
         loadComponent: () =>
           import('./features/metriques/metriques.component').then((m) => m.MetriquesComponent),
+      },
+      {
+        path: 'recherche',
+        loadComponent: () =>
+          import('./features/search/search.component').then((m) => m.SearchComponent),
+      },
+      {
+        path: 'admin',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
+          import('./features/admin/admin.component').then((m) => m.AdminComponent),
+      },
+      {
+        path: 'admin/utilisateurs',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
+          import('./features/admin/admin-users.component').then((m) => m.AdminUsersComponent),
+      },
+      {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./features/notifications/notifications.component').then((m) => m.NotificationsComponent),
       },
       {
         path: 'profil',

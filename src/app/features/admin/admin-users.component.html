@@ -1,0 +1,135 @@
+<div class="admin-users-page">
+
+  <div class="admin-header">
+    <div>
+      <h2 class="admin-title">Utilisateurs de la plateforme</h2>
+      <p class="admin-subtitle">
+        Vue globale de tous les comptes, tous espaces de travail confondus.
+        Inclut les invitations en attente et les administrateurs plateforme.
+      </p>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="admin-loading">
+      <span class="spinner"></span>
+      Chargement des utilisateurs…
+    </div>
+  } @else {
+
+    <!-- KPI strip -->
+    <div class="admin-users-kpi-grid">
+      <div class="admin-users-kpi">
+        <div class="admin-users-kpi-label">Comptes</div>
+        <div class="admin-users-kpi-value">{{ totalCount() }}</div>
+      </div>
+      <div class="admin-users-kpi">
+        <div class="admin-users-kpi-label">Admins plateforme</div>
+        <div class="admin-users-kpi-value" style="color:var(--accent);">{{ systemAdminCount() }}</div>
+      </div>
+      <div class="admin-users-kpi">
+        <div class="admin-users-kpi-label">Invitations en attente</div>
+        <div class="admin-users-kpi-value" style="color:var(--warning);">{{ pendingCount() }}</div>
+      </div>
+      <div class="admin-users-kpi">
+        <div class="admin-users-kpi-label">Sans espace</div>
+        <div class="admin-users-kpi-value" style="color:var(--danger);">{{ orphanCount() }}</div>
+      </div>
+    </div>
+
+    <!-- Search bar -->
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="input-group" style="flex:1; position:relative;">
+        <span class="input-icon"><tui-icon icon="@tui.search" style="font-size:14px;" /></span>
+        <input
+          class="input has-icon"
+          type="text"
+          placeholder="Rechercher par e-mail, nom ou espace de travail…"
+          [value]="searchQuery()"
+          (input)="searchQuery.set($any($event.target).value)"
+        />
+      </div>
+      <span style="font-size:12.5px; color:var(--fg-3);">{{ filteredUsers().length }} sur {{ totalCount() }}</span>
+    </div>
+
+    <!-- Users table -->
+    <div class="card">
+      @if (filteredUsers().length === 0) {
+        <div class="admin-empty">
+          <tui-icon icon="@tui.users" style="font-size:24px; color:var(--fg-3);" />
+          <p>Aucun utilisateur ne correspond à cette recherche.</p>
+        </div>
+      } @else {
+        <div class="table-wrap" style="border-radius:0; border:none; box-shadow:none;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Utilisateur</th>
+                <th>Rôle plateforme</th>
+                <th>Espaces de travail</th>
+                <th>Statut</th>
+                <th>Créé le</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (user of filteredUsers(); track user.user_id) {
+                <tr>
+                  <td>
+                    <div style="display:flex; flex-direction:column;">
+                      <span style="font-weight:500;">{{ user.display_name ?? user.email ?? '—' }}</span>
+                      @if (user.display_name && user.email) {
+                        <span style="font-size:11.5px; color:var(--fg-3);">{{ user.email }}</span>
+                      }
+                    </div>
+                  </td>
+                  <td>
+                    @if (user.global_role === 'system_admin') {
+                      <span class="badge badge-success" style="font-size:11px;">Admin plateforme</span>
+                    } @else if (user.global_role) {
+                      <span class="badge" style="font-size:11px;">{{ user.global_role }}</span>
+                    } @else {
+                      <span style="color:var(--fg-3);">—</span>
+                    }
+                  </td>
+                  <td>
+                    @if (user.memberships.length === 0) {
+                      <span class="badge badge-warning" style="font-size:11px;">Aucun</span>
+                    } @else {
+                      <div style="display:flex; flex-wrap:wrap; gap:4px; max-width:340px;">
+                        @for (m of user.memberships; track m.workspace_id) {
+                          <span class="badge"
+                                style="font-size:11px;"
+                                [class.badge-success]="m.role === 'owner'"
+                                [style.opacity]="m.deleted ? '0.5' : '1'"
+                                [attr.title]="m.role + (m.deleted ? ' · espace supprimé' : '')">
+                            {{ m.workspace_name }} · {{ m.role }}
+                          </span>
+                        }
+                      </div>
+                    }
+                  </td>
+                  <td>
+                    @if (user.banned) {
+                      <span class="badge badge-danger badge-dot" style="font-size:11px;">Bloqué</span>
+                    } @else if (!user.email_confirmed_at) {
+                      <span class="badge badge-warning badge-dot" style="font-size:11px;">En attente</span>
+                    } @else {
+                      <span class="badge badge-success badge-dot" style="font-size:11px;">Actif</span>
+                    }
+                  </td>
+                  <td style="font-size:12.5px; color:var(--fg-3);">
+                    @if (user.created_at) {
+                      {{ user.created_at | date:'d MMM yyyy':'':'fr' }}
+                    } @else {
+                      —
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+</div>

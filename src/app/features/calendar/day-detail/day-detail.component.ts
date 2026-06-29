@@ -1,19 +1,21 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { SlicePipe } from '@angular/common';
+import { DatePipe, SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { EventService } from '../../../core/events/event.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../../core/calendar/calendar-entry.service';
-import { Event, EventPosition } from '../../../models';
-
-const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+import { CampaignService } from '../../../core/campaigns/campaign.service';
+import { AuthService } from '../../../core/auth/auth.service';
+import { AdCampaign, Event, EventPosition } from '../../../models';
+import { formatDateLong } from '../../../core/utils/date.utils';
+import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-day-detail',
   standalone: true,
-  imports: [TuiIcon, SlicePipe],
+  imports: [TuiIcon, SlicePipe, DatePipe],
   templateUrl: './day-detail.component.html',
 })
 export class DayDetailComponent implements OnInit {
@@ -21,7 +23,19 @@ export class DayDetailComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly eventService = inject(EventService);
   private readonly calendarEntryService = inject(CalendarEntryService);
+  private readonly campaignService = inject(CampaignService);
+  private readonly authService = inject(AuthService);
   private readonly toast = inject(ToastService);
+
+  /**
+   * True only for chef_equipe+ (i.e. chef_equipe or owner). Plain editeurs no
+   * longer assign events directly — they go through the Presidence apply flow
+   * on /calendrier. presidence + charge_communication also see a read-only view.
+   */
+  readonly canEditAssignments = toSignal(
+    this.authService.hasRoleAtLeast('chef_equipe'),
+    { initialValue: false },
+  );
 
   calendarId = '';
   date = '';       // full YYYY-MM-DD (calendar publication date)
@@ -40,35 +54,40 @@ export class DayDetailComponent implements OnInit {
 
   readonly saveLoading = signal(false);
 
+  /**
+   * Active campaigns whose date range covers this calendar date. Shown
+   * read-only so the editor can see which campaigns the mobile will
+   * automatically render on this day (the system has no per-day campaign
+   * assignment — coverage is purely date-range driven).
+   */
+  readonly availableCampaigns = signal<AdCampaign[]>([]);
+
   readonly event1 = computed(() => this.libraryEvents().find(e => e.id === this.selectedPos1()) ?? null);
   readonly event2 = computed(() => this.libraryEvents().find(e => e.id === this.selectedPos2()) ?? null);
 
-  readonly dateLabel = computed(() => {
-    const parts = this.date.split('-');
-    if (parts.length !== 3) return this.date;
-    const d = parseInt(parts[2], 10);
-    const m = parseInt(parts[1], 10) - 1;
-    const y = parseInt(parts[0], 10);
-    return `${d} ${MONTHS_FR[m]} ${y}`;
-  });
+  readonly dateLabel = computed(() => formatDateLong(this.date) || this.date);
 
   async ngOnInit(): Promise<void> {
     this.calendarId = this.route.snapshot.paramMap.get('calendarId') ?? '';
     this.date       = this.route.snapshot.paramMap.get('date') ?? '';
     this.mmdd       = this.date.slice(5); // 'MM-DD'
 
-    const [libEvents, allEntries] = await Promise.all([
+    const [libEvents, allEntries, allCampaigns] = await Promise.all([
       firstValueFrom(this.eventService.listEventsByMmdd(this.mmdd)),
       firstValueFrom(this.calendarEntryService.getEntriesForCalendar(this.calendarId)),
+      firstValueFrom(this.campaignService.listCampaigns()),
     ]);
 
     this.libraryEvents.set(libEvents);
 
     const dayEntries = allEntries.filter(e => e.mmdd === this.mmdd);
     this.entries.set(dayEntries);
-
     this.selectedPos1.set(dayEntries.find(e => e.position === 1)?.event_id ?? null);
     this.selectedPos2.set(dayEntries.find(e => e.position === 2)?.event_id ?? null);
+
+    this.availableCampaigns.set(
+      allCampaigns.filter(c => c.active && c.start_date <= this.date && c.end_date >= this.date),
+    );
   }
 
   assign(eventId: string | null, position: EventPosition): void {
@@ -78,6 +97,10 @@ export class DayDetailComponent implements OnInit {
 
   async save(): Promise<void> {
     if (this.saveLoading()) return;
+    if (!this.canEditAssignments()) {
+      this.toast.error('Les affectations sont gérées par la Présidence et appliquées par l\'équipe éditoriale.');
+      return;
+    }
     this.saveLoading.set(true);
 
     const ops: Promise<{ success: boolean; error?: string }>[] = [];

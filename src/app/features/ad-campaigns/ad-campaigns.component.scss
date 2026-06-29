@@ -93,7 +93,7 @@
   border-radius: 6px;
   background: var(--bg-sunken);
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--fg-3);
   font-size: 11px;
 
   &--header,
@@ -134,7 +134,7 @@
     justify-content: center;
     flex-shrink: 0;
     overflow: hidden;
-    color: rgba(0, 0, 0, 0.4);
+    color: var(--fg-3);
     letter-spacing: 0.03em;
     font-size: 8px;
     font-weight: 700;
@@ -187,7 +187,8 @@
   justify-content: center;
   flex-shrink: 0;
 
-  &--ok       { background: var(--success-soft); color: var(--success); }
-  &--warn     { background: var(--warning-soft); color: var(--warning); }
-  &--duration { background: var(--warning-soft); color: var(--warning); }
+  &--ok      { background: var(--success-soft); color: var(--success); }
+  &--warn    { background: var(--warning-soft); color: var(--warning); }
+  &--pending { background: var(--bg-sunken);    color: var(--fg-3); }
+  &--error   { background: var(--danger-soft);  color: var(--danger); }
 }

@@ -1,0 +1,61 @@
+.recommandations-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.day-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border: 1px solid var(--border-1);
+  background: var(--bg-elev);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.05s;
+  font: inherit;
+
+  &:hover {
+    border-color: var(--accent);
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  &--partial {
+    background: color-mix(in srgb, var(--warning) 8%, var(--bg-elev));
+    border-color: color-mix(in srgb, var(--warning) 40%, var(--border-1));
+  }
+
+  &--full {
+    background: color-mix(in srgb, var(--success) 10%, var(--bg-elev));
+    border-color: color-mix(in srgb, var(--success) 50%, var(--border-1));
+  }
+}
+
+.day-cell__num {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.day-cell__dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-1);
+
+  &--filled {
+    background: var(--accent);
+  }
+}

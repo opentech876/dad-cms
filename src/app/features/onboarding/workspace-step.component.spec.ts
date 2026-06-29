@@ -37,7 +37,7 @@ describe('WorkspaceStepComponent', () => {
 
     mockWorkspaceService = {
       getWorkspaceSummaries: jest.fn().mockReturnValue(of([MOCK_WORKSPACE])),
-      upsertProfile: jest.fn().mockReturnValue(of(undefined)),
+      upsertProfile: jest.fn().mockReturnValue(of({ success: true })),
       inviteUser: jest.fn().mockReturnValue(of({ success: true })),
     };
 

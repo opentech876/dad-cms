@@ -118,6 +118,124 @@
   width: min(560px, 95vw);
 }
 
+// ── Day detail modal ───────────────────────────────
+
+.day-modal-library {
+  padding-top: 16px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.day-modal-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+// ── Slot cards ─────────────────────────────────────
+
+.day-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.day-slot {
+  border-radius: var(--r-md);
+  padding: 14px;
+  border: 1.5px solid var(--border-2);
+  background: var(--bg-surface-2);
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+
+  &--filled {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  &--empty {
+    border-style: dashed;
+  }
+}
+
+.day-slot__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.day-slot__num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.day-slot__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  flex: 1;
+  min-width: 0;
+}
+
+.day-slot__event {
+  // event info inside filled slot
+}
+
+.day-slot__empty-msg {
+  font-size: 12.5px;
+  color: var(--fg-3);
+  font-style: italic;
+}
+
+// ── Library events list ────────────────────────────
+
+.day-events-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.day-event-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-1);
+  transition: background-color var(--dur-fast);
+  background: var(--bg-surface);
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--bg-surface-2); }
+}
+
+.day-event-row__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.day-event-row__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 // ── Radio option cards ─────────────────────────────
 
 .cal-options-group {

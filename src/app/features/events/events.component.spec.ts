@@ -12,7 +12,8 @@ const fakeEvents: Event[] = [
   {
     id: 'evt-1', event_date: '2025-08-15',
     title: 'Indépendance', status: 'published', workspace_id: 'ws-1',
-    description: null, image_path: null,
+    description: 'Proclamation officielle à Brazzaville', image_path: null,
+    source: 'Wikipédia', historian: 'Geovann Auguste NKOUKA',
     created_by: 'u1', created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z',
     updated_by: null, deleted_at: null, deleted_by: null,
   },
@@ -20,14 +21,15 @@ const fakeEvents: Event[] = [
     id: 'evt-2', event_date: '2025-11-28',
     title: 'Naissance de Marien Ngouabi', status: 'draft', workspace_id: 'ws-1',
     description: null, image_path: null,
+    source: null, historian: null,
     created_by: 'u1', created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z',
     updated_by: null, deleted_at: null, deleted_by: null,
   },
 ];
 
 const fakeCalendars = [
-  { id: 'cal-1', year: 2025, name: 'Calendrier 2025', status: 'published', eventCount: 0, campaignCount: 0 },
-  { id: 'cal-2', year: 2024, name: 'Calendrier 2024', status: 'archived',  eventCount: 0, campaignCount: 0 },
+  { id: 'cal-1', year: 2025, name: 'Calendrier 2025', status: 'published', eventCount: 0 },
+  { id: 'cal-2', year: 2024, name: 'Calendrier 2024', status: 'archived',  eventCount: 0 },
 ];
 
 describe('EventsComponent', () => {
@@ -280,6 +282,69 @@ describe('EventsComponent', () => {
     it('filtre par statut draft', () => {
       component.selectedStatus.set('draft');
       expect(component.listRows().length).toBe(1);
+    });
+
+    it('cherche dans la description', () => {
+      component.searchQuery.set('proclamation');
+      expect(component.listRows().length).toBe(1);
+      expect(component.listRows()[0].title).toBe('Indépendance');
+    });
+
+    it('cherche dans la source', () => {
+      component.searchQuery.set('wikipédia');
+      expect(component.listRows().length).toBe(1);
+    });
+
+    it("cherche dans l'historien (insensible à la casse et aux accents)", () => {
+      component.searchQuery.set('geovann');
+      expect(component.listRows().length).toBe(1);
+    });
+
+    it('cherche par nom de mois en français', () => {
+      // 2025-08-15 → "août"
+      component.searchQuery.set('août');
+      expect(component.listRows().length).toBe(1);
+      expect(component.listRows()[0].title).toBe('Indépendance');
+    });
+
+    it("cherche par format jj/mm/aaaa", () => {
+      component.searchQuery.set('15/08/2025');
+      expect(component.listRows().length).toBe(1);
+    });
+  });
+
+  describe('tri (sortBy)', () => {
+    it('par défaut, trie par date croissante', () => {
+      const rows = component.listRows();
+      expect(rows[0].title).toBe('Indépendance');       // 2025-08-15
+      expect(rows[1].title).toBe('Naissance de Marien Ngouabi'); // 2025-11-28
+    });
+
+    it('date_desc met le plus récent en premier', () => {
+      component.sortBy.set('date_desc');
+      const rows = component.listRows();
+      expect(rows[0].title).toBe('Naissance de Marien Ngouabi');
+      expect(rows[1].title).toBe('Indépendance');
+    });
+
+    it('title_asc trie par ordre alphabétique', () => {
+      component.sortBy.set('title_asc');
+      const rows = component.listRows();
+      expect(rows[0].title).toBe('Indépendance');
+      expect(rows[1].title).toBe('Naissance de Marien Ngouabi');
+    });
+
+    it('title_desc trie par ordre alphabétique inverse', () => {
+      component.sortBy.set('title_desc');
+      const rows = component.listRows();
+      expect(rows[0].title).toBe('Naissance de Marien Ngouabi');
+      expect(rows[1].title).toBe('Indépendance');
+    });
+
+    it('setSortBy remet la pagination à 0', () => {
+      component.currentPage.set(5);
+      component.setSortBy('title_asc');
+      expect(component.currentPage()).toBe(0);
     });
   });
 
@@ -620,6 +685,115 @@ describe('EventsComponent', () => {
     it('remet editorEventId à null après la sauvegarde', async () => {
       await component.saveDraftAndCreateNew();
       expect(component.editorEventId()).toBeNull();
+    });
+  });
+
+  // ── Excel import: date cell parsing ───────────────────────────────
+  describe('parseDateCell — formats acceptés', () => {
+    it('parse une chaîne dd/mm/yyyy', () => {
+      expect((component as any)._parseDateCell('15/05/2026')).toBe('2026-05-15');
+    });
+
+    it('parse une chaîne d/m/yyyy sans zéros', () => {
+      expect((component as any)._parseDateCell('5/1/2026')).toBe('2026-01-05');
+    });
+
+    it('parse une chaîne ISO yyyy-mm-dd', () => {
+      expect((component as any)._parseDateCell('2026-08-15')).toBe('2026-08-15');
+    });
+
+    it('parse un objet Date JS', () => {
+      // 15 mai 2026 à midi UTC pour éviter les sauts de fuseau
+      const d = new Date(Date.UTC(2026, 4, 15, 12, 0, 0));
+      expect((component as any)._parseDateCell(d)).toBe('2026-05-15');
+    });
+
+    it("préserve le jour pour une Date construite en heure locale (régression UTC+1 -1 jour)", () => {
+      // SheetJS avec cellDates:true produit des Date en HEURE LOCALE
+      // (new Date(y, m, d) sans Date.UTC). En UTC+1 (Brazzaville), une telle
+      // Date pour le 15 août 1960 est minuit local = 23h00 UTC le 14 août.
+      // L'ancien code lisait getUTCDate() → renvoyait 14 → tous les
+      // événements importés étaient décalés d'un jour en arrière en base.
+      // La version corrigée doit lire les composantes locales et renvoyer 15.
+      const sheetJsStyle = new Date(1960, 7, 15); // 15 août 1960, minuit local
+      expect((component as any)._parseDateCell(sheetJsStyle)).toBe('1960-08-15');
+    });
+
+    it('parse un numéro de série Excel (45782 = 2025-05-15)', () => {
+      // Excel serial 45792 = 2025-05-15
+      const serial = 45792;
+      const result = (component as any)._parseDateCell(serial);
+      expect(result).toBe('2025-05-15');
+    });
+
+    it("parse le sérial 22143 → 1960-08-15 (Indépendance du Congo)", () => {
+      // Ground truth: opening the real spreadsheet with cellDates OFF returns
+      // 22143 for the Independence Day row. The UTC math must give 1960-08-15
+      // regardless of the runner's timezone — this is the canonical
+      // regression test that documents why we don't use cellDates:true.
+      expect((component as any)._parseDateCell(22143)).toBe('1960-08-15');
+    });
+
+    it('renvoie null pour une chaîne vide', () => {
+      expect((component as any)._parseDateCell('')).toBeNull();
+    });
+
+    it('renvoie null pour une chaîne invalide', () => {
+      expect((component as any)._parseDateCell('pas une date')).toBeNull();
+    });
+
+    it('renvoie null pour un mois hors plage (13)', () => {
+      expect((component as any)._parseDateCell('15/13/2026')).toBeNull();
+    });
+
+    it('renvoie null pour null/undefined', () => {
+      expect((component as any)._parseDateCell(null)).toBeNull();
+      expect((component as any)._parseDateCell(undefined)).toBeNull();
+    });
+  });
+
+  describe('_parseImportRows — robustesse formats Excel', () => {
+    it('accepte un mélange de formats (Date, serial, dd/mm/yyyy)', () => {
+      const rows: any[][] = [
+        ['15/05/2026',                   'Indépendance', 'Source A'],
+        [new Date(Date.UTC(2026, 7, 15, 12, 0, 0)), 'Fête nationale', 'Source B'],
+        [45792,                          'Anniversaire', ''],
+        ['',                             'Sans date',    ''],          // skip — pas de date
+        ['mauvais',                      'Mauvaise date',''],          // skip — date invalide
+      ];
+      const result = (component as any)._parseImportRows(rows);
+      expect(result.valid).toHaveLength(3);
+      expect(result.skipped).toBe(2);
+      expect(result.valid[0].date).toBe('2026-05-15');
+      expect(result.valid[1].date).toBe('2026-08-15');
+      expect(result.valid[2].date).toBe('2025-05-15');
+    });
+
+    it('compte les lignes ignorées par raison (empty vs badDate)', () => {
+      const rows: any[][] = [
+        ['', '', ''],                  // empty
+        ['15/05/2026', '', ''],        // empty title
+        ['mauvais', 'Titre', ''],      // bad date
+      ];
+      const result = (component as any)._parseImportRows(rows);
+      expect(result.valid).toHaveLength(0);
+      expect(result.skipped).toBe(3);
+      expect(result.skippedEmpty).toBe(2);
+      expect(result.skippedBadDate).toBe(1);
+    });
+
+    it("refuse les lignes dont l'Evenement contient déjà la queue 'Source :' (garde anti-régression)", () => {
+      // Si une description importée contient déjà "\nSource : ..." c'est le
+      // signe que le bug du parser d'origine est revenu OU qu'on relit un
+      // fichier déjà pollué. Dans les deux cas, on REFUSE plutôt que de
+      // dupliquer la pollution dans la base.
+      const rows: any[][] = [
+        ['date', 'evenement', 'source', 'historien'],
+        ['15/08/1960', "Indépendance du Congo\n\nSource : Wikipédia", 'Vraie source', 'Geovann'],
+      ];
+      const result = (component as any)._parseImportRows(rows);
+      expect(result.valid).toHaveLength(0);
+      expect(result.skippedEmpty).toBe(1);
     });
   });
 });

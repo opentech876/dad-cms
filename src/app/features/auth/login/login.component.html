@@ -1,5 +1,4 @@
 <div class="login-layout">
-
   <!-- ── Left — editorial pane ── -->
   <div class="login-left">
     <div class="login-left-deco-lines"></div>
@@ -7,13 +6,24 @@
     <div class="login-left-deco-circle login-left-deco-circle--2"></div>
 
     <div class="login-left-header">
-      <svg width="42" height="42" viewBox="0 0 40 40" fill="none" style="flex:none;">
-        <rect x="3.5" y="6" width="33" height="29" rx="2.5" fill="#d8a155"/>
-        <rect x="3.5" y="6" width="33" height="6.5" fill="rgba(0,0,0,0.18)"/>
-        <circle cx="11" cy="4.5" r="1.5" fill="#d8a155" stroke="#1f1a14" stroke-width="1"/>
-        <circle cx="20" cy="4.5" r="1.5" fill="#d8a155" stroke="#1f1a14" stroke-width="1"/>
-        <circle cx="29" cy="4.5" r="1.5" fill="#d8a155" stroke="#1f1a14" stroke-width="1"/>
-        <text x="20" y="28" text-anchor="middle" font-family="serif" font-weight="700" font-size="12" fill="#1f1a14" letter-spacing="0.5">DAD</text>
+      <svg width="42" height="42" viewBox="0 0 40 40" fill="none" style="flex: none">
+        <rect x="3.5" y="6" width="33" height="29" rx="2.5" fill="#d8a155" />
+        <rect x="3.5" y="6" width="33" height="6.5" fill="rgba(0,0,0,0.18)" />
+        <circle cx="11" cy="4.5" r="1.5" fill="#d8a155" stroke="#1f1a14" stroke-width="1" />
+        <circle cx="20" cy="4.5" r="1.5" fill="#d8a155" stroke="#1f1a14" stroke-width="1" />
+        <circle cx="29" cy="4.5" r="1.5" fill="#d8a155" stroke="#1f1a14" stroke-width="1" />
+        <text
+          x="20"
+          y="28"
+          text-anchor="middle"
+          font-family="serif"
+          font-weight="700"
+          font-size="12"
+          fill="#1f1a14"
+          letter-spacing="0.5"
+        >
+          DAD
+        </text>
       </svg>
       <div>
         <div class="login-left-brand-name">Day After Day</div>
@@ -23,28 +33,13 @@
 
     <div class="login-left-hero">
       <h1 class="login-left-headline">
-        L'histoire de la Nation,<br>
-        <em style="color: #d8a155; font-style: italic;">jour après jour.</em>
+        L'histoire de la Nation,<br />
+        <em style="color: #d8a155; font-style: italic">jour après jour.</em>
       </h1>
       <p class="login-left-desc">
         La plateforme éditoriale qui alimente l'éphéméride mobile de la République du Congo.
-        Calendriers, événements, campagnes — tout depuis un seul espace.
+        Calendriers, événements, annonces, tout depuis un seul espace.
       </p>
-      <hr class="login-left-rule">
-      <div class="login-left-stats">
-        <div>
-          <div class="login-stat-value">365</div>
-          <div class="login-stat-label">Dates / an</div>
-        </div>
-        <div>
-          <div class="login-stat-value">×2</div>
-          <div class="login-stat-label">Événements / jour</div>
-        </div>
-        <div>
-          <div class="login-stat-value">4</div>
-          <div class="login-stat-label">Rôles</div>
-        </div>
-      </div>
     </div>
 
     <div class="login-left-footer">
@@ -55,9 +50,40 @@
   <!-- ── Right — form pane ── -->
   <div class="login-right">
     <div class="login-form-wrap">
-      <div class="eyebrow">Système de Gestion de Contenu</div>
       <h2 class="login-form-title">Connexion</h2>
-      <p class="login-form-subtitle">Accès réservé aux membres invités de l'équipe Day After Day.</p>
+      <p class="login-form-subtitle">
+        Accès réservé aux membres invités de l'équipe Day After Day.
+      </p>
+
+      <!-- ── Mode toggle ── -->
+      <div class="login-mode-tabs" role="tablist" aria-label="Méthode de connexion">
+        <button
+          type="button"
+          role="tab"
+          class="login-mode-tab"
+          [class.is-active]="mode() === 'password'"
+          [attr.aria-selected]="mode() === 'password'"
+          (click)="setMode('password')"
+        >
+          <tui-icon icon="@tui.key-round" class="login-mode-tab-icon" />
+          <div class="login-mode-tab-text">
+            <span class="login-mode-tab-title">Mot de passe</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="login-mode-tab"
+          [class.is-active]="mode() === 'otp'"
+          [attr.aria-selected]="mode() === 'otp'"
+          (click)="setMode('otp')"
+        >
+          <tui-icon icon="@tui.mail" class="login-mode-tab-icon" />
+          <div class="login-mode-tab-text">
+            <span class="login-mode-tab-title">Lien Magique</span>
+          </div>
+        </button>
+      </div>
 
       <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="login-form">
         <div class="field required">
@@ -74,30 +100,82 @@
           </div>
         </div>
 
+        @if (mode() === 'password') {
+          <div class="field required">
+            <label class="field-label">Mot de passe</label>
+            <div class="input-group" style="position:relative;">
+              <span class="input-icon">🔒</span>
+              <input
+                class="input has-icon"
+                [type]="showPassword() ? 'text' : 'password'"
+                formControlName="password"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                minlength="8"
+                style="padding-right: 42px;"
+              />
+              <button
+                type="button"
+                class="input-eye-btn"
+                (click)="toggleShowPassword()"
+                [attr.aria-label]="showPassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+                tabindex="-1"
+              >
+                <tui-icon [icon]="showPassword() ? '@tui.eye-off' : '@tui.eye'" style="font-size:15px;" />
+              </button>
+            </div>
+            <div class="field-hint-row">
+              <span class="field-hint"
+                >8 caractères minimum. Pas de mot de passe ? Utilisez « Code par e-mail » puis
+                définissez-en un depuis votre profil.</span
+              >
+              <a routerLink="/mot-de-passe-oublie" class="btn-link" style="font-size:12px; white-space:nowrap;">
+                Mot de passe oublié ?
+              </a>
+            </div>
+          </div>
+        } @else {
+          <p style="font-size: 12.5px; color: var(--fg-3); margin: 0 0 4px 0">
+            Recevez un code à 6 chiffres par e-mail (utile si vous n'avez pas encore défini de mot
+            de passe).
+          </p>
+        }
+
         @if (errorMessage) {
           <div class="login-error">{{ errorMessage }}</div>
         }
 
-        <button class="btn btn-primary btn-lg" type="submit" [disabled]="loading" style="width:100%; margin-top:8px;">
-          @if (loading) { <span class="spinner"></span> }
-          Recevoir le lien de connexion →
+        <button
+          class="btn btn-primary btn-lg"
+          type="submit"
+          [disabled]="loading"
+          style="width: 100%; margin-top: 8px"
+        >
+          @if (loading) {
+            <span class="spinner"></span>
+          }
+          @if (mode() === 'password') {
+            Se connecter →
+          } @else {
+            Recevoir le code par e-mail →
+          }
         </button>
       </form>
 
-      <hr class="rule" style="margin: 28px 0;">
+      <hr class="rule" style="margin: 28px 0" />
 
       <p class="login-form-note">
         Pas encore membre ? Demandez une invitation à votre
-        <a href="mailto:lamine@open-tech.cg" class="btn-link">propriétaire d'espace</a>.
+        <a href="mailto:support@open-tech.cg" class="btn-link">propriétaire d'espace</a>.
       </p>
     </div>
 
     <div class="login-right-footer">
       <span>© 2026 OPEN-TECH · Tous droits réservés</span>
-      <div style="display:flex; gap:14px;">
-        <a href="#" class="btn-link" style="font-size:11.5px;">Mentions légales</a>
-        <a href="#" class="btn-link" style="font-size:11.5px;">Confidentialité</a>
-        <a href="#" class="btn-link" style="font-size:11.5px;">Aide</a>
+      <div style="display: flex; gap: 14px">
+        <a href="#" class="btn-link" style="font-size: 11.5px">Mentions légales</a>
+        <a href="#" class="btn-link" style="font-size: 11.5px">Confidentialité</a>
+        <a href="#" class="btn-link" style="font-size: 11.5px">Aide</a>
       </div>
     </div>
   </div>

@@ -1,0 +1,225 @@
+<div class="admin-page">
+
+  <!-- Header -->
+  <div class="admin-header">
+    <div>
+      <h2 class="admin-title">Administration de la plateforme</h2>
+      <p class="admin-subtitle">
+        Gestion des espaces de travail et des accès au niveau plateforme. Réservé aux administrateurs système.
+      </p>
+    </div>
+    <button class="btn btn-primary btn-sm" type="button" (click)="openCreateModal()">
+      <tui-icon icon="@tui.plus" style="font-size:14px;" />
+      Nouvel espace
+    </button>
+  </div>
+
+  @if (loading()) {
+    <div class="admin-loading">
+      <span class="spinner"></span>
+      Chargement des espaces de travail…
+    </div>
+  } @else {
+
+    <!-- Active workspaces -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Espaces actifs</div>
+          <div class="card-subtitle">{{ activeWorkspaces().length | number }} espace(s) de travail en service</div>
+        </div>
+      </div>
+
+      @if (activeWorkspaces().length === 0) {
+        <div class="admin-empty">
+          <tui-icon icon="@tui.building" style="font-size:24px; color:var(--fg-3);" />
+          <p>Aucun espace de travail n'a encore été créé.</p>
+          <button class="btn btn-primary btn-sm" type="button" (click)="openCreateModal()">
+            Créer le premier espace
+          </button>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Nom</th>
+                <th style="text-align:right;">Membres</th>
+                <th>Créé par</th>
+                <th>Créé le</th>
+                <th style="width:120px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ws of activeWorkspaces(); track ws.id) {
+                <tr>
+                  <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      @if (ws.logo_url) {
+                        <img [src]="ws.logo_url" alt="" style="width:32px; height:32px; border-radius:6px; object-fit:cover;" />
+                      } @else {
+                        <div style="width:32px; height:32px; border-radius:6px; background:var(--bg-sunken); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--fg-3);">
+                          {{ (ws.name.charAt(0) || '?').toUpperCase() }}
+                        </div>
+                      }
+                      @if (renameTargetId() === ws.id) {
+                        <input
+                          class="input"
+                          type="text"
+                          style="height: 30px; font-size: 13px; min-width: 220px;"
+                          [value]="renameValue()"
+                          (input)="renameValue.set($any($event.target).value)"
+                          (keydown.enter)="submitRename()"
+                          (keydown.escape)="cancelRename()"
+                          autofocus
+                        />
+                        <button class="btn btn-primary btn-sm" type="button"
+                                [disabled]="renameSaving() || !renameValue().trim()"
+                                (click)="submitRename()">
+                          @if (renameSaving()) { <span class="spinner"></span> }
+                          OK
+                        </button>
+                        <button class="btn btn-flat btn-sm" type="button"
+                                [disabled]="renameSaving()"
+                                (click)="cancelRename()">
+                          Annuler
+                        </button>
+                      } @else {
+                        <span style="font-weight:500;">{{ ws.name }}</span>
+                      }
+                    </div>
+                  </td>
+                  <td style="text-align:right; font-variant-numeric:tabular-nums;">{{ ws.member_count | number }}</td>
+                  <td style="font-size:12.5px; color:var(--fg-3);">{{ ws.created_by_email ?? '—' }}</td>
+                  <td style="font-size:12.5px; color:var(--fg-3);">{{ ws.created_at | date:'d MMM yyyy':'':'fr' }}</td>
+                  <td>
+                    @if (renameTargetId() !== ws.id) {
+                      <div style="display:flex; gap:2px; align-items:center; justify-content:flex-end;">
+                        <button
+                          class="btn btn-flat btn-icon btn-sm"
+                          type="button"
+                          title="Entrer dans cet espace en tant qu'administrateur"
+                          (click)="enterAsAdmin(ws.id)"
+                        >
+                          <tui-icon icon="@tui.log-in" style="font-size:14px;" />
+                        </button>
+                        <button
+                          class="btn btn-flat btn-icon btn-sm"
+                          type="button"
+                          title="Renommer"
+                          (click)="openRename(ws.id, ws.name)"
+                        >
+                          <tui-icon icon="@tui.pencil" style="font-size:14px;" />
+                        </button>
+                        <button
+                          class="btn btn-flat btn-icon btn-sm"
+                          type="button"
+                          title="Marquer comme supprimé"
+                          style="color:var(--danger);"
+                          [disabled]="busyWorkspaceId() === ws.id"
+                          (click)="softDelete(ws.id)"
+                        >
+                          <tui-icon icon="@tui.trash-2" style="font-size:14px;" />
+                        </button>
+                      </div>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    <!-- Soft-deleted workspaces (restorable) -->
+    @if (deletedWorkspaces().length > 0) {
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Espaces supprimés</div>
+            <div class="card-subtitle">
+              {{ deletedWorkspaces().length | number }} espace(s) masqué(s). Les données restent en base et peuvent être restaurées.
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Nom</th>
+                <th>Supprimé le</th>
+                <th style="width:120px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ws of deletedWorkspaces(); track ws.id) {
+                <tr style="opacity:0.7;">
+                  <td>{{ ws.name }}</td>
+                  <td style="font-size:12.5px; color:var(--fg-3);">{{ ws.deleted_at | date:'d MMM yyyy':'':'fr' }}</td>
+                  <td>
+                    <button
+                      class="btn btn-flat btn-sm"
+                      type="button"
+                      [disabled]="busyWorkspaceId() === ws.id"
+                      (click)="restore(ws.id)"
+                    >
+                      <tui-icon icon="@tui.rotate-ccw" style="font-size:13px;" />
+                      Restaurer
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  }
+</div>
+
+<!-- Create workspace modal -->
+@if (showCreateModal()) {
+  <div class="modal-backdrop" (click)="closeCreateModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Nouvel espace de travail</span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeCreateModal()">
+          <tui-icon icon="@tui.x" style="font-size:18px;" />
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12.5px; color:var(--fg-3); margin-bottom:16px;">
+          Vous deviendrez automatiquement le premier propriétaire de cet espace.
+          Vous pourrez ensuite transférer la propriété à un autre utilisateur.
+        </p>
+        <div class="field">
+          <label class="field-label">Nom de l'espace de travail *</label>
+          <input
+            class="input"
+            type="text"
+            placeholder="Day After Day — Production"
+            [value]="newName()"
+            (input)="newName.set($any($event.target).value)"
+            (keydown.enter)="submitCreate()"
+            autocomplete="off"
+          />
+        </div>
+        @if (createError()) {
+          <div style="color: var(--danger); font-size: 12.5px; margin-top: 10px;">
+            {{ createError() }}
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeCreateModal()" [disabled]="createSaving()">
+          Annuler
+        </button>
+        <button class="btn btn-primary btn-sm" type="button" (click)="submitCreate()" [disabled]="createSaving() || !newName().trim()">
+          @if (createSaving()) { <span class="spinner"></span> }
+          Créer l'espace
+        </button>
+      </div>
+    </div>
+  </div>
+}

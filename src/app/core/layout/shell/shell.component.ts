@@ -1,13 +1,18 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, HostListener, inject, OnInit, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { filter, firstValueFrom } from 'rxjs';
+import { filter, firstValueFrom, Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
 import { AppRole, WorkspaceSummary } from '../../../models';
 import { AuthService } from '../../auth/auth.service';
 import { WorkspaceService } from '../../workspace/workspace.service';
 import { WorkspaceContextService } from '../../workspace/workspace-context.service';
 import { ToastService, ToastType } from '../../services/toast.service';
+import { ThemeService } from '../../services/theme.service';
+import { NotificationService } from '../../notifications/notification.service';
+import { SupabaseService } from '../../supabase/supabase.service';
+import { SearchService, SearchResult, SearchResults } from '../../search/search.service';
+import { RefreshRouteReuseStrategy } from '../../router/refresh-route-reuse.strategy';
 
 interface NavItem {
   id: string;
@@ -16,6 +21,12 @@ interface NavItem {
   path: string;
   badge?: number;
   roles: AppRole[]; // empty = visible to all authenticated roles
+}
+
+interface NavSection {
+  id: string;
+  label: string;
+  items: NavItem[];
 }
 
 @Component({
@@ -29,9 +40,17 @@ export class ShellComponent implements OnInit {
   private router = inject(Router);
   private workspaceService = inject(WorkspaceService);
   private workspaceContext = inject(WorkspaceContextService);
+  private themeService = inject(ThemeService);
+  private notifService = inject(NotificationService);
+  private supabase = inject(SupabaseService);
+  private searchService = inject(SearchService);
+  private routeReuse = inject(RefreshRouteReuseStrategy);
   private currentRole = toSignal(this.auth.currentRole$);
+  /** True when the signed-in user is a platform-level system_admin. */
+  readonly isSystemAdmin = toSignal(this.auth.isSystemAdmin(), { initialValue: false });
 
   readonly toastService = inject(ToastService);
+  readonly notifUnread  = signal(0);
 
   toastIcon(type: ToastType): string {
     const map: Record<ToastType, string> = {
@@ -50,53 +69,298 @@ export class ShellComponent implements OnInit {
   userName = 'Utilisateur';
 
   readonly workspaces = signal<WorkspaceSummary[]>([]);
-  readonly currentWorkspace = computed(() => this.workspaces()[0] ?? null);
+  /** Active workspace is the one stored in WorkspaceContextService (localStorage-backed). */
+  readonly currentWorkspace = computed(() => {
+    const id = this.workspaceContext.activeWorkspaceId();
+    return this.workspaces().find(w => w.id === id) ?? this.workspaces()[0] ?? null;
+  });
+  /**
+   * Deterministic color for the active workspace, derived from its UUID hash
+   * → HSL hue. Same workspace always gets the same color so users build
+   * muscle memory: "blue stripe = Tenant A, orange = Tenant B". Used by the
+   * topbar accent stripe to make "wrong workspace" mistakes harder.
+   */
+  readonly currentWorkspaceColor = computed<string | null>(() => {
+    const ws = this.currentWorkspace();
+    if (!ws) return null;
+    let hash = 0;
+    for (let i = 0; i < ws.id.length; i++) hash = (hash * 31 + ws.id.charCodeAt(i)) | 0;
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 62%, 52%)`;
+  });
   readonly workspaceName = computed(() => this.currentWorkspace()?.name ?? 'Day After Day');
+  readonly workspaceInitials = computed(() => {
+    const name = this.currentWorkspace()?.name ?? 'Day After Day';
+    const parts = name.trim().split(/\s+/);
+    return ((parts[0]?.[0] ?? 'D') + (parts[1]?.[0] ?? parts[0]?.[1] ?? 'A')).toUpperCase();
+  });
+  readonly workspaceMemberLabel = computed(() => {
+    const count = this.currentWorkspace()?.member_count ?? 0;
+    return count === 1 ? '1 membre' : `${count} membres`;
+  });
+  readonly workspaceMenuOpen = signal(false);
+  readonly otherWorkspaces = computed(() =>
+    this.workspaces().filter(w => w.id !== this.currentWorkspace()?.id),
+  );
+
+  toggleWorkspaceMenu(): void {
+    this.workspaceMenuOpen.update(v => !v);
+  }
+  closeWorkspaceMenu(): void { this.workspaceMenuOpen.set(false); }
+
+  /** Returns 2-letter uppercase initials for a workspace name. */
+  workspaceInitialsFor(name: string): string {
+    const trimmed = (name ?? '').trim();
+    if (!trimmed) return 'DA';
+    const parts = trimmed.split(/\s+/);
+    const first = parts[0]?.[0] ?? trimmed[0] ?? 'D';
+    const second = parts[1]?.[0] ?? trimmed[1] ?? 'A';
+    return (first + second).toUpperCase();
+  }
+
+  workspaceMemberLabelFor(count: number): string {
+    return count === 1 ? '1 membre' : `${count} membres`;
+  }
+
+  /**
+   * Switch active workspace. Persists in localStorage and re-navigates to the
+   * current URL with a one-shot RouteReuseStrategy override + onSameUrlNavigation,
+   * forcing every workspace-scoped component to re-init and re-fetch under the
+   * new tenant. Cheaper than `window.location.reload()` — no JS bundle re-parse.
+   */
+  async switchWorkspace(id: string): Promise<void> {
+    if (id === this.currentWorkspace()?.id) { this.closeWorkspaceMenu(); return; }
+    this.workspaceContext.setActiveWorkspace(id);
+    this.closeWorkspaceMenu();
+    const target = this.router.url;
+    this.routeReuse.triggerRefresh();
+    await this.router.navigateByUrl(target);
+  }
 
   collapsed = signal(false);
   pageTitle = signal('Tableau de bord');
 
+  // ── Sidebar resize + mobile drawer ──────────────────────────────────────
+  /** Sidebar width in px when not collapsed. Persisted to localStorage. Bounded [200, 360]. */
+  readonly sidebarWidth = signal(this._loadSidebarWidth());
+  /** True under the mobile breakpoint (768px). Updated on resize. */
+  readonly isMobile = signal(typeof window !== 'undefined' && window.innerWidth < 768);
+  /** Off-canvas sidebar visibility on mobile. */
+  readonly mobileOpen = signal(false);
+
+  private _loadSidebarWidth(): number {
+    if (typeof localStorage === 'undefined') return 260;
+    const stored = parseInt(localStorage.getItem('dad-sidebar-width') ?? '', 10);
+    return Number.isFinite(stored) && stored >= 200 && stored <= 360 ? stored : 260;
+  }
+
+  openMobileSidebar(): void  { this.mobileOpen.set(true); }
+  closeMobileSidebar(): void { this.mobileOpen.set(false); }
+
+  /** Handle drag from the right-edge resize handle. */
+  startResize(ev: PointerEvent): void {
+    if (this.isMobile()) return;
+    ev.preventDefault();
+    const startX = ev.clientX;
+    const startW = this.sidebarWidth();
+    const onMove = (e: PointerEvent) => {
+      const next = Math.min(360, Math.max(200, startW + (e.clientX - startX)));
+      this.sidebarWidth.set(next);
+      // If the user drags past the lower threshold, snap into the collapsed state.
+      if (next <= 200 && !this.collapsed()) this.collapsed.set(true);
+      if (next > 220 && this.collapsed()) this.collapsed.set(false);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup',   onUp);
+      try { localStorage.setItem('dad-sidebar-width', String(this.sidebarWidth())); } catch {}
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup',   onUp);
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    const m = window.innerWidth < 768;
+    this.isMobile.set(m);
+    if (!m) this.mobileOpen.set(false);
+  }
+
   readonly showProfileSetup = signal(false);
   readonly profileFullName = signal('');
   readonly profilePhone = signal('');
+  readonly profilePassword = signal('');
   readonly profileSaveLoading = signal(false);
+  readonly profilePasswordError = signal('');
+  readonly profileSaveError = signal('');
+  readonly showProfilePassword = signal(false);
+  toggleShowProfilePassword(): void { this.showProfilePassword.update(v => !v); }
 
-  private readonly navItems: NavItem[] = [
-    { id: 'dashboard',    label: 'Tableau de bord',      icon: '@tui.layout-dashboard', path: '/dashboard',    roles: [] },
-    { id: 'calendrier',   label: 'Calendrier éditorial', icon: '@tui.calendar',          path: '/calendrier',   roles: [] },
-    { id: 'evenements',   label: 'Événements',           icon: '@tui.book-open',         path: '/evenements',   roles: ['owner', 'chef_equipe', 'editeur'] },
-    { id: 'campagnes',    label: 'Campagnes pub.',        icon: '@tui.megaphone',         path: '/campagnes',    roles: ['owner', 'chef_equipe', 'charge_communication'] },
-    { id: 'utilisateurs', label: 'Utilisateurs',         icon: '@tui.users',             path: '/utilisateurs', roles: ['owner'] },
-  ];
+  /** Name of the active workspace — shown in the invitation welcome modal. */
+  readonly activeWorkspaceName = signal('');
 
-  private readonly adminItems: NavItem[] = [
-    { id: 'metriques',   label: 'Métriques',         icon: '@tui.bar-chart-2', path: '/metriques',  roles: ['owner', 'chef_equipe', 'charge_communication'] },
-    { id: 'workspace',   label: 'Espace de travail', icon: '@tui.building',    path: '/espace-de-travail', roles: [] },
-    { id: 'parametres',  label: 'Paramètres',         icon: '@tui.settings',    path: '/parametres', roles: [] },
-  ];
+  readonly hasPasswordNotSet = signal(false);
+  readonly passwordBannerDismissed = signal(false);
+  readonly showPasswordBanner = computed(() => this.hasPasswordNotSet() && !this.passwordBannerDismissed());
+  dismissPasswordBanner(): void { this.passwordBannerDismissed.set(true); }
 
-  readonly visibleNavItems   = computed(() => this.filterByRole(this.navItems));
-  readonly visibleAdminItems = computed(() => this.filterByRole(this.adminItems));
+  // ── Topbar search ────────────────────────────────────────────────────────
+  readonly searchTerm     = signal('');
+  readonly searchOpen     = signal(false);
+  readonly searchLoading  = signal(false);
+  readonly searchResults  = signal<SearchResults>({ events: [], campaigns: [], companies: [], calendars: [] });
+  readonly searchTotalCount = computed(() => {
+    const r = this.searchResults();
+    return r.events.length + r.campaigns.length + r.companies.length + r.calendars.length;
+  });
+  readonly searchHasAny = computed(() => this.searchTotalCount() > 0);
+  private readonly searchInput$ = new Subject<string>();
 
-  private filterByRole(items: NavItem[]): NavItem[] {
-    const role = this.currentRole();
-    if (!role) return [];
-    return items.filter(item => item.roles.length === 0 || item.roles.includes(role));
+  onSearchInput(value: string): void {
+    this.searchTerm.set(value);
+    this.searchOpen.set(true);
+    this.searchInput$.next(value);
   }
 
+  closeSearchDropdown(): void { this.searchOpen.set(false); }
+
+  submitSearch(): void {
+    const term = this.searchTerm().trim();
+    if (!term) return;
+    this.closeSearchDropdown();
+    this.router.navigate(['/recherche'], { queryParams: { q: term } });
+  }
+
+  goToResult(r: SearchResult): void {
+    const routes: Record<SearchResult['type'], string> = {
+      event:    '/evenements',
+      campaign: '/campagnes',
+      company:  '/compagnies',
+      calendar: '/calendrier',
+    };
+    this.searchOpen.set(false);
+    this.searchTerm.set('');
+    this.router.navigate([routes[r.type]], { queryParams: { q: r.label } });
+  }
+
+  private readonly navSections: NavSection[] = [
+    {
+      id: 'pilotage',
+      label: 'Pilotage',
+      items: [
+        { id: 'dashboard',     label: 'Tableau de bord', icon: '@tui.layout-dashboard', path: '/dashboard', roles: [] },
+        { id: 'metriques',     label: 'Métriques',       icon: '@tui.bar-chart-2',      path: '/metriques', roles: ['owner', 'chef_equipe', 'charge_communication'] },
+      ],
+    },
+    {
+      id: 'editorial',
+      label: 'Éditorial',
+      items: [
+        { id: 'calendrier',      label: 'Calendrier éditorial',       icon: '@tui.calendar',    path: '/calendrier',      roles: [] },
+        { id: 'recommandations', label: 'Recommandations',            icon: '@tui.list-checks', path: '/recommandations', roles: ['owner', 'presidence'] },
+        { id: 'evenements',      label: "Bibliothèque d'événements",  icon: '@tui.book-open',   path: '/evenements',      roles: ['owner', 'chef_equipe', 'editeur'] },
+      ],
+    },
+    {
+      id: 'regie',
+      label: 'Régie publicitaire',
+      items: [
+        { id: 'campagnes',  label: 'Encarts publicitaires', icon: '@tui.megaphone', path: '/campagnes',  roles: ['owner', 'chef_equipe', 'charge_communication', 'chef_equipe_commerciale'] },
+        { id: 'compagnies', label: 'Annonceurs',            icon: '@tui.building',  path: '/compagnies', roles: ['owner', 'chef_equipe_commerciale', 'charge_communication'] },
+      ],
+    },
+    {
+      id: 'equipe',
+      label: 'Équipe & alertes',
+      items: [
+        { id: 'utilisateurs',  label: 'Utilisateurs',  icon: '@tui.users', path: '/utilisateurs',  roles: ['owner'] },
+        { id: 'notifications', label: 'Notifications', icon: '@tui.bell',  path: '/notifications', roles: [] },
+      ],
+    },
+    {
+      id: 'administration',
+      label: 'Administration',
+      items: [
+        { id: 'workspace',  label: 'Espace de travail', icon: '@tui.building', path: '/espace-de-travail', roles: [] },
+        { id: 'parametres', label: 'Paramètres',         icon: '@tui.settings', path: '/parametres',        roles: [] },
+      ],
+    },
+  ];
+
+  /** Platform-level admin section, only surfaced when the user has the
+   *  global system_admin role. It sits outside the per-workspace sections
+   *  because system_admin is by design not workspace-scoped. */
+  private readonly platformSection: NavSection = {
+    id: 'plateforme',
+    label: 'Plateforme',
+    items: [
+      { id: 'admin',             label: 'Espaces de travail', icon: '@tui.shield', path: '/admin',             roles: [] },
+      { id: 'admin-utilisateurs', label: 'Tous les utilisateurs', icon: '@tui.users', path: '/admin/utilisateurs', roles: [] },
+    ],
+  };
+
+  readonly visibleNavSections = computed<NavSection[]>(() => {
+    const role = this.currentRole();
+    if (!role && !this.isSystemAdmin()) return [];
+    const sections = this.navSections
+      .map(s => ({
+        ...s,
+        items: s.items.filter((i: NavItem) => i.roles.length === 0 || (role ? i.roles.includes(role) : false)),
+      }))
+      .filter(s => s.items.length > 0);
+    // Prepend the platform-admin section when the user is a system_admin.
+    return this.isSystemAdmin() ? [this.platformSection, ...sections] : sections;
+  });
+
+  /** Flat list of all role-visible nav items, in section order. Useful for cross-checks. */
+  readonly visibleNavItems = computed<NavItem[]>(() =>
+    this.visibleNavSections().flatMap(s => s.items),
+  );
+
   private readonly routeTitles: Record<string, string> = {
-    dashboard:    'Tableau de bord',
-    calendrier:   'Calendrier éditorial',
-    evenements:   'Événements historiques',
-    campagnes:    'Campagnes publicitaires',
-    utilisateurs: 'Utilisateurs',
-    metriques:    'Métriques',
+    dashboard:           'Tableau de bord',
+    calendrier:          'Calendrier éditorial',
+    recommandations:     'Recommandations Présidence',
+    evenements:          'Bibliothèque d\'événements historiques',
+    campagnes:           'Encarts publicitaires',
+    compagnies:          'Annonceurs',
+    utilisateurs:        'Utilisateurs',
+    metriques:           'Métriques',
+    notifications:       'Notifications',
     profil:              'Mon profil',
     parametres:          'Paramètres',
     'espace-de-travail': 'Espace de travail',
+    admin:                   'Administration plateforme · Espaces',
+    'admin/utilisateurs':    'Administration plateforme · Utilisateurs',
   };
 
   async ngOnInit(): Promise<void> {
+    // Wire the topbar-title subscription FIRST so we don't miss any NavigationEnd
+    // that fires while the rest of ngOnInit awaits profile / workspace data.
+    // Also seed from the current URL since the initial NavigationEnd may have
+    // already fired by the time this component instantiates.
+    this.applyTitleFromUrl(this.router.url);
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+    ).subscribe(e => this.applyTitleFromUrl(e.urlAfterRedirects));
+
+    // Debounced topbar search — fires SearchService after 300ms of idle typing.
+    this.searchInput$.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(term => {
+        if (!term.trim()) {
+          this.searchLoading.set(false);
+          return of({ events: [], campaigns: [], companies: [], calendars: [] } as SearchResults);
+        }
+        this.searchLoading.set(true);
+        return this.searchService.search(term);
+      }),
+    ).subscribe(results => {
+      this.searchResults.set(results);
+      this.searchLoading.set(false);
+    });
+
     const user = await firstValueFrom(this.auth.getCurrentUser().pipe(filter(Boolean)));
     this.userId = user.id ?? '';
     this.userEmail = user.email ?? '';
@@ -111,6 +375,7 @@ export class ShellComponent implements OnInit {
         const stored = localStorage.getItem('dad-workspace-id');
         const active = summaries.find(w => w.id === stored) ?? summaries[0];
         this.workspaceContext.setActiveWorkspace(active.id);
+        this.activeWorkspaceName.set(active.name);
       }
     } catch {
       // Workspace fetch failed — use fallback name
@@ -132,20 +397,65 @@ export class ShellComponent implements OnInit {
       // Profile check failed — skip setup modal
     }
 
-    this.router.events.pipe(
-      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-    ).subscribe(e => {
-      const key = e.urlAfterRedirects.split('/').filter(Boolean).at(-1) ?? 'dashboard';
-      this.pageTitle.set(this.routeTitles[key] ?? 'Day After Day');
-    });
+    try {
+      const count = await firstValueFrom(this.notifService.unreadCount());
+      this.notifUnread.set(count);
+    } catch {
+      // Notifications non disponibles — pas bloquant
+    }
+
+    const pwdSet = await this.supabase.hasPasswordSet();
+    this.hasPasswordNotSet.set(!pwdSet);
+  }
+
+  private applyTitleFromUrl(url: string | undefined | null): void {
+    if (!url) return;
+    const segments = url.split('?')[0].split('/').filter(Boolean);
+    // Try the full path first (e.g. "admin/utilisateurs"), then fall back to
+    // the last segment alone. That way nested routes can have dedicated
+    // titles without colliding with same-named top-level routes.
+    const fullKey = segments.join('/');
+    const tailKey = segments.at(-1) ?? 'dashboard';
+    const title = this.routeTitles[fullKey] ?? this.routeTitles[tailKey] ?? 'Day After Day';
+    this.pageTitle.set(title);
   }
 
   async saveProfile(): Promise<void> {
     if (!this.profileFullName().trim() || this.profileSaveLoading()) return;
+    const pwd = this.profilePassword();
+    // Required when the user has no password yet — first-time invitees only
+    // get one reliable shot at this since the free-plan OTP fallback is
+    // rate-limited to 2 emails/hr. Optional for existing users who already
+    // have a password but somehow re-hit the setup modal.
+    if (this.hasPasswordNotSet() && !pwd) {
+      this.profilePasswordError.set('Veuillez définir un mot de passe pour finaliser votre inscription.');
+      return;
+    }
+    if (pwd && pwd.length < 8) {
+      this.profilePasswordError.set('Le mot de passe doit comporter au moins 8 caractères.');
+      return;
+    }
+    this.profilePasswordError.set('');
+    this.profileSaveError.set('');
     this.profileSaveLoading.set(true);
-    await firstValueFrom(
+    const profileRes = await firstValueFrom(
       this.workspaceService.upsertProfile(this.userId, this.profileFullName().trim(), this.profilePhone().trim()),
     );
+    if (!profileRes.success) {
+      this.profileSaveError.set('Erreur lors de l\'enregistrement : ' + (profileRes.error ?? 'inconnue'));
+      this.profileSaveLoading.set(false);
+      return;
+    }
+    if (pwd) {
+      const { error } = await this.supabase.updatePassword(pwd);
+      if (error) {
+        this.profilePasswordError.set('Mot de passe non enregistré : ' + error.message);
+        this.profileSaveLoading.set(false);
+        return;
+      }
+      this.supabase.markPasswordSet();
+      this.hasPasswordNotSet.set(false);
+    }
     this.profileSaveLoading.set(false);
     this.showProfileSetup.set(false);
   }

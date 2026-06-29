@@ -1,9 +1,17 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { CalendarService, CalendarSummary } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
+import { EventService } from '../../core/events/event.service';
+import { CampaignService } from '../../core/campaigns/campaign.service';
+import { ToastService } from '../../core/services/toast.service';
+import { RecommendationService } from '../../core/presidency/recommendation.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { AdCampaign, Event as HistoricalEvent, EventPosition } from '../../models';
+import { MONTHS_FR_LONG as MONTHS_FR, MONTHS_FR_LONG_CAP as MONTHS_FR_CAP } from '../../core/utils/date.utils';
 
 type CalendarView = 'year' | 'month' | 'list';
 export type CalendarFilter = 'all' | 'full' | 'partial' | 'empty' | 'has_campaign';
@@ -67,8 +75,9 @@ export interface DayDetailData {
   campaigns: DayCampaign[];
 }
 
-const MONTHS_FR       = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-const MONTHS_FR_CAP   = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+// MONTHS_FR_SHORT here is the 3-letter heatmap variant ('Jan', 'Fév', …),
+// distinct from the formal abbreviations in date.utils.ts ('janv.', 'févr.', …).
+// MONTHS_FR / MONTHS_FR_CAP come from the shared utility.
 const MONTHS_FR_SHORT = ['Jan','Fév','Mar','Avr','Mai','Jun','Juil','Aoû','Sep','Oct','Nov','Déc'];
 const DOW_SHORT       = ['L','M','M','J','V','S','D'];
 const DOW_LONG        = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
@@ -96,12 +105,37 @@ export class CalendarComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly calendarService = inject(CalendarService);
   private readonly calendarEntryService = inject(CalendarEntryService);
+  private readonly eventService = inject(EventService);
+  private readonly campaignService = inject(CampaignService);
+  private readonly recommendationService = inject(RecommendationService);
+  private readonly authService = inject(AuthService);
+  private readonly toast = inject(ToastService);
+
+  /**
+   * Editorial-tier visibility for the "Appliquer la recommandation" button.
+   * Mirrors the RPC's `has_role_at_least('editeur')` check so we don't show
+   * a button that would return `42501 insufficient_privilege` for
+   * `charge_communication` or `presidence` users who also reach /calendrier.
+   */
+  readonly canApplyRecommendations = toSignal(
+    this.authService.hasRoleAtLeast('editeur'),
+    { initialValue: false },
+  );
+
+  // Pending Presidence recommendations for the selected calendar (count only).
+  readonly pendingRecommendationsCount = signal(0);
+  readonly recommendationsApplying = signal(false);
+
+  // Confirm dialog state for the apply flow.
+  readonly applyDialogVisible = signal(false);
+  readonly applyConflicts = signal<import('../../core/presidency/recommendation.service').RecommendationConflict[]>([]);
 
   readonly monthsFr      = MONTHS_FR;
   readonly monthsFrCap   = MONTHS_FR_CAP;
   readonly monthsFrShort = MONTHS_FR_SHORT;
   readonly dowShort      = DOW_SHORT;
   readonly dowLong       = DOW_LONG;
+  readonly slotPositions: EventPosition[] = [1, 2];
   readonly viewOptions: { id: CalendarView; label: string }[] = [
     { id: 'year', label: 'Année' },
     { id: 'month', label: 'Mois' },
@@ -165,8 +199,36 @@ export class CalendarComponent implements OnInit {
     this.loading.set(false);
   }
 
+  // ── Campaigns ─────────────────────────────────────
+  readonly activeCampaigns = signal<AdCampaign[]>([]);
+
+  /** Maps each MM-DD (for the selected year) to the first active campaign name covering it. */
+  readonly campaignByMmdd = computed<Map<string, string>>(() => {
+    const year = this.selectedYear();
+    const map = new Map<string, string>();
+    for (const c of this.activeCampaigns()) {
+      if (!c.active) continue;
+      for (let month = 0; month < 12; month++) {
+        const dim = daysInMonth(year, month);
+        for (let d = 1; d <= dim; d++) {
+          const mmdd = `${pad2(month + 1)}-${pad2(d)}`;
+          if (!map.has(mmdd)) {
+            const fullDate = `${year}-${mmdd}`;
+            if (c.start_date <= fullDate && c.end_date >= fullDate) {
+              map.set(mmdd, c.name);
+            }
+          }
+        }
+      }
+    }
+    return map;
+  });
+
   // ── Calendar entries (assignments) ───────────────
   readonly entries = signal<CalendarEntryWithEvent[]>([]);
+  readonly loadingEntries = signal(false);
+
+  private readonly _entriesCache = new Map<string, CalendarEntryWithEvent[]>();
 
   /** Groups entries by mmdd ('MM-DD') for O(1) day lookup. */
   readonly entriesByMmdd = computed(() => {
@@ -193,7 +255,21 @@ export class CalendarComponent implements OnInit {
     if (cal) this.selectedYear.set(cal.year);
     this.selectedDay.set(null);
     this.currentPage.set(0);
-    this.calendarEntryService.getEntriesForCalendar(id).subscribe(entries => this.entries.set(entries));
+    // Refresh the Presidence apply-button badge for the new selection.
+    this.refreshPendingCount();
+
+    const cached = this._entriesCache.get(id);
+    if (cached) {
+      this.entries.set(cached);
+    } else {
+      this.loadingEntries.set(true);
+      this.calendarEntryService.getEntriesForCalendar(id).subscribe(entries => {
+        this._entriesCache.set(id, entries);
+        this.entries.set(entries);
+        this.loadingEntries.set(false);
+      });
+    }
+    this.campaignService.listCampaigns().subscribe(campaigns => this.activeCampaigns.set(campaigns));
   }
 
   prevCalendar(): void {
@@ -252,26 +328,51 @@ export class CalendarComponent implements OnInit {
     return { day: sel.day, month: sel.month, year, dayOfWeek, events, campaigns: [] };
   });
 
-  openDayDetail(day: number | null, month: number): void {
+  // ── Day modal — library events ────────────────────
+  readonly dayModalEvents   = signal<HistoricalEvent[]>([]);
+  readonly dayModalLoading  = signal(false);
+  readonly dayModalSearch   = signal('');
+  readonly dayModalSaving   = signal(false);
+
+  readonly filteredDayEvents = computed(() => {
+    const q = this.dayModalSearch().toLowerCase().trim();
+    return q
+      ? this.dayModalEvents().filter(e =>
+          e.title.toLowerCase().includes(q) ||
+          e.event_date.slice(0, 4).includes(q),
+        )
+      : this.dayModalEvents();
+  });
+
+  async openDayDetail(day: number | null, month: number): Promise<void> {
     if (day === null) return;
     this.selectedDay.set({ day, month });
+    this.dayModalSearch.set('');
+    await this._loadDayModalEvents(`${pad2(month + 1)}-${pad2(day)}`);
   }
 
   closeDayDetail(): void {
     this.selectedDay.set(null);
+    this.dayModalEvents.set([]);
+    this.dayModalSearch.set('');
   }
 
   navigateToPrevDay(): void {
     const sel = this.selectedDay();
     if (!sel) return;
     const { day, month } = sel;
+    let newDay = day, newMonth = month;
     if (day > 1) {
-      this.selectedDay.set({ day: day - 1, month });
+      newDay = day - 1;
     } else if (month > 0) {
-      const prevMonth = month - 1;
-      const lastDay = daysInMonth(this.selectedYear(), prevMonth);
-      this.selectedDay.set({ day: lastDay, month: prevMonth });
+      newMonth = month - 1;
+      newDay = daysInMonth(this.selectedYear(), newMonth);
+    } else {
+      return;
     }
+    this.selectedDay.set({ day: newDay, month: newMonth });
+    this.dayModalSearch.set('');
+    this._loadDayModalEvents(`${pad2(newMonth + 1)}-${pad2(newDay)}`);
   }
 
   navigateToNextDay(): void {
@@ -279,25 +380,104 @@ export class CalendarComponent implements OnInit {
     if (!sel) return;
     const { day, month } = sel;
     const maxDay = daysInMonth(this.selectedYear(), month);
+    let newDay = day, newMonth = month;
     if (day < maxDay) {
-      this.selectedDay.set({ day: day + 1, month });
+      newDay = day + 1;
     } else if (month < 11) {
-      this.selectedDay.set({ day: 1, month: month + 1 });
+      newMonth = month + 1;
+      newDay = 1;
+    } else {
+      return;
+    }
+    this.selectedDay.set({ day: newDay, month: newMonth });
+    this.dayModalSearch.set('');
+    this._loadDayModalEvents(`${pad2(newMonth + 1)}-${pad2(newDay)}`);
+  }
+
+  private async _loadDayModalEvents(mmdd: string): Promise<void> {
+    this.dayModalLoading.set(true);
+    const events = await firstValueFrom(this.eventService.listEventsByMmdd(mmdd));
+    const sel = this.selectedDay();
+    if (sel && `${pad2(sel.month + 1)}-${pad2(sel.day)}` === mmdd) {
+      this.dayModalEvents.set(events);
+    }
+    this.dayModalLoading.set(false);
+  }
+
+  // ── Slot helpers ──────────────────────────────────
+  getSlotEvent(position: EventPosition): DayEvent | null {
+    return this.selectedDayDetail()?.events.find(e => e.displayPosition === position) ?? null;
+  }
+
+  isEventAtPosition(eventId: string, position: EventPosition): boolean {
+    return this.selectedDayDetail()?.events.some(e => e.id === eventId && e.displayPosition === position) ?? false;
+  }
+
+  isSlotFilled(position: EventPosition): boolean {
+    return this.getSlotEvent(position) !== null;
+  }
+
+  // ── Assign / unassign ─────────────────────────────
+  async toggleSlot(eventId: string, position: EventPosition): Promise<void> {
+    if (this.isEventAtPosition(eventId, position)) {
+      await this.unassignFromSlot(position);
+    } else {
+      await this.assignToSlot(eventId, position);
     }
   }
 
-  // ── Navigation shortcuts ──────────────────────────
-  editEvent(_eventId: string): void {
-    this.router.navigate(['/evenements']);
+  async assignToSlot(eventId: string, position: EventPosition): Promise<void> {
+    const calId = this.selectedCalendarId();
+    const sel   = this.selectedDay();
+    if (!calId || !sel || this.dayModalSaving()) return;
+    const mmdd = `${pad2(sel.month + 1)}-${pad2(sel.day)}`;
+    this.dayModalSaving.set(true);
+    const res = await firstValueFrom(
+      this.calendarEntryService.assignEvent(calId, mmdd, eventId, position),
+    );
+    if (res.success) {
+      const entries = await firstValueFrom(
+        this.calendarEntryService.getEntriesForCalendar(calId),
+      );
+      this._entriesCache.set(calId, entries);
+      this.entries.set(entries);
+    } else {
+      this.toast.error(
+        res.error === 'insufficient_privilege'
+          ? 'Votre rôle ne permet pas de modifier les affectations du calendrier.'
+          : (res.error ?? 'Erreur lors de l\'assignation.'),
+      );
+    }
+    this.dayModalSaving.set(false);
   }
 
-  addEventForDay(): void {
-    this.router.navigate(['/evenements']);
+  async unassignFromSlot(position: EventPosition): Promise<void> {
+    const calId = this.selectedCalendarId();
+    const sel   = this.selectedDay();
+    if (!calId || !sel || this.dayModalSaving()) return;
+    const mmdd = `${pad2(sel.month + 1)}-${pad2(sel.day)}`;
+    this.dayModalSaving.set(true);
+    const res = await firstValueFrom(
+      this.calendarEntryService.unassignSlot(calId, mmdd, position),
+    );
+    if (res.success) {
+      const entries = await firstValueFrom(
+        this.calendarEntryService.getEntriesForCalendar(calId),
+      );
+      this._entriesCache.set(calId, entries);
+      this.entries.set(entries);
+    } else {
+      this.toast.error(
+        res.error === 'insufficient_privilege'
+          ? 'Votre rôle ne permet pas de modifier les affectations du calendrier.'
+          : (res.error ?? 'Erreur lors du retrait.'),
+      );
+    }
+    this.dayModalSaving.set(false);
   }
 
-  editCampaign(_campaignId: string): void {
-    this.router.navigate(['/campagnes']);
-  }
+  goToEvents(): void { this.router.navigate(['/evenements']); }
+  goToCampaigns(): void { this.router.navigate(['/campagnes']); }
 
   // ── Helpers ───────────────────────────────────────
   statusBadgeClass(status: Calendar['status']): string {
@@ -333,6 +513,51 @@ export class CalendarComponent implements OnInit {
 
   readonly canPublish = computed(() => this.selectedCalendar()?.status === 'draft');
 
+  // ── Presidency apply flow ──────────────────────────────────────────────
+  /** Refresh the pending-count badge for the currently selected calendar. */
+  async refreshPendingCount(): Promise<void> {
+    const id = this.selectedCalendarId();
+    if (!id) { this.pendingRecommendationsCount.set(0); return; }
+    const count = await firstValueFrom(this.recommendationService.countPending(id));
+    this.pendingRecommendationsCount.set(count);
+  }
+
+  /** Compute conflict list and open the confirm dialog. */
+  async openApplyDialog(): Promise<void> {
+    const id = this.selectedCalendarId();
+    if (!id) return;
+    if (!this.canApplyRecommendations()) return;
+    const [recs, entries] = await Promise.all([
+      firstValueFrom(this.recommendationService.listByCalendar(id)),
+      firstValueFrom(this.calendarEntryService.getEntriesForCalendar(id)),
+    ]);
+    const conflicts = this.recommendationService.getConflicts(recs, entries);
+    this.applyConflicts.set(conflicts);
+    this.applyDialogVisible.set(true);
+  }
+
+  cancelApply(): void {
+    this.applyDialogVisible.set(false);
+    this.applyConflicts.set([]);
+  }
+
+  async confirmApply(): Promise<void> {
+    const id = this.selectedCalendarId();
+    if (!id || this.recommendationsApplying()) return;
+    if (!this.canApplyRecommendations()) return;
+    this.recommendationsApplying.set(true);
+    const result = await firstValueFrom(this.recommendationService.applyAll(id, true));
+    this.recommendationsApplying.set(false);
+    this.applyDialogVisible.set(false);
+    this.applyConflicts.set([]);
+    if (!result.success) {
+      this.toast.error(result.error ?? 'Échec de l\'application des recommandations.');
+      return;
+    }
+    this.toast.success(`${result.applied ?? 0} recommandation(s) appliquée(s).`);
+    await this.refreshPendingCount();
+  }
+
   async publishCalendar(): Promise<void> {
     if (this.publishing()) return;
     const calId = this.selectedCalendarId();
@@ -359,6 +584,7 @@ export class CalendarComponent implements OnInit {
   readonly monthCells = computed<DayCell[]>(() => {
     const year = this.selectedYear(), month = this.selectedMonth();
     const byMmdd = this.entriesByMmdd();
+    const campByMmdd = this.campaignByMmdd();
     const dim = daysInMonth(year, month), offset = dowMondayFirst(year, month, 1);
     return Array.from({ length: 42 }, (_, i) => {
       const d = i - offset + 1;
@@ -369,7 +595,7 @@ export class CalendarComponent implements OnInit {
       const pos1 = dayEntries.find(e => e.position === 1);
       const pos2 = dayEntries.find(e => e.position === 2);
       const pinnedCount = ((pos1 ? 1 : 0) + (pos2 ? 1 : 0)) as 0 | 1 | 2;
-      return { d, isToday, totalEvents: dayEntries.length, pinnedCount, title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null, ad: false };
+      return { d, isToday, totalEvents: dayEntries.length, pinnedCount, title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null, ad: campByMmdd.has(mmdd) };
     });
   });
 
@@ -393,6 +619,7 @@ export class CalendarComponent implements OnInit {
   readonly listRows = computed<DateRow[]>(() => {
     const year = this.selectedYear();
     const byMmdd = this.entriesByMmdd();
+    const campByMmdd = this.campaignByMmdd();
     const rows: DateRow[] = [];
     for (let month = 0; month < 12; month++) {
       const dim = daysInMonth(year, month);
@@ -411,7 +638,7 @@ export class CalendarComponent implements OnInit {
           pinnedCount,
           title: pos1?.event.title ?? dayEntries[0]?.event.title ?? null,
           sub: dayEntries.length > 1 ? `+ ${dayEntries[dayEntries.length - 1].event.title}` : null,
-          ad: '—',
+          ad: campByMmdd.get(mmdd) ?? '—',
           status: dayEntries.length === 0 ? 'empty' : pinnedCount > 0 ? 'published' : 'draft',
         });
       }
@@ -423,10 +650,11 @@ export class CalendarComponent implements OnInit {
     const filter = this.activeFilter();
     const rows = this.listRows();
     switch (filter) {
-      case 'full':    return rows.filter(r => r.pinnedCount === 2);
-      case 'partial': return rows.filter(r => r.pinnedCount === 1);
-      case 'empty':   return rows.filter(r => r.totalEvents === 0);
-      default:        return rows;
+      case 'full':         return rows.filter(r => r.pinnedCount === 2);
+      case 'partial':      return rows.filter(r => r.pinnedCount === 1);
+      case 'empty':        return rows.filter(r => r.totalEvents === 0);
+      case 'has_campaign': return rows.filter(r => r.ad !== '—');
+      default:             return rows;
     }
   });
 
@@ -477,7 +705,6 @@ export class CalendarComponent implements OnInit {
   readonly showDupModal        = signal(false);
   readonly dupSourceId         = signal('');
   readonly dupIncludeEvents    = signal(true);
-  readonly dupIncludeCampaigns = signal(true);
   readonly dupTargetType       = signal<'existing' | 'new'>('existing');
   readonly dupTargetId         = signal('');
   readonly dupNewYear          = signal(0);
@@ -497,7 +724,6 @@ export class CalendarComponent implements OnInit {
     const selId = this.selectedCalendarId();
     this.dupSourceId.set(selId);
     this.dupIncludeEvents.set(true);
-    this.dupIncludeCampaigns.set(true);
     this.dupTargetType.set('existing');
     const targets = this.sortedCalendars().filter(c => c.id !== selId && c.status !== 'archived');
     this.dupTargetId.set(targets[0]?.id ?? '');
@@ -520,15 +746,14 @@ export class CalendarComponent implements OnInit {
   confirmDuplicate(): void {
     const src = this.dupSourceCalendar();
     if (!src) return;
-    const evCount   = this.dupIncludeEvents()    ? src.eventCount    : 0;
-    const campCount = this.dupIncludeCampaigns() ? src.campaignCount : 0;
+    const evCount = this.dupIncludeEvents() ? src.eventCount : 0;
     if (this.dupTargetType() === 'new') {
       const year = this.dupNewYear(), name = this.dupNewName().trim() || `Calendrier ${year}`;
       const newId = `cal-${Date.now()}`;
       this.calendars.update(cals => [...cals, {
         id: newId, year, name, status: 'draft' as const,
         createdBy: null, publishedAt: null,
-        eventCount: evCount, campaignCount: campCount,
+        eventCount: evCount,
         fillPct: this.dupIncludeEvents() ? src.fillPct : 0,
       }]);
       this.dupResultCalId.set(newId);
@@ -536,7 +761,7 @@ export class CalendarComponent implements OnInit {
       const targetId = this.dupTargetId();
       this.calendars.update(cals => cals.map(c =>
         c.id !== targetId ? c : {
-          ...c, eventCount: c.eventCount + evCount, campaignCount: c.campaignCount + campCount,
+          ...c, eventCount: c.eventCount + evCount,
           fillPct: this.dupIncludeEvents()
             ? Math.min(100, Math.round((c.fillPct + src.fillPct) / 2)) : c.fillPct,
         }

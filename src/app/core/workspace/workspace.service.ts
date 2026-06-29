@@ -1,12 +1,15 @@
 import { Injectable } from '@angular/core';
-import { Observable, forkJoin, from, switchMap } from 'rxjs';
+import { Observable, from, switchMap } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { AppRole, ManageUserAction, UserListEntry, Workspace, WorkspaceSummary } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
+import { WorkspaceContextService } from './workspace-context.service';
 import { environment } from '../../../environments/environment';
+import { inject } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceService {
+  private workspaceContext = inject(WorkspaceContextService);
   constructor(private supabaseService: SupabaseService) {}
 
   hasWorkspace(): Observable<boolean> {
@@ -23,49 +26,77 @@ export class WorkspaceService {
     ).pipe(map(({ data }) => (data as Workspace[]) ?? []));
   }
 
+  /**
+   * Returns the caller's workspace list with accurate per-workspace member
+   * counts via the `get_my_workspace_summaries()` RPC. Replaces the previous
+   * client-side double-query which applied one global member count to every
+   * row.
+   */
   getWorkspaceSummaries(): Observable<WorkspaceSummary[]> {
-    const workspaces$ = from(
-      this.supabaseService.client.from('workspaces').select('id, name, logo_url'),
-    );
-    const memberCount$ = from(
-      this.supabaseService.client
-        .from('workspace_members')
-        .select('*', { count: 'exact', head: true }),
-    );
-
-    return forkJoin([workspaces$, memberCount$]).pipe(
-      map(([{ data: workspaces }, { count }]) =>
-        (workspaces ?? []).map((ws) => ({
+    return from(this.supabaseService.client.rpc('get_my_workspace_summaries')).pipe(
+      map(({ data }: any) =>
+        (data ?? []).map((ws: any) => ({
           id: ws.id,
           name: ws.name,
           logo_url: ws.logo_url ?? null,
-          member_count: count ?? 0,
-          last_accessed_at: null,
-        })),
+          member_count: ws.member_count ?? 0,
+          last_accessed_at: ws.last_accessed_at ?? null,
+        }) as WorkspaceSummary),
       ),
     );
   }
 
-  upsertProfile(userId: string, fullName: string, phone: string, avatarUrl?: string): Observable<void> {
+  /**
+   * All three profile methods are workspace-scoped. The active workspace
+   * defaults to `WorkspaceContextService.activeWorkspaceId()` when no
+   * explicit workspace_id is passed. Returns / writes to the row keyed by
+   * (user_id, workspace_id) — same user can have different name / phone /
+   * avatar per workspace.
+   */
+  private resolveWorkspaceId(explicit?: string | null): string | null {
+    return explicit ?? this.workspaceContext.activeWorkspaceId();
+  }
+
+  upsertProfile(userId: string, fullName: string, phone: string, avatarUrl?: string, workspaceId?: string | null): Observable<{ success: boolean; error?: string }> {
+    const workspace_id = this.resolveWorkspaceId(workspaceId);
+    if (!workspace_id) return from(Promise.resolve({ success: false, error: 'Aucun espace de travail actif' }));
     const payload: Record<string, any> = {
       user_id: userId,
+      workspace_id,
       full_name: fullName || null,
       phone: phone || null,
     };
     if (avatarUrl !== undefined) payload['avatar_url'] = avatarUrl;
     return from(
-      this.supabaseService.client.from('profiles').upsert(payload, { onConflict: 'user_id' }),
-    ).pipe(map(() => undefined));
+      this.supabaseService.client.from('profiles').upsert(payload, { onConflict: 'user_id,workspace_id' }),
+    ).pipe(
+      map(({ error }: any) =>
+        error ? { success: false, error: error.message } : { success: true },
+      ),
+    );
   }
 
-  getMyProfile(userId: string): Observable<{ full_name: string | null; phone: string | null; avatar_url: string | null } | null> {
+  getMyProfile(userId: string, workspaceId?: string | null): Observable<{ full_name: string | null; phone: string | null; avatar_url: string | null } | null> {
+    const workspace_id = this.resolveWorkspaceId(workspaceId);
+    if (!workspace_id) return from(Promise.resolve(null));
     return from(
       this.supabaseService.client
         .from('profiles')
         .select('full_name, phone, avatar_url')
         .eq('user_id', userId)
+        .eq('workspace_id', workspace_id)
         .maybeSingle(),
     ).pipe(map(({ data }) => data));
+  }
+
+  saveAppearance(userId: string, theme: string, colorMode: string, workspaceId?: string | null): Observable<void> {
+    const workspace_id = this.resolveWorkspaceId(workspaceId);
+    if (!workspace_id) return from(Promise.resolve(undefined));
+    return from(
+      this.supabaseService.client
+        .from('profiles')
+        .upsert({ user_id: userId, workspace_id, theme, color_mode: colorMode }, { onConflict: 'user_id,workspace_id' }),
+    ).pipe(map(() => undefined));
   }
 
   updateWorkspace(id: string, name: string): Observable<{ success: boolean; error?: string }> {
@@ -80,6 +111,39 @@ export class WorkspaceService {
       map(({ error }: any) =>
         error ? { success: false, error: error.message } : { success: true },
       ),
+    );
+  }
+
+  uploadAvatar(userId: string, file: File, workspaceId?: string | null): Observable<{ success: boolean; avatarUrl?: string; error?: string }> {
+    const workspace_id = this.resolveWorkspaceId(workspaceId);
+    if (!workspace_id) {
+      return from(Promise.resolve({ success: false, error: 'Aucun espace de travail actif' }));
+    }
+    // Store the avatar under a per-workspace path so a user can have a different
+    // avatar per tenant. Old path was `${userId}/avatar.ext` (single avatar
+    // shared across workspaces); new path is `${userId}/${workspace_id}/avatar.ext`.
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const storagePath = `${userId}/${workspace_id}/avatar.${ext}`;
+    return from(
+      this.supabaseService.client.storage
+        .from('avatars')
+        .upload(storagePath, file, { upsert: true }),
+    ).pipe(
+      switchMap(({ data, error }: any) => {
+        if (error) return [{ success: false, error: error.message as string }];
+        const avatarUrl = this.supabaseService.client.storage
+          .from('avatars')
+          .getPublicUrl(data!.path).data.publicUrl;
+        return from(
+          this.supabaseService.client
+            .from('profiles')
+            .upsert({ user_id: userId, workspace_id, avatar_url: avatarUrl }, { onConflict: 'user_id,workspace_id' }),
+        ).pipe(
+          map(({ error: dbErr }: any) =>
+            dbErr ? { success: false, error: dbErr.message as string } : { success: true, avatarUrl },
+          ),
+        );
+      }),
     );
   }
 
@@ -128,10 +192,15 @@ export class WorkspaceService {
   }
 
   inviteUser(email: string, role: AppRole): Observable<{ success: boolean; error?: string }> {
+    const workspace_id = this.workspaceContext.activeWorkspaceId();
+    if (!workspace_id) {
+      return from(Promise.resolve({ success: false, error: "Aucun espace de travail actif" }));
+    }
     return from(
       this.supabaseService.invoke<{ id: string; email: string }>('invite-user', {
         email,
         role,
+        workspace_id,
         redirectTo: `${environment.appUrl}/dashboard`,
       }),
     ).pipe(
@@ -142,7 +211,9 @@ export class WorkspaceService {
   }
 
   listUsers(): Observable<UserListEntry[]> {
-    return from(this.supabaseService.invoke<UserListEntry[]>('list-users', {})).pipe(
+    const workspace_id = this.workspaceContext.activeWorkspaceId();
+    if (!workspace_id) return from(Promise.resolve([] as UserListEntry[]));
+    return from(this.supabaseService.invoke<UserListEntry[]>('list-users', { workspace_id })).pipe(
       map(({ data, error }) => (error || !data ? [] : data)),
     );
   }
@@ -151,9 +222,15 @@ export class WorkspaceService {
     userId: string,
     action: ManageUserAction,
     role?: AppRole,
+    password?: string,
   ): Observable<{ success: boolean; error?: string }> {
-    const body: Record<string, unknown> = { userId, action };
+    const workspace_id = this.workspaceContext.activeWorkspaceId();
+    if (!workspace_id) {
+      return from(Promise.resolve({ success: false, error: "Aucun espace de travail actif" }));
+    }
+    const body: Record<string, unknown> = { userId, action, workspace_id };
     if (role) body['role'] = role;
+    if (password) body['password'] = password;
     return from(this.supabaseService.invoke<{ success: boolean }>('manage-user', body)).pipe(
       map(({ error }) =>
         error ? { success: false, error: error.message } : { success: true },

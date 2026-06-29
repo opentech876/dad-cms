@@ -1,74 +1,241 @@
 <div class="users-page">
-
   <!-- ── KPI strip ── -->
-  <div class="kpi-grid" style="margin-bottom:16px;">
-    <div class="card" style="padding:18px 20px;">
-      <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Membres actifs</div>
-      <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1;">{{ kpiTotal() }}</div>
-      <div style="margin-top:10px; font-size:12px; color:var(--fg-3);">sur {{ kpiTotal() }} invités</div>
+  <div class="kpi-grid" style="margin-bottom: 16px">
+    <div class="card" style="padding: 18px 20px">
+      <div
+        style="
+          font-size: 11px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--fg-3);
+          font-weight: 600;
+        "
+      >
+        Membres actifs
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 6px;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          color: var(--accent);
+        "
+      >
+        {{ kpiTotal() }}
+      </div>
+      <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">
+        sur {{ kpiTotal() }} invités
+      </div>
     </div>
-    <div class="card" style="padding:18px 20px;">
-      <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Propriétaires</div>
-      <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--accent);">{{ kpiOwners() }}</div>
-      <div style="margin-top:10px; font-size:12px; color:var(--fg-3);">accès complet</div>
+    <div class="card" style="padding: 18px 20px">
+      <div
+        style="
+          font-size: 11px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--fg-3);
+          font-weight: 600;
+        "
+      >
+        Propriétaires
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 6px;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          color: var(--accent);
+        "
+      >
+        {{ kpiOwners() }}
+      </div>
+      <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">accès complet</div>
     </div>
-    <div class="card" style="padding:18px 20px;">
-      <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Éditeurs</div>
-      <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--info);">{{ kpiEditors() }}</div>
-      <div style="margin-top:10px; font-size:12px; color:var(--fg-3);">contenu historique</div>
+    <div class="card" style="padding: 18px 20px">
+      <div
+        style="
+          font-size: 11px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--fg-3);
+          font-weight: 600;
+        "
+      >
+        Éditeurs
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 6px;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          color: var(--info);
+        "
+      >
+        {{ kpiEditors() }}
+      </div>
+      <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">contenu historique</div>
     </div>
-    <div class="card" style="padding:18px 20px;">
-      <div style="font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Chargés com.</div>
-      <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; margin-top:6px; letter-spacing:-0.02em; line-height:1; color:var(--warning);">{{ kpiComm() }}</div>
-      <div style="margin-top:10px; font-size:12px; color:var(--fg-3);">campagnes pub.</div>
+    <div class="card" style="padding: 18px 20px">
+      <div
+        style="
+          font-size: 11px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--fg-3);
+          font-weight: 600;
+        "
+      >
+        Chargés com.
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 6px;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          color: var(--warning);
+        "
+      >
+        {{ kpiComm() }}
+      </div>
+      <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">campagnes pub.</div>
+    </div>
+    <div class="card" style="padding: 18px 20px">
+      <div
+        style="
+          font-size: 11px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--fg-3);
+          font-weight: 600;
+        "
+      >
+        Présidence
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 6px;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          color: var(--accent);
+        "
+      >
+        {{ kpiPresidence() }}
+      </div>
+      <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">recommandations éditoriales</div>
+    </div>
+    <div class="card" style="padding: 18px 20px">
+      <div
+        style="
+          font-size: 11px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--fg-3);
+          font-weight: 600;
+        "
+      >
+        Chef d'équipe comm.
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 6px;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          color: var(--warning);
+        "
+      >
+        {{ kpiCommercialLead() }}
+      </div>
+      <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">supervision commerciale</div>
     </div>
   </div>
 
   <!-- ── Toolbar ── -->
-  <div class="card" style="padding:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-    <div class="input-group" style="width:320px;">
+  <div
+    class="card"
+    style="
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    "
+  >
+    <div class="input-group" style="width: 320px">
       <span class="input-icon">&#128269;</span>
-      <input class="input has-icon" placeholder="Rechercher par nom ou e-mail…"
-             [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)"
-             style="height:36px; font-size:13px;">
+      <input
+        class="input has-icon"
+        placeholder="Rechercher par nom ou e-mail…"
+        [value]="searchQuery()"
+        (input)="searchQuery.set($any($event.target).value)"
+        style="height: 36px; font-size: 13px"
+      />
     </div>
-    <select class="select" style="width:170px; height:36px; font-size:13px;">
+    <select class="select" style="width: 170px; height: 36px; font-size: 13px">
       <option>Tous les rôles</option>
       <option>Propriétaire</option>
       <option>Chef d'équipe</option>
       <option>Éditeur</option>
       <option>Chargé comm.</option>
+      <option>Chef d'équipe comm.</option>
+      <option>Présidence</option>
     </select>
-    <div style="flex:1;"></div>
+    <div style="flex: 1"></div>
     <button class="btn btn-primary btn-sm" type="button" (click)="openInviteModal()">
-      <tui-icon icon="@tui.user-plus" style="font-size:14px;" />
+      <tui-icon icon="@tui.user-plus" style="font-size: 14px" />
       Inviter un membre
     </button>
   </div>
 
   <!-- ── Users table ── -->
-  <div class="card" style="margin-bottom:20px;">
+  <div class="card" style="margin-bottom: 20px">
     @if (loading()) {
       @for (_ of [1, 2, 3]; track $index) {
         <div class="users-skeleton-row">
           <div class="skeleton users-skeleton-avatar"></div>
           <div class="users-skeleton-lines">
-            <div class="skeleton" style="height:12px; width:140px; border-radius:4px;"></div>
-            <div class="skeleton" style="height:11px; width:80px; border-radius:4px; margin-top:6px;"></div>
+            <div class="skeleton" style="height: 12px; width: 140px; border-radius: 4px"></div>
+            <div
+              class="skeleton"
+              style="height: 11px; width: 80px; border-radius: 4px; margin-top: 6px"
+            ></div>
           </div>
-          <div class="skeleton" style="height:22px; width:90px; border-radius:99px; margin-left:auto;"></div>
+          <div
+            class="skeleton"
+            style="height: 22px; width: 90px; border-radius: 99px; margin-left: auto"
+          ></div>
         </div>
       }
     } @else if (isEmpty()) {
-      <div class="empty" style="padding:40px 20px;">
+      <div class="empty" style="padding: 40px 20px">
         <div class="empty-icon">
-          <tui-icon icon="@tui.users" style="font-size:22px;" />
+          <tui-icon icon="@tui.users" style="font-size: 22px" />
         </div>
         <p class="empty-title">Aucun membre</p>
-        <p style="font-size:13px; color:var(--fg-3);">Invitez des collaborateurs pour commencer.</p>
+        <p style="font-size: 13px; color: var(--fg-3)">
+          Invitez des collaborateurs pour commencer.
+        </p>
       </div>
     } @else {
-      <div class="table-wrap" style="border-radius:0; border:none; box-shadow:none;">
+      <div class="table-wrap" style="border-radius: 0; border: none; box-shadow: none">
         <table class="table">
           <thead>
             <tr>
@@ -76,30 +243,46 @@
               <th>Rôle</th>
               <th>Statut</th>
               <th>Rejoint le</th>
-              <th style="width:60px;"></th>
+              <th style="width: 100px"></th>
             </tr>
           </thead>
           <tbody>
             @for (user of filteredUsers(); track user.userId) {
               <tr>
                 <td>
-                  <div style="display:flex; align-items:center; gap:12px;">
+                  <div style="display: flex; align-items: center; gap: 12px">
                     @if (user.avatarUrl) {
                       <img class="avatar" [src]="user.avatarUrl" [alt]="user.fullName ?? ''" />
                     } @else {
                       <div class="avatar">{{ initials(user) }}</div>
                     }
                     <div>
-                      <div style="font-weight:500;">{{ user.fullName ?? 'Sans nom' }}</div>
-                      <div style="font-size:12px; color:var(--fg-3);">{{ user.email ?? (user.userId | slice: 0 : 8) + '…' }}</div>
+                      <div style="font-weight: 500">{{ user.fullName ?? 'Sans nom' }}</div>
+                      <div style="font-size: 12px; color: var(--fg-3)">
+                        {{ user.email ?? (user.userId | slice: 0 : 8) + '…' }}
+                      </div>
                     </div>
                   </div>
                 </td>
                 <td>
-                  @if (user.role === 'owner') { <span class="badge badge-accent">★ Propriétaire</span> }
-                  @if (user.role === 'chef_equipe') { <span class="badge badge-info">Chef d'équipe</span> }
-                  @if (user.role === 'editeur') { <span class="badge">Éditeur</span> }
-                  @if (user.role === 'charge_communication') { <span class="badge badge-warning">Chargé comm.</span> }
+                  @if (user.role === 'owner') {
+                    <span class="badge badge-accent">★ Propriétaire</span>
+                  }
+                  @if (user.role === 'chef_equipe') {
+                    <span class="badge badge-info">Chef d'équipe</span>
+                  }
+                  @if (user.role === 'editeur') {
+                    <span class="badge">Éditeur</span>
+                  }
+                  @if (user.role === 'charge_communication') {
+                    <span class="badge badge-warning">Chargé comm.</span>
+                  }
+                  @if (user.role === 'presidence') {
+                    <span class="badge badge-accent">Présidence</span>
+                  }
+                  @if (user.role === 'chef_equipe_commerciale') {
+                    <span class="badge badge-warning">Chef d'équipe comm.</span>
+                  }
                 </td>
                 <td>
                   @if (user.banned) {
@@ -112,24 +295,59 @@
                     <span class="badge badge-success badge-dot">Actif</span>
                   }
                 </td>
-                <td style="font-size:13px; color:var(--fg-2);">{{ user.joinedAt | date: 'd MMM yyyy' : '' : 'fr' }}</td>
-                <td style="position:relative;">
+                <td style="font-size: 13px; color: var(--fg-2)">
+                  {{ user.joinedAt | date: 'd MMM yyyy' : '' : 'fr' }}
+                </td>
+                <td>
                   @if (user.role !== 'owner') {
-                    <button class="btn btn-flat btn-icon btn-sm" title="Options" type="button"
-                            (click)="activeMenuUserId() === user.userId ? closeActionsMenu() : openActionsMenu(user.userId)">
-                      <tui-icon icon="@tui.ellipsis" style="font-size:16px;" />
-                    </button>
-                    @if (activeMenuUserId() === user.userId) {
-                      <div class="actions-dropdown" (click)="$event.stopPropagation()">
-                        @if (user.banned) {
-                          <button class="actions-dropdown__item" type="button" (click)="handleAction(user.userId, 'unblock'); closeActionsMenu()">Débloquer</button>
-                        } @else {
-                          <button class="actions-dropdown__item" type="button" (click)="handleAction(user.userId, 'block'); closeActionsMenu()">Bloquer</button>
-                        }
-                        <button class="actions-dropdown__item actions-dropdown__item--danger" type="button"
-                                (click)="handleAction(user.userId, 'remove'); closeActionsMenu()">Retirer du workspace</button>
-                      </div>
-                    }
+                    <div style="display: flex; gap: 2px; align-items: center">
+                      <button
+                        class="btn btn-flat btn-icon btn-sm"
+                        title="Changer le rôle"
+                        type="button"
+                        (click)="openRoleModal(user.userId)"
+                      >
+                        <tui-icon icon="@tui.shield" style="font-size: 14px" />
+                      </button>
+                      <button
+                        class="btn btn-flat btn-icon btn-sm"
+                        title="Définir un mot de passe"
+                        type="button"
+                        (click)="openPasswordModal(user.userId)"
+                      >
+                        <tui-icon icon="@tui.key-round" style="font-size: 14px" />
+                      </button>
+                      @if (user.banned) {
+                        <button
+                          class="btn btn-flat btn-icon btn-sm"
+                          title="Débloquer l'accès"
+                          type="button"
+                          style="color: var(--success)"
+                          (click)="openConfirmModal(user.userId, 'unblock')"
+                        >
+                          <tui-icon icon="@tui.lock-open" style="font-size: 14px" />
+                        </button>
+                      } @else {
+                        <button
+                          class="btn btn-flat btn-icon btn-sm"
+                          title="Bloquer l'accès"
+                          type="button"
+                          style="color: var(--warning)"
+                          (click)="openConfirmModal(user.userId, 'block')"
+                        >
+                          <tui-icon icon="@tui.ban" style="font-size: 14px" />
+                        </button>
+                      }
+                      <button
+                        class="btn btn-flat btn-icon btn-sm"
+                        title="Retirer du workspace"
+                        type="button"
+                        style="color: var(--error)"
+                        (click)="openConfirmModal(user.userId, 'remove')"
+                      >
+                        <tui-icon icon="@tui.user-x" style="font-size: 14px" />
+                      </button>
+                    </div>
                   }
                 </td>
               </tr>
@@ -140,6 +358,94 @@
     }
   </div>
 
+  <!-- ── Pending invitations ── -->
+  @if (pendingInvitations().length > 0) {
+    <div class="card" style="margin-top: 20px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Invitations en attente</div>
+          <div class="card-subtitle">
+            {{ pendingInvitations().length }} invitation(s) envoyée(s) mais non encore acceptée(s).
+          </div>
+        </div>
+      </div>
+
+      @if (invitationActionError()) {
+        <div style="margin: 0 20px 12px 20px; color: var(--danger); font-size: 12.5px;">
+          {{ invitationActionError() }}
+        </div>
+      }
+
+      <div class="table-wrap" style="border-radius: 0; border: none; box-shadow: none">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>E-mail</th>
+              <th>Rôle prévu</th>
+              <th>Invité le</th>
+              <th style="width: 180px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of filteredPendingInvitations(); track user.userId) {
+              <tr style="opacity: 0.92;">
+                <td>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="avatar" style="background: var(--bg-sunken); color: var(--fg-3); font-size: 11px;">
+                      <tui-icon icon="@tui.mail" style="font-size: 14px;" />
+                    </div>
+                    <div>
+                      <div style="font-size: 13.5px; font-weight: 500;">{{ user.email ?? '—' }}</div>
+                      <div style="font-size: 11.5px; color: var(--fg-3);">en attente d'acceptation</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span class="role-badge role-badge--{{ user.role }}">{{ roleLabels[user.role] }}</span>
+                </td>
+                <td style="font-size: 12.5px; color: var(--fg-3);">
+                  @if (user.invitedAt) {
+                    {{ user.invitedAt | date: 'd MMM yyyy' : '' : 'fr' }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>
+                  <div style="display: flex; gap: 2px; align-items: center; justify-content: flex-end;">
+                    <button
+                      class="btn btn-flat btn-sm"
+                      title="Renvoyer le lien d'invitation"
+                      type="button"
+                      [disabled]="invitationActionBusyId() === user.userId"
+                      (click)="resendInvitation(user.userId)"
+                    >
+                      @if (invitationActionBusyId() === user.userId) {
+                        <span class="spinner"></span>
+                      } @else {
+                        <tui-icon icon="@tui.mail" style="font-size: 13px" />
+                      }
+                      Renvoyer
+                    </button>
+                    <button
+                      class="btn btn-flat btn-icon btn-sm"
+                      title="Révoquer l'invitation"
+                      type="button"
+                      style="color: var(--error)"
+                      [disabled]="invitationActionBusyId() === user.userId"
+                      (click)="revokeInvitation(user.userId)"
+                    >
+                      <tui-icon icon="@tui.x" style="font-size: 14px" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
   <!-- ── Permissions matrix ── -->
   <div class="card">
     <div class="card-header">
@@ -148,27 +454,29 @@
         <div class="card-subtitle">Permissions par rôle — appliquées via RLS Supabase</div>
       </div>
     </div>
-    <div class="table-wrap" style="border-radius:0; border:none; box-shadow:none;">
-      <table class="table" style="font-size:12.5px;">
+    <div class="table-wrap" style="border-radius: 0; border: none; box-shadow: none">
+      <table class="table" style="font-size: 12.5px">
         <thead>
           <tr>
             <th>Action</th>
-            <th style="text-align:center;">Propriétaire</th>
-            <th style="text-align:center;">Chef d'équipe</th>
-            <th style="text-align:center;">Éditeur</th>
-            <th style="text-align:center;">Chargé comm.</th>
+            <th style="text-align: center">Propriétaire</th>
+            <th style="text-align: center">Chef d'équipe</th>
+            <th style="text-align: center">Éditeur</th>
+            <th style="text-align: center">Chargé comm.</th>
+            <th style="text-align: center">Présidence</th>
+            <th style="text-align: center">Chef d'éq. comm.</th>
           </tr>
         </thead>
         <tbody>
           @for (row of permissionsMatrix; track row[0]) {
             <tr>
-              <td style="font-weight:500;">{{ row[0] }}</td>
-              @for (v of row | slice:1; track $index) {
-                <td style="text-align:center;">
+              <td style="font-weight: 500">{{ row[0] }}</td>
+              @for (v of row | slice: 1; track $index) {
+                <td style="text-align: center">
                   @if (v) {
-                    <span style="color:var(--success); font-size:16px;">✓</span>
+                    <span style="color: var(--success); font-size: 16px">✓</span>
                   } @else {
-                    <span style="color:var(--fg-3);">—</span>
+                    <span style="color: var(--fg-3)">—</span>
                   }
                 </td>
               }
@@ -178,8 +486,209 @@
       </table>
     </div>
   </div>
-
 </div>
+
+<!-- Role change modal -->
+@if (showRoleModal()) {
+  <div class="modal-backdrop" (click)="closeRoleModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Changer le rôle</span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeRoleModal()">
+          <tui-icon icon="@tui.x" style="font-size: 18px" />
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--fg-2); margin-bottom: 16px">
+          Sélectionnez le nouveau rôle à attribuer à ce membre.
+        </p>
+        <div class="field">
+          <label class="field-label">Nouveau rôle</label>
+          <select
+            class="select"
+            [value]="roleModalTargetRole()"
+            (change)="roleModalTargetRole.set($any($event.target).value)"
+          >
+            <option value="chef_equipe">Chef d'équipe</option>
+            <option value="editeur">Éditeur</option>
+            <option value="charge_communication">Chargé de communication</option>
+            <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
+            <option value="presidence">Présidence</option>
+          </select>
+          <span class="field-hint">
+            @if (roleModalTargetRole() === 'chef_equipe') {
+              Accès complet sauf gestion des utilisateurs.
+            }
+            @if (roleModalTargetRole() === 'editeur') {
+              Calendriers et événements historiques uniquement.
+            }
+            @if (roleModalTargetRole() === 'charge_communication') {
+              Campagnes publicitaires et tableaux de bord.
+            }
+            @if (roleModalTargetRole() === 'presidence') {
+              Recommandations éditoriales (Présidence) — décide les événements à proposer chaque jour.
+            }
+            @if (roleModalTargetRole() === 'chef_equipe_commerciale') {
+              Gestion des compagnies (annonceurs) et supervision des campagnes publicitaires.
+            }
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeRoleModal()">
+          Annuler
+        </button>
+        <button class="btn btn-primary btn-sm" type="button" (click)="submitRoleChange()">
+          <tui-icon icon="@tui.check" style="font-size: 13px" />
+          Confirmer
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Confirm action modal -->
+@if (showConfirmModal()) {
+  <div class="modal-backdrop" (click)="closeConfirmModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        @if (confirmModalAction() === 'block') {
+          <span class="modal-title" style="color: var(--warning)">Bloquer l'accès</span>
+        }
+        @if (confirmModalAction() === 'unblock') {
+          <span class="modal-title" style="color: var(--success)">Débloquer l'accès</span>
+        }
+        @if (confirmModalAction() === 'remove') {
+          <span class="modal-title" style="color: var(--error)">Retirer du workspace</span>
+        }
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeConfirmModal()">
+          <tui-icon icon="@tui.x" style="font-size: 18px" />
+        </button>
+      </div>
+      <div class="modal-body">
+        @if (confirmModalUser(); as u) {
+          <p style="font-size: 13.5px; color: var(--fg-1); margin-bottom: 12px">
+            <strong>{{ u.fullName ?? u.email }}</strong>
+          </p>
+        }
+        @if (confirmModalAction() === 'block') {
+          <p style="font-size: 13px; color: var(--fg-2)">
+            Cet utilisateur ne pourra plus se connecter à l'application
+            @if (activeWorkspaceName()) {
+              dans <strong>{{ activeWorkspaceName() }}</strong>
+            }.
+            Vous pouvez débloquer son accès à tout moment.
+          </p>
+        }
+        @if (confirmModalAction() === 'unblock') {
+          <p style="font-size: 13px; color: var(--fg-2)">
+            Cet utilisateur pourra à nouveau se connecter avec son adresse e-mail habituelle.
+          </p>
+        }
+        @if (confirmModalAction() === 'remove') {
+          <p style="font-size: 13px; color: var(--fg-2)">
+            Ce membre perdra son accès
+            @if (activeWorkspaceName()) {
+              à <strong>{{ activeWorkspaceName() }}</strong>
+            } @else {
+              à cet espace de travail
+            }.
+            Son compte reste actif s'il appartient à d'autres espaces et toutes
+            ses contributions passées restent attribuées à son nom.
+          </p>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeConfirmModal()">
+          Annuler
+        </button>
+        @if (confirmModalAction() === 'block') {
+          <button
+            class="btn btn-sm"
+            style="background: var(--warning); color: #fff"
+            type="button"
+            (click)="confirmAction()"
+          >
+            <tui-icon icon="@tui.ban" style="font-size: 13px" />
+            Bloquer
+          </button>
+        }
+        @if (confirmModalAction() === 'unblock') {
+          <button class="btn btn-success btn-sm" type="button" (click)="confirmAction()">
+            <tui-icon icon="@tui.lock-open" style="font-size: 13px" />
+            Débloquer
+          </button>
+        }
+        @if (confirmModalAction() === 'remove') {
+          <button class="btn btn-danger btn-sm" type="button" (click)="confirmAction()">
+            <tui-icon icon="@tui.user-x" style="font-size: 13px" />
+            Retirer définitivement
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Set-password modal -->
+@if (showPasswordModal()) {
+  <div class="modal-backdrop" (click)="closePasswordModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Définir un mot de passe</span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closePasswordModal()">
+          <tui-icon icon="@tui.x" style="font-size: 18px" />
+        </button>
+      </div>
+      <div class="modal-body">
+        @if (passwordModalUser(); as u) {
+          <p style="font-size: 13.5px; color: var(--fg-1); margin-bottom: 12px">
+            Utilisateur&nbsp;: <strong>{{ u.fullName ?? u.email }}</strong>
+          </p>
+        }
+        <p style="font-size: 12.5px; color: var(--fg-3); margin-bottom: 16px">
+          Le nouveau mot de passe sera immédiatement actif. Aucun e-mail n'est envoyé.
+          Communiquez-le à l'utilisateur via un canal de confiance.
+        </p>
+        <div class="field" style="margin-bottom:14px;">
+          <label class="field-label">Nouveau mot de passe</label>
+          <div style="position:relative;">
+            <input class="input"
+                   [type]="passwordModalShow() ? 'text' : 'password'"
+                   placeholder="8 caractères minimum"
+                   autocomplete="new-password" minlength="8"
+                   style="padding-right:42px;"
+                   [value]="passwordModalValue()"
+                   (input)="passwordModalValue.set($any($event.target).value)" />
+            <button type="button"
+                    style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px; cursor:pointer; color:var(--fg-3); display:inline-flex; align-items:center; border-radius:4px;"
+                    (click)="togglePasswordModalShow()"
+                    [attr.aria-label]="passwordModalShow() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+                    tabindex="-1">
+              <tui-icon [icon]="passwordModalShow() ? '@tui.eye-off' : '@tui.eye'" style="font-size:15px;" />
+            </button>
+          </div>
+        </div>
+        @if (passwordModalError()) {
+          <div style="color: var(--danger); font-size: 12.5px; margin-bottom: 8px;">
+            {{ passwordModalError() }}
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closePasswordModal()">
+          Annuler
+        </button>
+        <button class="btn btn-primary btn-sm" type="button"
+                [disabled]="passwordModalLoading() || !passwordModalValue()"
+                (click)="submitSetPassword()">
+          @if (passwordModalLoading()) { <span class="spinner"></span> }
+          Définir le mot de passe
+        </button>
+      </div>
+    </div>
+  </div>
+}
 
 <!-- Invite modal -->
 @if (showInviteModal()) {
@@ -188,7 +697,7 @@
       <div class="modal-header">
         <span class="modal-title">Inviter un collaborateur</span>
         <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeInviteModal()">
-          <tui-icon icon="@tui.x" style="font-size:18px;" />
+          <tui-icon icon="@tui.x" style="font-size: 18px" />
         </button>
       </div>
       <div class="modal-body">
@@ -196,34 +705,56 @@
           <div class="invite-success">
             <tui-icon icon="@tui.circle-check" class="invite-success__icon" />
             <p class="invite-success__title">Invitation envoyée !</p>
-            <p class="invite-success__sub">{{ inviteEmail() }} recevra un lien d'accès par e-mail.</p>
-            <button class="btn btn-secondary btn-sm" type="button" (click)="closeInviteModal()">Fermer</button>
+            <p class="invite-success__sub">
+              {{ inviteEmail() }} recevra un lien d'accès par e-mail.
+            </p>
+            <button class="btn btn-secondary btn-sm" type="button" (click)="closeInviteModal()">
+              Fermer
+            </button>
           </div>
         } @else {
-          <div class="field" style="margin-bottom:14px;">
+          <div class="field" style="margin-bottom: 14px">
             <label class="field-label">Adresse e-mail</label>
-            <input class="input" type="email" placeholder="collaborateur@exemple.com"
-                   [value]="inviteEmail()" (input)="inviteEmail.set($any($event.target).value)" autocomplete="off" />
+            <input
+              class="input"
+              type="email"
+              placeholder="collaborateur@exemple.com"
+              [value]="inviteEmail()"
+              (input)="inviteEmail.set($any($event.target).value)"
+              autocomplete="off"
+            />
           </div>
-          <div class="field" style="margin-bottom:20px;">
+          <div class="field" style="margin-bottom: 20px">
             <label class="field-label">Rôle</label>
-            <select class="select" [value]="inviteRole()" (change)="inviteRole.set($any($event.target).value)">
+            <select
+              class="select"
+              [value]="inviteRole()"
+              (change)="inviteRole.set($any($event.target).value)"
+            >
               <option value="chef_equipe">Chef d'équipe</option>
               <option value="editeur">Éditeur</option>
               <option value="charge_communication">Chargé de communication</option>
             </select>
           </div>
           @if (inviteStatus() === 'error') {
-            <p class="login-error" style="margin-bottom:12px;">{{ inviteError() }}</p>
+            <p class="login-error" style="margin-bottom: 12px">{{ inviteError() }}</p>
           }
         }
       </div>
       @if (inviteStatus() !== 'sent') {
         <div class="modal-footer">
-          <button class="btn btn-secondary btn-sm" type="button" (click)="closeInviteModal()">Annuler</button>
-          <button class="btn btn-primary btn-sm" type="button" (click)="submitInvite()"
-                  [disabled]="!inviteEmail().trim() || inviteStatus() === 'loading'">
-            @if (inviteStatus() === 'loading') { <span class="spinner"></span> }
+          <button class="btn btn-secondary btn-sm" type="button" (click)="closeInviteModal()">
+            Annuler
+          </button>
+          <button
+            class="btn btn-primary btn-sm"
+            type="button"
+            (click)="submitInvite()"
+            [disabled]="!inviteEmail().trim() || inviteStatus() === 'loading'"
+          >
+            @if (inviteStatus() === 'loading') {
+              <span class="spinner"></span>
+            }
             Envoyer l'invitation
           </button>
         </div>

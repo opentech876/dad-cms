@@ -1,0 +1,134 @@
+<div class="search-page">
+
+  <div class="search-page-header">
+    <div>
+      <h2 class="search-page-title">
+        Recherche : <em>« {{ term() }} »</em>
+      </h2>
+      <p class="search-page-sub">
+        @if (loading()) { Recherche en cours… }
+        @else if (!term().trim()) { Tapez un terme dans la barre de recherche en haut. }
+        @else { {{ totalCount() }} résultat(s) trouvé(s) }
+      </p>
+    </div>
+    <a routerLink="/dashboard" class="btn btn-flat btn-sm">
+      <tui-icon icon="@tui.arrow-left" style="font-size:14px;" />
+      Retour
+    </a>
+  </div>
+
+  @if (term().trim() && totalCount() > 0) {
+    <div class="search-page-filters" role="tablist">
+      <button type="button" class="search-filter-tab" [class.is-active]="filterType() === 'all'"
+              (click)="setFilter('all')">
+        Tous ({{ totalCount() }})
+      </button>
+      @if (results().events.length > 0) {
+        <button type="button" class="search-filter-tab" [class.is-active]="filterType() === 'event'"
+                (click)="setFilter('event')">
+          Bibliothèque ({{ results().events.length }})
+        </button>
+      }
+      @if (results().campaigns.length > 0) {
+        <button type="button" class="search-filter-tab" [class.is-active]="filterType() === 'campaign'"
+                (click)="setFilter('campaign')">
+          Encarts ({{ results().campaigns.length }})
+        </button>
+      }
+      @if (results().companies.length > 0) {
+        <button type="button" class="search-filter-tab" [class.is-active]="filterType() === 'company'"
+                (click)="setFilter('company')">
+          Compagnies ({{ results().companies.length }})
+        </button>
+      }
+      @if (results().calendars.length > 0) {
+        <button type="button" class="search-filter-tab" [class.is-active]="filterType() === 'calendar'"
+                (click)="setFilter('calendar')">
+          Calendriers ({{ results().calendars.length }})
+        </button>
+      }
+    </div>
+  }
+
+  @if (term().trim() && !loading() && totalCount() === 0) {
+    <div class="search-page-empty">
+      <tui-icon icon="@tui.search-x" style="font-size:32px; color:var(--fg-3);" />
+      <p>Aucun résultat pour <strong>« {{ term() }} »</strong></p>
+      <p style="font-size:12.5px; color:var(--fg-3);">
+        Vérifiez l'orthographe ou essayez un autre terme.
+      </p>
+    </div>
+  }
+
+  @if (visibleResults().events.length > 0) {
+    <div class="search-page-group">
+      <h3 class="search-page-group-title">
+        <tui-icon icon="@tui.book-open" style="font-size:16px;" />
+        Bibliothèque historique
+      </h3>
+      @for (r of visibleResults().events; track r.id) {
+        <button type="button" class="search-page-item" (click)="goToResult(r)">
+          <div class="search-page-item-text">
+            <span class="search-page-item-label">{{ r.label }}</span>
+            @if (r.subtitle) {<span class="search-page-item-sub">{{ r.subtitle }}</span>}
+          </div>
+          <tui-icon icon="@tui.chevron-right" style="font-size:14px; color:var(--fg-3);" />
+        </button>
+      }
+    </div>
+  }
+
+  @if (visibleResults().campaigns.length > 0) {
+    <div class="search-page-group">
+      <h3 class="search-page-group-title">
+        <tui-icon icon="@tui.megaphone" style="font-size:16px;" />
+        Encarts publicitaires
+      </h3>
+      @for (r of visibleResults().campaigns; track r.id) {
+        <button type="button" class="search-page-item" (click)="goToResult(r)">
+          <div class="search-page-item-text">
+            <span class="search-page-item-label">{{ r.label }}</span>
+            @if (r.subtitle) {<span class="search-page-item-sub">{{ r.subtitle }}</span>}
+          </div>
+          <tui-icon icon="@tui.chevron-right" style="font-size:14px; color:var(--fg-3);" />
+        </button>
+      }
+    </div>
+  }
+
+  @if (visibleResults().companies.length > 0) {
+    <div class="search-page-group">
+      <h3 class="search-page-group-title">
+        <tui-icon icon="@tui.building" style="font-size:16px;" />
+        Compagnies
+      </h3>
+      @for (r of visibleResults().companies; track r.id) {
+        <button type="button" class="search-page-item" (click)="goToResult(r)">
+          <div class="search-page-item-text">
+            <span class="search-page-item-label">{{ r.label }}</span>
+            @if (r.subtitle) {<span class="search-page-item-sub">{{ r.subtitle }}</span>}
+          </div>
+          <tui-icon icon="@tui.chevron-right" style="font-size:14px; color:var(--fg-3);" />
+        </button>
+      }
+    </div>
+  }
+
+  @if (visibleResults().calendars.length > 0) {
+    <div class="search-page-group">
+      <h3 class="search-page-group-title">
+        <tui-icon icon="@tui.calendar" style="font-size:16px;" />
+        Calendriers
+      </h3>
+      @for (r of visibleResults().calendars; track r.id) {
+        <button type="button" class="search-page-item" (click)="goToResult(r)">
+          <div class="search-page-item-text">
+            <span class="search-page-item-label">{{ r.label }}</span>
+            @if (r.subtitle) {<span class="search-page-item-sub">{{ r.subtitle }}</span>}
+          </div>
+          <tui-icon icon="@tui.chevron-right" style="font-size:14px; color:var(--fg-3);" />
+        </button>
+      }
+    </div>
+  }
+</div>

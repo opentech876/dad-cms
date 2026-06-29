@@ -46,6 +46,15 @@
       }
     </div>
 
+    @if (pendingRecommendationsCount() > 0 && canApplyRecommendations()) {
+      <button class="btn btn-primary btn-sm" type="button"
+              [disabled]="recommendationsApplying()"
+              (click)="openApplyDialog()">
+        @if (recommendationsApplying()) { <span class="spinner"></span> }
+        <tui-icon icon="@tui.list-checks" style="font-size:14px;" />
+        Appliquer la recommandation ({{ pendingRecommendationsCount() }})
+      </button>
+    }
     @if (canPublish()) {
       <button class="btn btn-success btn-sm" type="button"
               [disabled]="publishing()"
@@ -117,7 +126,13 @@
           </span>
         </div>
       </div>
-      <div class="heatmap-grid">
+      @if (loadingEntries()) {
+        <div style="display:flex; align-items:center; justify-content:center; padding:32px; gap:8px; color:var(--fg-3); font-size:13px;">
+          <span class="spinner" style="width:16px; height:16px; border-width:2px;"></span>
+          Chargement des événements…
+        </div>
+      }
+      <div class="heatmap-grid" [style.opacity]="loadingEntries() ? '0.35' : '1'" [style.pointer-events]="loadingEntries() ? 'none' : 'auto'">
         @for (mon of yearHeatmap(); track mon.mi) {
           <div class="heatmap-month" (click)="pickMonth(mon.mi)">
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
@@ -168,29 +183,35 @@
         @for (cell of monthCells(); track $index; let i = $index) {
           <div class="month-cell"
                [class.month-cell--empty]="cell.d === null"
-               [class.month-cell--today]="cell.isToday"
+               [class.month-cell--today]="cell.isToday && !loadingEntries()"
                [style.border-right]="(i % 7) < 6 ? '1px solid var(--border-1)' : 'none'"
-               [style.border-bottom]="i < 35 ? '1px solid var(--border-1)' : 'none'">
+               [style.border-bottom]="i < 35 ? '1px solid var(--border-1)' : 'none'"
+               (click)="!loadingEntries() && openDayDetail(cell.d, selectedMonth())">
             @if (cell.d !== null) {
-              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <span class="month-cell__day" [class.month-cell__day--today]="cell.isToday">{{ cell.d }}</span>
-                <div style="display:flex; gap:3px;">
-                  @for (_ of [].constructor(cell.totalEvents); track $index) {
-                    <span class="event-dot"></span>
-                  }
-                  @if (cell.ad) {
-                    <span class="ad-dot" title="Pub. active"></span>
-                  }
+              @if (loadingEntries()) {
+                <div class="skeleton" style="height:12px; width:20px; border-radius:3px; margin-bottom:8px;"></div>
+                <div class="skeleton" style="height:9px; width:70%; border-radius:3px;"></div>
+              } @else {
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                  <span class="month-cell__day" [class.month-cell__day--today]="cell.isToday">{{ cell.d }}</span>
+                  <div style="display:flex; gap:3px;">
+                    @for (_ of [].constructor(cell.totalEvents); track $index) {
+                      <span class="event-dot"></span>
+                    }
+                    @if (cell.ad) {
+                      <span class="ad-dot" title="Pub. active"></span>
+                    }
+                  </div>
                 </div>
-              </div>
-              @if (cell.title) {
-                <div class="month-cell__title">{{ cell.title }}</div>
-              }
-              @if (cell.pinnedCount === 2) {
-                <div style="margin-top:4px; font-size:10.5px; color:var(--fg-3);">+ 1 événement</div>
-              }
-              @if (cell.pinnedCount === 0) {
-                <div style="margin-top:8px; font-size:11px; color:var(--fg-3); font-style:italic;">+ Ajouter</div>
+                @if (cell.title) {
+                  <div class="month-cell__title">{{ cell.title }}</div>
+                }
+                @if (cell.pinnedCount === 2) {
+                  <div style="margin-top:4px; font-size:10.5px; color:var(--fg-3);">+ 1 événement</div>
+                }
+                @if (cell.pinnedCount === 0) {
+                  <div style="margin-top:8px; font-size:11px; color:var(--fg-3); font-style:italic;">+ Ajouter</div>
+                }
               }
             }
           </div>
@@ -214,47 +235,63 @@
           </tr>
         </thead>
         <tbody>
-          @for (row of paginatedRows(); track row.date) {
-            <tr style="cursor:pointer;">
-              <td>
-                <div style="display:flex; flex-direction:column; line-height:1.2;">
-                  <span style="font-family:var(--font-serif); font-size:15px; font-weight:600;">
-                    {{ row.date }} {{ selectedCalendar().year }}
-                  </span>
-                  <span style="font-size:11.5px; color:var(--fg-3);">{{ row.dow }}</span>
-                </div>
-              </td>
-              <td>
-                @if (row.title) {
-                  <div>
-                    <div style="font-family:var(--font-serif); font-style:italic; color:var(--fg-1);">« {{ row.title }} »</div>
-                    @if (row.sub) {
-                      <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ row.sub }}</div>
-                    }
+          @if (loadingEntries()) {
+            @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
+              <tr>
+                <td>
+                  <div class="skeleton" style="height:14px; width:90px; border-radius:4px; margin-bottom:4px;"></div>
+                  <div class="skeleton" style="height:11px; width:50px; border-radius:4px;"></div>
+                </td>
+                <td><div class="skeleton" style="height:13px; width:200px; border-radius:4px;"></div></td>
+                <td style="text-align:center;"><div class="skeleton" style="height:20px; width:42px; border-radius:99px; margin:auto;"></div></td>
+                <td><div class="skeleton" style="height:12px; width:100px; border-radius:4px;"></div></td>
+                <td><div class="skeleton" style="height:20px; width:64px; border-radius:99px;"></div></td>
+                <td></td>
+              </tr>
+            }
+          } @else {
+            @for (row of paginatedRows(); track row.date) {
+              <tr style="cursor:pointer;" (click)="openDayDetail(row.day, row.month)">
+                <td>
+                  <div style="display:flex; flex-direction:column; line-height:1.2;">
+                    <span style="font-family:var(--font-serif); font-size:15px; font-weight:600;">
+                      {{ row.date }} {{ selectedCalendar().year }}
+                    </span>
+                    <span style="font-size:11.5px; color:var(--fg-3);">{{ row.dow }}</span>
                   </div>
-                } @else {
-                  <span style="color:var(--fg-3); font-style:italic;">Aucun événement</span>
-                }
-              </td>
-              <td style="text-align:center;">
-                <span class="badge"
-                      [style.background]="row.pinnedCount === 2 ? 'var(--success-soft)' : row.pinnedCount === 1 ? 'var(--warning-soft)' : 'var(--bg-sunken)'"
-                      [style.color]="row.pinnedCount === 2 ? 'var(--success)' : row.pinnedCount === 1 ? 'var(--warning)' : 'var(--fg-3)'">
-                  {{ row.pinnedCount }} / 2
-                </span>
-              </td>
-              <td style="color:var(--fg-2); font-size:12.5px;">{{ row.ad }}</td>
-              <td>
-                @if (row.status === 'published') { <span class="badge badge-success badge-dot">Publié</span> }
-                @if (row.status === 'draft')     { <span class="badge badge-warning badge-dot">Brouillon</span> }
-                @if (row.status === 'empty')     { <span class="badge badge-dot">Vide</span> }
-              </td>
-              <td>
-                <button class="btn btn-flat btn-icon btn-sm" type="button">
-                  <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
-                </button>
-              </td>
-            </tr>
+                </td>
+                <td>
+                  @if (row.title) {
+                    <div>
+                      <div style="font-family:var(--font-serif); font-style:italic; color:var(--fg-1);">« {{ row.title }} »</div>
+                      @if (row.sub) {
+                        <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ row.sub }}</div>
+                      }
+                    </div>
+                  } @else {
+                    <span style="color:var(--fg-3); font-style:italic;">Aucun événement</span>
+                  }
+                </td>
+                <td style="text-align:center;">
+                  <span class="badge"
+                        [style.background]="row.pinnedCount === 2 ? 'var(--success-soft)' : row.pinnedCount === 1 ? 'var(--warning-soft)' : 'var(--bg-sunken)'"
+                        [style.color]="row.pinnedCount === 2 ? 'var(--success)' : row.pinnedCount === 1 ? 'var(--warning)' : 'var(--fg-3)'">
+                    {{ row.pinnedCount }} / 2
+                  </span>
+                </td>
+                <td style="color:var(--fg-2); font-size:12.5px;">{{ row.ad }}</td>
+                <td>
+                  @if (row.status === 'published') { <span class="badge badge-success badge-dot">Publié</span> }
+                  @if (row.status === 'draft')     { <span class="badge badge-warning badge-dot">Brouillon</span> }
+                  @if (row.status === 'empty')     { <span class="badge badge-dot">Vide</span> }
+                </td>
+                <td>
+                  <button class="btn btn-flat btn-icon btn-sm" type="button">
+                    <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+                  </button>
+                </td>
+              </tr>
+            }
           }
         </tbody>
       </table>
@@ -262,6 +299,180 @@
   }
 
 </div>
+
+<!-- ══ DAY DETAIL MODAL ══ -->
+@if (selectedDay()) {
+  <div class="modal-backdrop" (click)="closeDayDetail()">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+
+      <!-- Header -->
+      <div class="modal-header">
+        <div>
+          @if (selectedDayDetail(); as d) {
+            <div class="eyebrow" style="margin-bottom:4px;">{{ d.dayOfWeek }} · {{ d.year }}</div>
+            <div class="modal-title">{{ d.day }} {{ monthsFrCap[d.month] }}</div>
+          }
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <button class="btn btn-flat btn-icon btn-sm" type="button"
+                  title="Jour précédent" (click)="navigateToPrevDay()">
+            <tui-icon icon="@tui.chevron-left" style="font-size:14px;" />
+          </button>
+          <button class="btn btn-flat btn-icon btn-sm" type="button"
+                  title="Jour suivant" (click)="navigateToNextDay()">
+            <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+          </button>
+          <div class="divider-v"></div>
+          <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeDayDetail()">
+            <tui-icon icon="@tui.x" style="font-size:18px;" />
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Slot assignments ── -->
+      <div class="modal-body" style="padding-bottom:16px;">
+        <div class="eyebrow" style="margin-bottom:12px;">Sélection éditoriale</div>
+        <div class="day-slots">
+          @for (pos of slotPositions; track pos) {
+            <div class="day-slot"
+                 [class.day-slot--filled]="isSlotFilled(pos)"
+                 [class.day-slot--empty]="!isSlotFilled(pos)">
+              <div class="day-slot__header">
+                <span class="day-slot__num">{{ pos }}</span>
+                <span class="day-slot__label">
+                  {{ pos === 1 ? 'Événement principal' : 'Événement secondaire' }}
+                </span>
+                @if (isSlotFilled(pos)) {
+                  <button class="btn btn-flat btn-sm" type="button"
+                          style="margin-left:auto; color:var(--danger); font-size:12px; height:28px; padding:0 8px;"
+                          [disabled]="dayModalSaving()"
+                          (click)="unassignFromSlot(pos)">
+                    <tui-icon icon="@tui.x" style="font-size:11px;" />
+                    Retirer
+                  </button>
+                }
+              </div>
+              @if (getSlotEvent(pos); as ev) {
+                <div class="day-slot__event">
+                  <div style="font-family:var(--font-serif); font-style:italic; font-size:14px; color:var(--fg-1); line-height:1.35;">
+                    « {{ ev.title }} »
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
+                    <span style="font-size:12px; color:var(--fg-3);">{{ ev.historicalYear }}</span>
+                    @if (ev.status === 'draft') {
+                      <span class="badge badge-warning" style="font-size:10px;">Brouillon</span>
+                    }
+                    @if (ev.hasImage) {
+                      <tui-icon icon="@tui.image" style="font-size:12px; color:var(--fg-3);" />
+                    }
+                  </div>
+                </div>
+              } @else {
+                <div class="day-slot__empty-msg">Sélectionner un événement ci-dessous</div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <hr class="rule" />
+
+      <!-- ── Library events ── -->
+      <div class="modal-body scroll-pretty day-modal-library">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <div class="eyebrow">Événements historiques ce jour</div>
+          @if (dayModalLoading()) {
+            <div class="day-modal-spinner"></div>
+          }
+        </div>
+
+        @if (!dayModalLoading()) {
+          @if (dayModalEvents().length === 0) {
+            <div class="empty" style="padding:20px 0;">
+              <div class="empty-icon">
+                <tui-icon icon="@tui.calendar" style="font-size:22px;" />
+              </div>
+              <div class="empty-title">Aucun événement pour cette date</div>
+              <p style="font-size:12.5px; color:var(--fg-3); max-width:320px;">
+                Créez des événements depuis la bibliothèque et ils apparaîtront ici pour être assignés.
+              </p>
+              <button class="btn btn-secondary btn-sm" type="button" (click)="closeDayDetail(); goToEvents()">
+                <tui-icon icon="@tui.external-link" style="font-size:13px;" />
+                Aller à la bibliothèque
+              </button>
+            </div>
+          } @else {
+            @if (dayModalEvents().length > 4) {
+              <div class="input-group" style="margin-bottom:12px;">
+                <span class="input-icon">
+                  <tui-icon icon="@tui.search" style="font-size:14px;" />
+                </span>
+                <input class="input has-icon" style="height:36px; font-size:13px;"
+                       placeholder="Rechercher par titre ou année…"
+                       [value]="dayModalSearch()"
+                       (input)="dayModalSearch.set($any($event.target).value)" />
+              </div>
+            }
+
+            <div class="day-events-list">
+              @for (ev of filteredDayEvents(); track ev.id) {
+                <div class="day-event-row">
+                  <div class="day-event-row__info">
+                    <div style="font-family:var(--font-serif); font-style:italic; font-size:13px; color:var(--fg-1); line-height:1.3;">
+                      {{ ev.title }}
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:3px;">
+                      <span style="font-size:11.5px; color:var(--fg-3);">{{ ev.event_date.slice(0, 4) }}</span>
+                      @if (ev.status === 'draft') {
+                        <span class="badge badge-warning" style="font-size:10px;">Brouillon</span>
+                      }
+                      @if (ev.image_path) {
+                        <tui-icon icon="@tui.image" style="font-size:11px; color:var(--fg-3);" />
+                      }
+                    </div>
+                  </div>
+                  <div class="day-event-row__actions">
+                    @for (pos of slotPositions; track pos) {
+                      <button
+                        class="btn btn-sm"
+                        [class.btn-secondary]="isEventAtPosition(ev.id, pos)"
+                        [class.btn-primary]="!isEventAtPosition(ev.id, pos) && !isSlotFilled(pos)"
+                        [class.btn-flat]="!isEventAtPosition(ev.id, pos) && isSlotFilled(pos)"
+                        [style.color]="isEventAtPosition(ev.id, pos) ? 'var(--success)' : ''"
+                        [style.border-color]="isEventAtPosition(ev.id, pos) ? 'var(--success)' : ''"
+                        [disabled]="dayModalSaving() || (isSlotFilled(pos) && !isEventAtPosition(ev.id, pos))"
+                        (click)="toggleSlot(ev.id, pos)"
+                        [title]="isEventAtPosition(ev.id, pos) ? 'Retirer de la position ' + pos : 'Assigner en position ' + pos">
+                        @if (isEventAtPosition(ev.id, pos)) {
+                          <tui-icon icon="@tui.check" style="font-size:11px;" />
+                        }
+                        Pos.&nbsp;{{ pos }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+              @if (filteredDayEvents().length === 0) {
+                <div style="padding:20px; text-align:center; font-size:13px; color:var(--fg-3);">
+                  Aucun résultat pour « {{ dayModalSearch() }} »
+                </div>
+              }
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-footer">
+        <span style="font-size:11.5px; color:var(--fg-3);">
+          Max. 2 événements par date · l'Événement National s'affiche en premier sur mobile
+        </span>
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeDayDetail()">Fermer</button>
+      </div>
+
+    </div>
+  </div>
+}
 
 <!-- ══ NOUVEAU CALENDRIER MODAL ══ -->
 @if (showNewCalModal()) {
@@ -376,7 +587,7 @@
             </select>
             @if (dupSourceCalendar(); as src) {
               <span class="field-hint">
-                {{ src.eventCount }} événements &middot; {{ src.campaignCount }} campagnes &middot; {{ src.fillPct }}% rempli
+                {{ src.eventCount }} événements &middot; {{ src.fillPct }}% rempli
               </span>
             }
           </div>
@@ -393,17 +604,9 @@
                   <span class="badge">{{ src.eventCount }}</span>
                 }
               </label>
-              <label class="cal-checkbox-option">
-                <input type="checkbox" [checked]="dupIncludeCampaigns()"
-                       (change)="dupIncludeCampaigns.set($any($event.target).checked)" />
-                <span style="flex:1;">Campagnes publicitaires</span>
-                @if (dupSourceCalendar(); as src) {
-                  <span class="badge">{{ src.campaignCount }}</span>
-                }
-              </label>
             </div>
-            @if (!dupIncludeEvents() && !dupIncludeCampaigns()) {
-              <span class="field-hint" style="color:var(--danger);">Sélectionnez au moins un type de contenu.</span>
+            @if (!dupIncludeEvents()) {
+              <span class="field-hint" style="color:var(--danger);">Sélectionnez le contenu à copier.</span>
             }
           </div>
 
@@ -485,13 +688,59 @@
         <div class="modal-footer">
           <button class="btn btn-secondary btn-sm" type="button" (click)="closeDupModal()">Annuler</button>
           <button class="btn btn-primary btn-sm" type="button" (click)="confirmDuplicate()"
-                  [disabled]="!dupIncludeEvents() && !dupIncludeCampaigns()">
+                  [disabled]="!dupIncludeEvents()">
             <tui-icon icon="@tui.copy" style="font-size:14px;" />
             Dupliquer
           </button>
         </div>
       }
 
+    </div>
+  </div>
+}
+
+<!-- ── Apply Presidence recommendations: confirm dialog ─────────────────── -->
+@if (applyDialogVisible()) {
+  <div class="modal-backdrop" (click)="cancelApply()">
+    <div class="modal" style="max-width:560px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin:0; font-size:16px;">Appliquer la recommandation Présidence</h3>
+        <button class="btn btn-flat btn-sm" type="button" (click)="cancelApply()" aria-label="Fermer">
+          <tui-icon icon="@tui.x" style="font-size:14px;" />
+        </button>
+      </div>
+      <div class="modal-body">
+        @if (applyConflicts().length === 0) {
+          <p style="margin:0; font-size:13.5px; color:var(--fg-2);">
+            {{ pendingRecommendationsCount() }} recommandation(s) seront appliquées au calendrier.
+            Aucune affectation existante n'est en conflit.
+          </p>
+        } @else {
+          <p style="margin:0 0 12px 0; font-size:13.5px; color:var(--fg-2);">
+            {{ applyConflicts().length }} jour(s) déjà affecté(s) seront <strong>remplacé(s)</strong> par la recommandation Présidence&nbsp;:
+          </p>
+          <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--fg-2); max-height:240px; overflow:auto;">
+            @for (c of applyConflicts(); track c.mmdd + '-' + c.position) {
+              <li>
+                <strong>{{ c.mmdd }}</strong> · position {{ c.position }} :
+                «&nbsp;{{ c.current_event_title }}&nbsp;» → «&nbsp;{{ c.recommended_event_title }}&nbsp;»
+              </li>
+            }
+          </ul>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="cancelApply()">
+          Annuler
+        </button>
+        <button class="btn btn-primary btn-sm"
+                type="button"
+                [disabled]="recommendationsApplying()"
+                (click)="confirmApply()">
+          @if (recommendationsApplying()) { <span class="spinner"></span> }
+          Appliquer
+        </button>
+      </div>
     </div>
   </div>
 }

@@ -7,13 +7,19 @@ import { AuthService } from '../../auth/auth.service';
 import { WorkspaceService } from '../../workspace/workspace.service';
 import { AppRole, WorkspaceSummary } from '../../../models';
 import { WorkspaceContextService } from '../../workspace/workspace-context.service';
+import { NotificationService } from '../../notifications/notification.service';
+import { SupabaseService } from '../../supabase/supabase.service';
+import { SearchService, SearchResults } from '../../search/search.service';
+import { RefreshRouteReuseStrategy } from '../../router/refresh-route-reuse.strategy';
+import { RouteReuseStrategy } from '@angular/router';
 
 describe('ShellComponent — navigation par rôle', () => {
   let component: ShellComponent;
   let fixture: ComponentFixture<ShellComponent>;
   let roleSubject: BehaviorSubject<AppRole | null>;
   let mockWorkspace: { getMyProfile: jest.Mock; upsertProfile: jest.Mock; getWorkspaceSummaries: jest.Mock };
-  let mockRouter: { events: any; navigate: jest.Mock };
+  let mockRouter: { events: any; navigate: jest.Mock; navigateByUrl: jest.Mock; url: string };
+  let mockRouteReuse: { triggerRefresh: jest.Mock };
   let mockWorkspaceContext: { activeWorkspaceId: jest.Mock; setActiveWorkspace: jest.Mock };
 
   const MOCK_WORKSPACES: WorkspaceSummary[] = [
@@ -26,12 +32,18 @@ describe('ShellComponent — navigation par rôle', () => {
     workspacesOverride?: WorkspaceSummary[],
   ): void {
     roleSubject = new BehaviorSubject<AppRole | null>(role);
-    mockRouter = { events: EMPTY, navigate: jest.fn() };
+    mockRouter = {
+      events: EMPTY,
+      navigate: jest.fn(),
+      navigateByUrl: jest.fn().mockResolvedValue(true),
+      url: '/dashboard',
+    };
+    mockRouteReuse = { triggerRefresh: jest.fn() };
     mockWorkspace = {
       getMyProfile: jest.fn().mockReturnValue(
         of(profileOverride ?? { full_name: 'Test User', phone: null, avatar_url: null }),
       ),
-      upsertProfile: jest.fn().mockReturnValue(of(undefined)),
+      upsertProfile: jest.fn().mockReturnValue(of({ success: true })),
       getWorkspaceSummaries: jest.fn().mockReturnValue(of(workspacesOverride ?? MOCK_WORKSPACES)),
     };
     mockWorkspaceContext = {
@@ -49,6 +61,7 @@ describe('ShellComponent — navigation par rôle', () => {
             currentRole$: roleSubject.asObservable(),
             getCurrentUser: jest.fn().mockReturnValue(of({ id: 'mock-user-id', email: 'test@example.com' })),
             signOut: jest.fn().mockReturnValue(of(null)),
+            isSystemAdmin: jest.fn().mockReturnValue(of(false)),
           },
         },
         {
@@ -62,6 +75,28 @@ describe('ShellComponent — navigation par rôle', () => {
         {
           provide: WorkspaceContextService,
           useValue: mockWorkspaceContext,
+        },
+        {
+          provide: NotificationService,
+          useValue: { unreadCount: jest.fn().mockReturnValue(of(3)) },
+        },
+        {
+          provide: SupabaseService,
+          useValue: {
+            updatePassword: jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
+            markPasswordSet: jest.fn(),
+            hasPasswordSet: jest.fn().mockResolvedValue(false),
+          },
+        },
+        {
+          provide: SearchService,
+          useValue: {
+            search: jest.fn().mockReturnValue(of({ events: [], campaigns: [], companies: [], calendars: [] } as SearchResults)),
+          },
+        },
+        {
+          provide: RefreshRouteReuseStrategy,
+          useValue: mockRouteReuse,
         },
       ],
       schemas: [NO_ERRORS_SCHEMA],
@@ -77,14 +112,15 @@ describe('ShellComponent — navigation par rôle', () => {
 
   // ── owner ──────────────────────────────────────────────────────────────────
 
-  it('affiche les 5 navItems pour le rôle owner', () => {
+  it('affiche tous les nav items pour le rôle owner (recommandations + compagnies inclus)', () => {
     createComponent('owner');
-    expect(component.visibleNavItems().length).toBe(5);
-  });
-
-  it('affiche les 3 adminItems pour le rôle owner', () => {
-    createComponent('owner');
-    expect(component.visibleAdminItems().length).toBe(3);
+    const paths = component.visibleNavItems().map(i => i.path);
+    expect(paths).toContain('/recommandations');
+    expect(paths).toContain('/compagnies');
+    // Owner sees every section; quick sanity check
+    expect(paths).toContain('/metriques');
+    expect(paths).toContain('/espace-de-travail');
+    expect(paths).toContain('/parametres');
   });
 
   // ── chef_equipe ────────────────────────────────────────────────────────────
@@ -106,12 +142,7 @@ describe('ShellComponent — navigation par rôle', () => {
 
   it("chef_equipe voit 'metriques'", () => {
     createComponent('chef_equipe');
-    expect(component.visibleAdminItems().map((i) => i.path)).toContain('/metriques');
-  });
-
-  it("chef_equipe ne voit pas 'workspace'", () => {
-    createComponent('chef_equipe');
-    expect(component.visibleAdminItems().map((i) => i.path)).not.toContain('/espaces');
+    expect(component.visibleNavItems().map((i) => i.path)).toContain('/metriques');
   });
 
   // ── editeur ────────────────────────────────────────────────────────────────
@@ -131,9 +162,12 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(component.visibleNavItems().map((i) => i.path)).toContain('/evenements');
   });
 
-  it("éditeur voit 'espace-de-travail' et 'parametres' dans les adminItems", () => {
+  it("éditeur voit 'espace-de-travail' et 'parametres' mais pas 'metriques'", () => {
     createComponent('editeur');
-    expect(component.visibleAdminItems().map(i => i.path)).toEqual(['/espace-de-travail', '/parametres']);
+    const paths = component.visibleNavItems().map(i => i.path);
+    expect(paths).toContain('/espace-de-travail');
+    expect(paths).toContain('/parametres');
+    expect(paths).not.toContain('/metriques');
   });
 
   // ── charge_communication ───────────────────────────────────────────────────
@@ -153,9 +187,42 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(component.visibleNavItems().map((i) => i.path)).toContain('/campagnes');
   });
 
-  it("charge_communication ne voit pas 'workspace'", () => {
+  it("charge_communication voit 'metriques' (rôle autorisé)", () => {
     createComponent('charge_communication');
-    expect(component.visibleAdminItems().map((i) => i.path)).not.toContain('/espaces');
+    expect(component.visibleNavItems().map((i) => i.path)).toContain('/metriques');
+  });
+
+  // ── presidence ─────────────────────────────────────────────────────────────
+
+  it("presidence voit 'recommandations' mais pas evenements/campagnes/utilisateurs", () => {
+    createComponent('presidence');
+    const paths = component.visibleNavItems().map(i => i.path);
+    expect(paths).toContain('/recommandations');
+    expect(paths).not.toContain('/evenements');
+    expect(paths).not.toContain('/campagnes');
+    expect(paths).not.toContain('/utilisateurs');
+  });
+
+  it("editeur ne voit pas 'recommandations'", () => {
+    createComponent('editeur');
+    expect(component.visibleNavItems().map(i => i.path)).not.toContain('/recommandations');
+  });
+
+  // ── chef_equipe_commerciale ───────────────────────────────────────────────
+
+  it("chef_equipe_commerciale voit 'campagnes' et 'compagnies'", () => {
+    createComponent('chef_equipe_commerciale');
+    const paths = component.visibleNavItems().map(i => i.path);
+    expect(paths).toContain('/campagnes');
+    expect(paths).toContain('/compagnies');
+    expect(paths).not.toContain('/evenements');
+    expect(paths).not.toContain('/utilisateurs');
+    expect(paths).not.toContain('/recommandations');
+  });
+
+  it("editeur ne voit pas 'compagnies'", () => {
+    createComponent('editeur');
+    expect(component.visibleNavItems().map(i => i.path)).not.toContain('/compagnies');
   });
 
   // ── réactivité ─────────────────────────────────────────────────────────────
@@ -173,9 +240,9 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(component.visibleNavItems()).toEqual([]);
   });
 
-  it('retourne des adminItems vides quand aucun rôle n\'est assigné', () => {
+  it('retourne des sections vides quand aucun rôle n\'est assigné', () => {
     createComponent(null);
-    expect(component.visibleAdminItems()).toEqual([]);
+    expect(component.visibleNavSections()).toEqual([]);
   });
 
   // ── workspace name ────────────────────────────────────────────────────────
@@ -225,6 +292,8 @@ describe('ShellComponent — navigation par rôle', () => {
 
     it('saveProfile appelle upsertProfile avec le userId, fullName et phone', async () => {
       createComponent('editeur');
+      const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true); // bypass the first-time-invitee password requirement
       await component.ngOnInit();
       component.profileFullName.set('Alice Martin');
       component.profilePhone.set('+242060000000');
@@ -236,12 +305,273 @@ describe('ShellComponent — navigation par rôle', () => {
 
     it('saveProfile ferme la modal après enregistrement', async () => {
       createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true); // bypass the first-time-invitee password requirement
       await component.ngOnInit();
       component.profileFullName.set('Alice Martin');
 
       await component.saveProfile();
 
       expect(component.showProfileSetup()).toBe(false);
+    });
+
+    // ── Password optional field ──────────────────────────────────────────
+
+    it("saveProfile n'appelle PAS updatePassword si l'utilisateur a déjà un mot de passe et laisse le champ vide", async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true);
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+
+      await component.saveProfile();
+
+      expect(supabase.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('saveProfile refuse d\'enregistrer sans mot de passe quand aucun n\'est encore défini (cas invité première connexion)', async () => {
+      // hasPasswordSet default = false in beforeEach
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+      component.profilePassword.set('');
+
+      await component.saveProfile();
+
+      expect(supabase.updatePassword).not.toHaveBeenCalled();
+      expect(component.profilePasswordError()).toContain('mot de passe');
+      expect(component.showProfileSetup()).toBe(true);
+    });
+
+    it('saveProfile appelle updatePassword quand un mot de passe est saisi', async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+      component.profilePassword.set('motdepasse123');
+
+      await component.saveProfile();
+
+      expect(supabase.updatePassword).toHaveBeenCalledWith('motdepasse123');
+      expect(supabase.markPasswordSet).toHaveBeenCalled();
+      expect(component.showProfileSetup()).toBe(false);
+    });
+
+    it('saveProfile rejette un mot de passe trop court', async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+      component.profilePassword.set('court');
+
+      await component.saveProfile();
+
+      expect(supabase.updatePassword).not.toHaveBeenCalled();
+      expect(component.profilePasswordError()).toContain('8 caractères');
+      expect(component.showProfileSetup()).toBe(true);
+    });
+
+    it('saveProfile affiche profileSaveError quand upsertProfile échoue', async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      mockWorkspace.upsertProfile.mockReturnValue(of({ success: false, error: 'DB down' }));
+      const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true);
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+
+      await component.saveProfile();
+
+      expect(component.profileSaveError()).toContain('DB down');
+      expect(component.showProfileSetup()).toBe(true);
+    });
+
+    it('renseigne activeWorkspaceName depuis le workspace actif', async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      await component.ngOnInit();
+
+      // MOCK_WORKSPACES[0].name is "Mon Espace" by convention
+      expect(component.activeWorkspaceName()).toBeTruthy();
+    });
+  });
+
+  // ── visibilité du mot de passe (modal setup) ──────────────────────────────
+
+  describe('visibilité du mot de passe de configuration', () => {
+    it('showProfilePassword démarre à false', () => {
+      createComponent('editeur');
+      expect(component.showProfilePassword()).toBe(false);
+    });
+
+    it('toggleShowProfilePassword bascule la visibilité', () => {
+      createComponent('editeur');
+      component.toggleShowProfilePassword();
+      expect(component.showProfilePassword()).toBe(true);
+      component.toggleShowProfilePassword();
+      expect(component.showProfilePassword()).toBe(false);
+    });
+  });
+
+  // ── bannière mot de passe non défini ──────────────────────────────────────
+
+  describe('bannière mot de passe non défini', () => {
+    it('showPasswordBanner est vrai quand hasPasswordSet retourne false', async () => {
+      createComponent('editeur');
+      await component.ngOnInit();
+      expect(component.showPasswordBanner()).toBe(true);
+    });
+
+    it('showPasswordBanner est faux quand hasPasswordSet retourne true', async () => {
+      createComponent('editeur');
+      const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true);
+      await component.ngOnInit();
+      expect(component.showPasswordBanner()).toBe(false);
+    });
+
+    it('dismissPasswordBanner masque la bannière', async () => {
+      createComponent('editeur');
+      await component.ngOnInit();
+      component.dismissPasswordBanner();
+      expect(component.showPasswordBanner()).toBe(false);
+    });
+  });
+
+  // ── recherche dans la topbar ──────────────────────────────────────────────
+
+  describe('recherche topbar', () => {
+    it('searchTerm démarre vide', () => {
+      createComponent('owner');
+      expect(component.searchTerm()).toBe('');
+    });
+
+    it('searchOpen démarre à false', () => {
+      createComponent('owner');
+      expect(component.searchOpen()).toBe(false);
+    });
+
+    it('onSearchInput met à jour searchTerm', () => {
+      createComponent('owner');
+      component.onSearchInput('indep');
+      expect(component.searchTerm()).toBe('indep');
+    });
+
+    it('closeSearchDropdown ferme la dropdown', () => {
+      createComponent('owner');
+      component.searchOpen.set(true);
+      component.closeSearchDropdown();
+      expect(component.searchOpen()).toBe(false);
+    });
+
+    it('submitSearch navigue vers /recherche avec le terme', () => {
+      createComponent('owner');
+      component.searchTerm.set('indep');
+      component.submitSearch();
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/recherche'], { queryParams: { q: 'indep' } });
+    });
+
+    it('submitSearch ne navigue pas quand le terme est vide', () => {
+      createComponent('owner');
+      component.searchTerm.set('   ');
+      component.submitSearch();
+      expect(mockRouter.navigate).not.toHaveBeenCalledWith(['/recherche'], expect.anything());
+    });
+
+    it('goToResult navigue vers la page correspondant au type', () => {
+      createComponent('owner');
+      component.goToResult({ type: 'event', id: 'e1', label: 'Test' });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/evenements'], { queryParams: { q: 'Test' } });
+
+      component.goToResult({ type: 'campaign', id: 'c1', label: 'Test' });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/campagnes'], { queryParams: { q: 'Test' } });
+
+      component.goToResult({ type: 'company', id: 'co1', label: 'Test' });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/compagnies'], { queryParams: { q: 'Test' } });
+
+      component.goToResult({ type: 'calendar', id: 'ca1', label: 'Test' });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/calendrier'], { queryParams: { q: 'Test' } });
+    });
+
+    it('goToResult ferme la dropdown et efface le terme', () => {
+      createComponent('owner');
+      component.searchTerm.set('test');
+      component.searchOpen.set(true);
+      component.goToResult({ type: 'event', id: 'e1', label: 'Test' });
+      expect(component.searchOpen()).toBe(false);
+      expect(component.searchTerm()).toBe('');
+    });
+  });
+
+  // ── sidebar resize + mobile drawer ────────────────────────────────────────
+
+  describe('sidebar resize + mobile drawer', () => {
+    it("sidebarWidth a une valeur par défaut dans la plage 200-360", () => {
+      createComponent('owner');
+      const w = component.sidebarWidth();
+      expect(w).toBeGreaterThanOrEqual(200);
+      expect(w).toBeLessThanOrEqual(360);
+    });
+
+    it("openMobileSidebar passe mobileOpen à true et closeMobileSidebar le ferme", () => {
+      createComponent('owner');
+      component.openMobileSidebar();
+      expect(component.mobileOpen()).toBe(true);
+      component.closeMobileSidebar();
+      expect(component.mobileOpen()).toBe(false);
+    });
+
+    it("onWindowResize met à jour isMobile selon innerWidth", () => {
+      createComponent('owner');
+      (window as any).innerWidth = 500;
+      component.onWindowResize();
+      expect(component.isMobile()).toBe(true);
+      (window as any).innerWidth = 1280;
+      component.onWindowResize();
+      expect(component.isMobile()).toBe(false);
+    });
+
+    it("onWindowResize ferme la drawer mobile en repassant en desktop", () => {
+      createComponent('owner');
+      component.mobileOpen.set(true);
+      (window as any).innerWidth = 1280;
+      component.onWindowResize();
+      expect(component.mobileOpen()).toBe(false);
+    });
+  });
+
+  // ── switchWorkspace (in-place refresh) ────────────────────────────────────
+
+  describe('switchWorkspace', () => {
+    it("ne fait rien quand l'id correspond au workspace courant", async () => {
+      createComponent('owner');
+      // Let ngOnInit's async work (which calls setActiveWorkspace('ws-1') for seeding) settle.
+      await component.ngOnInit();
+      mockWorkspaceContext.setActiveWorkspace.mockClear();
+      mockRouter.navigateByUrl.mockClear();
+      await component.switchWorkspace('ws-1'); // current
+      expect(mockWorkspaceContext.setActiveWorkspace).not.toHaveBeenCalled();
+      expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    it('met à jour le workspace actif et déclenche un refresh', async () => {
+      createComponent('owner');
+      await component.switchWorkspace('ws-2');
+      expect(mockWorkspaceContext.setActiveWorkspace).toHaveBeenCalledWith('ws-2');
+      expect(mockRouteReuse.triggerRefresh).toHaveBeenCalled();
+    });
+
+    it("re-navigue vers l'URL courante pour forcer le re-init des composants", async () => {
+      createComponent('owner');
+      mockRouter.url = '/calendrier';
+      await component.switchWorkspace('ws-2');
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/calendrier');
+    });
+
+    it('ferme le menu workspace après le switch', async () => {
+      createComponent('owner');
+      component.workspaceMenuOpen.set(true);
+      await component.switchWorkspace('ws-2');
+      expect(component.workspaceMenuOpen()).toBe(false);
     });
   });
 

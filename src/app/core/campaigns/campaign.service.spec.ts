@@ -15,7 +15,9 @@ describe('CampaignService', () => {
 
   const fakeCampaigns = [
     {
-      id: 'c1', name: 'MTN Congo', advertiser: 'MTN', position: 'header',
+      id: 'c1', name: 'MTN Congo', company_id: 'co-mtn',
+      company: { id: 'co-mtn', name: 'MTN Congo', type: 'telecom', business_domain: 'Téléphonie mobile' },
+      position: 'header',
       start_date: '2026-01-01', end_date: '2026-06-30',
       active: true, image_path: '', link_url: null, workspace_id: 'ws-1',
       created_by: null, deleted_at: null,
@@ -35,6 +37,7 @@ describe('CampaignService', () => {
         eq: (col: string, val: unknown) => { eqCalls.push([col, val]); return makeQuery(data); },
         is: () => makeQuery(data),
         order: () => makeQuery(data),
+        range: () => Promise.resolve({ data, error: err }),
         single: () =>
           Promise.resolve({
             data: err ? null : (Array.isArray(data) ? data[0] ?? null : data),
@@ -114,13 +117,89 @@ describe('CampaignService', () => {
       const result = await firstValueFrom(service.listCampaigns());
       expect(result).toEqual([]);
     });
+
+    it('pagine au-delà de 1000 lignes (limite PostgREST par défaut)', async () => {
+      // Set up a client whose .range() returns two pages of data:
+      // page 1 = 1000 campaigns, page 2 = 35 campaigns → total 1035
+      const page1 = Array.from({ length: 1000 }, (_, i) => ({ ...fakeCampaigns[0], id: `c-${i + 1}` }));
+      const page2 = Array.from({ length: 35 },   (_, i) => ({ ...fakeCampaigns[0], id: `c-${1001 + i}` }));
+      const pages = [page1, page2];
+      const rangeSpy = jest.fn().mockImplementation(() => {
+        const next = pages.shift() ?? [];
+        return Promise.resolve({ data: next, error: null });
+      });
+      const chain: any = {};
+      Object.assign(chain, {
+        select: jest.fn().mockReturnValue(chain),
+        eq:     jest.fn().mockReturnValue(chain),
+        is:     jest.fn().mockReturnValue(chain),
+        order:  jest.fn().mockReturnValue(chain),
+        range:  rangeSpy,
+      });
+      mockSupabase.client = {
+        auth: { getUser: jest.fn() },
+        from: jest.fn().mockReturnValue(chain),
+        storage: { from: jest.fn() },
+      };
+
+      // Re-inject service with the new client
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          CampaignService,
+          { provide: SupabaseService, useValue: mockSupabase },
+          { provide: WorkspaceContextService, useValue: mockWorkspaceContext },
+        ],
+      });
+      service = TestBed.inject(CampaignService);
+
+      const result = await firstValueFrom(service.listCampaigns());
+
+      expect(result).toHaveLength(1035);
+      expect(rangeSpy).toHaveBeenCalledTimes(2);
+      expect(rangeSpy).toHaveBeenNthCalledWith(1, 0, 999);
+      expect(rangeSpy).toHaveBeenNthCalledWith(2, 1000, 1999);
+    });
+
+    it("s'arrête dès qu'une page renvoie moins de 1000 lignes", async () => {
+      const page1 = Array.from({ length: 500 }, (_, i) => ({ ...fakeCampaigns[0], id: `c-${i + 1}` }));
+      const rangeSpy = jest.fn().mockResolvedValue({ data: page1, error: null });
+      const chain: any = {};
+      Object.assign(chain, {
+        select: jest.fn().mockReturnValue(chain),
+        eq:     jest.fn().mockReturnValue(chain),
+        is:     jest.fn().mockReturnValue(chain),
+        order:  jest.fn().mockReturnValue(chain),
+        range:  rangeSpy,
+      });
+      mockSupabase.client = {
+        auth: { getUser: jest.fn() },
+        from: jest.fn().mockReturnValue(chain),
+        storage: { from: jest.fn() },
+      };
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          CampaignService,
+          { provide: SupabaseService, useValue: mockSupabase },
+          { provide: WorkspaceContextService, useValue: mockWorkspaceContext },
+        ],
+      });
+      service = TestBed.inject(CampaignService);
+
+      const result = await firstValueFrom(service.listCampaigns());
+
+      expect(result).toHaveLength(500);
+      expect(rangeSpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ── createCampaign() ────────────────────────────────────────────────────────
 
   describe('createCampaign()', () => {
     const dto = {
-      name: 'Test', advertiser: 'MTN',
+      name: 'Test', company_id: 'co-mtn',
       start_date: '2026-01-01', end_date: '2026-06-30',
       position: 'header' as const,
     };
@@ -242,6 +321,166 @@ describe('CampaignService', () => {
     it('retourne l\'URL publique depuis le bucket ads-banners', () => {
       const url = service.getBannerUrl('camp-1/banner.jpg');
       expect(url).toBe('https://example.com/banner.jpg');
+    });
+  });
+
+  // ── findOverlappingCampaigns() ──────────────────────────────────────────────
+
+  describe('findOverlappingCampaigns()', () => {
+    const otherCampaigns = [
+      { id: 'c2', name: 'MTN', company_id: 'co-mtn', company: { id: 'co-mtn', name: 'MTN Congo' }, start_date: '2026-08-10', end_date: '2026-08-20', position: 'header', active: true, deleted_at: null, workspace_id: 'ws-1' },
+      { id: 'c3', name: 'SG',  company_id: 'co-sg',  company: { id: 'co-sg',  name: 'SG Congo' },  start_date: '2026-09-01', end_date: '2026-09-30', position: 'header', active: true, deleted_at: null, workspace_id: 'ws-1' },
+    ];
+
+    function buildOverlapClient(rows: any[]) {
+      eqCalls = [];
+      const lteCalls: Array<[string, unknown]> = [];
+      const gteCalls: Array<[string, unknown]> = [];
+      const neqCalls: Array<[string, unknown]> = [];
+
+      function makeQuery(data: any): any {
+        const q: any = {
+          then: (fn: any) => Promise.resolve({ data, error: null }).then(fn),
+          select: () => makeQuery(data),
+          eq:  (col: string, val: unknown) => { eqCalls.push([col, val]);   return makeQuery(data); },
+          is:  () => makeQuery(data),
+          lte: (col: string, val: unknown) => { lteCalls.push([col, val]);  return makeQuery(data); },
+          gte: (col: string, val: unknown) => { gteCalls.push([col, val]);  return makeQuery(data); },
+          neq: (col: string, val: unknown) => { neqCalls.push([col, val]);  return makeQuery(data); },
+          order: () => makeQuery(data),
+        };
+        return q;
+      }
+
+      return {
+        client: {
+          from: (table: string) => (table === 'ad_campaigns' ? { select: () => makeQuery(rows) } : makeQuery([])),
+        },
+        lteCalls,
+        gteCalls,
+        neqCalls,
+      };
+    }
+
+    it('retourne les campagnes actives dont la période chevauche', async () => {
+      const { client } = buildOverlapClient(otherCampaigns);
+      mockSupabase.client = client;
+      const result = await firstValueFrom(
+        service.findOverlappingCampaigns('2026-08-15', '2026-08-25'),
+      );
+      expect(result.length).toBe(2);
+      expect(result[0].id).toBe('c2');
+    });
+
+    it('filtre par active=true et workspace', async () => {
+      const { client } = buildOverlapClient([]);
+      mockSupabase.client = client;
+      await firstValueFrom(service.findOverlappingCampaigns('2026-08-15', '2026-08-25'));
+      expect(eqCalls).toContainEqual(['active', true]);
+      expect(eqCalls).toContainEqual(['workspace_id', 'ws-1']);
+      expect(eqCalls.some(([col]) => col === 'position')).toBe(false);
+    });
+
+    it('teste le chevauchement: start_date <= end ET end_date >= start', async () => {
+      const built = buildOverlapClient([]);
+      mockSupabase.client = built.client;
+      await firstValueFrom(service.findOverlappingCampaigns('2026-08-15', '2026-08-25'));
+      expect(built.lteCalls).toContainEqual(['start_date', '2026-08-25']);
+      expect(built.gteCalls).toContainEqual(['end_date', '2026-08-15']);
+    });
+
+    it('exclut la campagne en cours d\'édition quand excludeId est fourni', async () => {
+      const built = buildOverlapClient([]);
+      mockSupabase.client = built.client;
+      await firstValueFrom(service.findOverlappingCampaigns('2026-08-15', '2026-08-25', 'c1'));
+      expect(built.neqCalls).toContainEqual(['id', 'c1']);
+    });
+
+    it("retourne [] en cas d'erreur DB", async () => {
+      mockSupabase.client = {
+        from: () => ({
+          select: () => ({
+            is: () => ({ eq: () => ({ lte: () => ({ gte: () => ({ order: () => ({ eq: () => Promise.resolve({ data: null, error: { message: 'fail' } }) }) }) }) }) }),
+          }),
+        }),
+      };
+      const result = await firstValueFrom(service.findOverlappingCampaigns('2026-08-15', '2026-08-25'));
+      expect(result).toEqual([]);
+    });
+  });
+
+  // ── Validation workflow (Round 3) ──────────────────────────────────────────
+
+  describe('validation workflow', () => {
+    let rpcSpy: jest.Mock;
+
+    function rebuildWithRpc(error: { code?: string; message?: string } | null = null): void {
+      rpcSpy = jest.fn().mockResolvedValue({ data: null, error });
+      mockSupabase.client = { rpc: rpcSpy };
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          CampaignService,
+          { provide: SupabaseService, useValue: mockSupabase },
+          { provide: WorkspaceContextService, useValue: mockWorkspaceContext },
+        ],
+      });
+      service = TestBed.inject(CampaignService);
+    }
+
+    describe('markPaid()', () => {
+      it('appelle mark_campaign_paid avec le bon paramètre', async () => {
+        rebuildWithRpc();
+        const res = await firstValueFrom(service.markPaid('c1'));
+        expect(rpcSpy).toHaveBeenCalledWith('mark_campaign_paid', { p_campaign_id: 'c1' });
+        expect(res.success).toBe(true);
+      });
+
+      it('mappe l\'erreur de privilège 42501 vers un message FR', async () => {
+        rebuildWithRpc({ code: '42501', message: 'insufficient_privilege' });
+        const res = await firstValueFrom(service.markPaid('c1'));
+        expect(res.success).toBe(false);
+        expect(res.error).toContain('droits');
+      });
+
+      it('mappe l\'erreur P0002 vers "Campagne introuvable"', async () => {
+        rebuildWithRpc({ code: 'P0002', message: 'campaign_not_found' });
+        const res = await firstValueFrom(service.markPaid('c1'));
+        expect(res.success).toBe(false);
+        expect(res.error).toBe('Campagne introuvable.');
+      });
+    });
+
+    describe('confirmCampaign()', () => {
+      it('appelle confirm_campaign avec le bon paramètre', async () => {
+        rebuildWithRpc();
+        const res = await firstValueFrom(service.confirmCampaign('c1'));
+        expect(rpcSpy).toHaveBeenCalledWith('confirm_campaign', { p_campaign_id: 'c1' });
+        expect(res.success).toBe(true);
+      });
+
+      it('retourne success: false en cas d\'erreur DB', async () => {
+        rebuildWithRpc({ message: 'boom' });
+        const res = await firstValueFrom(service.confirmCampaign('c1'));
+        expect(res.success).toBe(false);
+        expect(res.error).toBe('boom');
+      });
+    });
+
+    describe('unmarkPaid()', () => {
+      it('appelle unmark_campaign_paid', async () => {
+        rebuildWithRpc();
+        await firstValueFrom(service.unmarkPaid('c1'));
+        expect(rpcSpy).toHaveBeenCalledWith('unmark_campaign_paid', { p_campaign_id: 'c1' });
+      });
+    });
+
+    describe('unconfirmCampaign()', () => {
+      it('appelle unconfirm_campaign', async () => {
+        rebuildWithRpc();
+        await firstValueFrom(service.unconfirmCampaign('c1'));
+        expect(rpcSpy).toHaveBeenCalledWith('unconfirm_campaign', { p_campaign_id: 'c1' });
+      });
     });
   });
 });

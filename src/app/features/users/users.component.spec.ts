@@ -12,6 +12,7 @@ describe('UsersComponent', () => {
     listUsers: jest.Mock;
     manageUser: jest.Mock;
     inviteUser: jest.Mock;
+    getWorkspaceSummaries: jest.Mock;
   };
 
   const fakeUsers: UserListEntry[] = [
@@ -19,16 +20,26 @@ describe('UsersComponent', () => {
       id: 'u1', email: 'alice@test.com', full_name: 'Alice Martin',
       phone: null, avatar_url: null, role: 'editeur',
       expires_at: null, banned: false, created_at: '2026-01-15T10:00:00Z',
+      email_confirmed_at: '2026-01-16T09:00:00Z', invited_at: '2026-01-15T10:00:00Z',
     },
     {
       id: 'u2', email: 'bob@test.com', full_name: null,
       phone: null, avatar_url: null, role: 'owner',
       expires_at: null, banned: false, created_at: '2026-01-01T08:00:00Z',
+      email_confirmed_at: '2026-01-01T08:00:00Z', invited_at: '2026-01-01T08:00:00Z',
     },
     {
       id: 'u3', email: 'carol@test.com', full_name: 'Carol Dupont',
       phone: null, avatar_url: null, role: 'charge_communication',
       expires_at: null, banned: false, created_at: '2026-01-20T09:00:00Z',
+      email_confirmed_at: '2026-01-21T11:00:00Z', invited_at: '2026-01-20T09:00:00Z',
+    },
+    // A pending invitation — no email_confirmed_at.
+    {
+      id: 'u4', email: 'david@test.com', full_name: null,
+      phone: null, avatar_url: null, role: 'editeur',
+      expires_at: null, banned: false, created_at: '2026-06-20T14:00:00Z',
+      email_confirmed_at: null, invited_at: '2026-06-20T14:00:00Z',
     },
   ];
 
@@ -37,6 +48,9 @@ describe('UsersComponent', () => {
       listUsers: jest.fn().mockReturnValue(of(fakeUsers)),
       manageUser: jest.fn().mockReturnValue(of({ success: true })),
       inviteUser: jest.fn().mockReturnValue(of({ success: true })),
+      getWorkspaceSummaries: jest.fn().mockReturnValue(of([
+        { id: 'ws-1', name: 'DIOUGA-DIOP Media', logo_url: null, member_count: 4, last_accessed_at: null },
+      ])),
     };
 
     await TestBed.configureTestingModule({
@@ -63,7 +77,7 @@ describe('UsersComponent', () => {
     it('peuple le signal users avec le bon nombre d\'entrées', async () => {
       await component.ngOnInit();
 
-      expect(component.users().length).toBe(3);
+      expect(component.users().length).toBe(4); // 3 actifs + 1 invitation en attente
     });
 
     it('mappe correctement l\'id de la première entrée', async () => {
@@ -224,6 +238,88 @@ describe('UsersComponent', () => {
     });
   });
 
+  // ── activeWorkspaceName ───────────────────────────────────────────────────
+
+  describe("activeWorkspaceName", () => {
+    it("est chargé depuis getWorkspaceSummaries au démarrage", async () => {
+      await component.ngOnInit();
+      expect(mockWorkspace.getWorkspaceSummaries).toHaveBeenCalled();
+      expect(component.activeWorkspaceName()).toBe('DIOUGA-DIOP Media');
+    });
+
+    it("reste vide si getWorkspaceSummaries échoue (non-bloquant)", async () => {
+      mockWorkspace.getWorkspaceSummaries.mockReturnValueOnce(of([]));
+      await component.ngOnInit();
+      expect(component.activeWorkspaceName()).toBe('');
+    });
+  });
+
+  // ── Pending invitations ───────────────────────────────────────────────────
+
+  describe('invitations en attente', () => {
+    beforeEach(async () => { await component.ngOnInit(); });
+
+    it('pendingInvitations contient uniquement les utilisateurs sans email_confirmed_at', () => {
+      const pending = component.pendingInvitations();
+      expect(pending.length).toBe(1);
+      expect(pending[0].userId).toBe('u4');
+      expect(pending[0].email).toBe('david@test.com');
+    });
+
+    it('activeUsers exclut les invitations en attente', () => {
+      const active = component.activeUsers();
+      expect(active.length).toBe(3);
+      expect(active.map(u => u.userId)).not.toContain('u4');
+    });
+
+    it("filteredPendingInvitations applique le filtre de recherche", () => {
+      component.searchQuery.set('david');
+      expect(component.filteredPendingInvitations().length).toBe(1);
+      component.searchQuery.set('alice');
+      expect(component.filteredPendingInvitations().length).toBe(0);
+    });
+
+    it("kpiTotal compte uniquement les membres actifs, pas les invitations", () => {
+      expect(component.kpiTotal()).toBe(3); // 3 actifs (Alice + Bob + Carol); David est en attente
+    });
+
+    it("kpiEditors compte uniquement les éditeurs actifs", () => {
+      expect(component.kpiEditors()).toBe(1); // Alice seulement (David en attente est aussi editeur)
+    });
+
+    describe('resendInvitation()', () => {
+      it("appelle manageUser avec l'action resend_invitation", async () => {
+        await component.resendInvitation('u4');
+        expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u4', 'resend_invitation');
+      });
+
+      it('recharge la liste après succès', async () => {
+        mockWorkspace.listUsers.mockClear();
+        await component.resendInvitation('u4');
+        expect(mockWorkspace.listUsers).toHaveBeenCalled();
+      });
+
+      it("affiche l'erreur quand le RPC échoue", async () => {
+        mockWorkspace.manageUser.mockReturnValueOnce(of({ success: false, error: 'rate_limit' }));
+        await component.resendInvitation('u4');
+        expect(component.invitationActionError()).toContain('rate_limit');
+      });
+    });
+
+    describe('revokeInvitation()', () => {
+      it("appelle manageUser avec l'action revoke_invitation", async () => {
+        await component.revokeInvitation('u4');
+        expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u4', 'revoke_invitation');
+      });
+
+      it('recharge la liste après succès', async () => {
+        mockWorkspace.listUsers.mockClear();
+        await component.revokeInvitation('u4');
+        expect(mockWorkspace.listUsers).toHaveBeenCalled();
+      });
+    });
+  });
+
   // ── initials() ────────────────────────────────────────────────────────────
 
   describe('initials()', () => {
@@ -292,7 +388,161 @@ describe('UsersComponent', () => {
     });
   });
 
+  // ── role modal ─────────────────────────────────────────────────────────────
+
+  describe('openRoleModal() / closeRoleModal()', () => {
+    beforeEach(async () => { await component.ngOnInit(); });
+
+    it('ouvre la modal et positionne roleModalUserId', () => {
+      component.openRoleModal('u1');
+      expect(component.showRoleModal()).toBe(true);
+      expect(component.roleModalUserId()).toBe('u1');
+    });
+
+    it('pré-sélectionne le rôle courant de l\'utilisateur', () => {
+      component.openRoleModal('u1'); // u1 est 'editeur'
+      expect(component.roleModalTargetRole()).toBe('editeur');
+    });
+
+    it('closeRoleModal ferme la modal', () => {
+      component.openRoleModal('u1');
+      component.closeRoleModal();
+      expect(component.showRoleModal()).toBe(false);
+    });
+  });
+
+  describe('submitRoleChange()', () => {
+    beforeEach(async () => {
+      await component.ngOnInit();
+      component.openRoleModal('u1');
+      component.roleModalTargetRole.set('chef_equipe');
+    });
+
+    it('appelle manageUser avec update_role et le nouveau rôle', async () => {
+      await component.submitRoleChange();
+      expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u1', 'update_role', 'chef_equipe');
+    });
+
+    it('ferme la modal après l\'action', async () => {
+      await component.submitRoleChange();
+      expect(component.showRoleModal()).toBe(false);
+    });
+
+    it('ne fait rien si roleModalUserId est null', async () => {
+      component.roleModalUserId.set(null);
+      await component.submitRoleChange();
+      expect(mockWorkspace.manageUser).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── confirm modal ──────────────────────────────────────────────────────────
+
+  describe('openConfirmModal() / closeConfirmModal()', () => {
+    it('ouvre la modal avec userId et action', () => {
+      component.openConfirmModal('u1', 'block');
+      expect(component.showConfirmModal()).toBe(true);
+      expect(component.confirmModalUserId()).toBe('u1');
+      expect(component.confirmModalAction()).toBe('block');
+    });
+
+    it('closeConfirmModal ferme la modal', () => {
+      component.openConfirmModal('u1', 'block');
+      component.closeConfirmModal();
+      expect(component.showConfirmModal()).toBe(false);
+    });
+  });
+
+  describe('confirmAction()', () => {
+    beforeEach(async () => { await component.ngOnInit(); });
+
+    it('appelle manageUser avec l\'userId et l\'action confirmée', async () => {
+      component.openConfirmModal('u1', 'block');
+      await component.confirmAction();
+      expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u1', 'block', undefined);
+    });
+
+    it('ferme la modal après l\'action', async () => {
+      component.openConfirmModal('u1', 'remove');
+      await component.confirmAction();
+      expect(component.showConfirmModal()).toBe(false);
+    });
+
+    it('ne fait rien si confirmModalUserId est null', async () => {
+      component.openConfirmModal('u1', 'block');
+      component.confirmModalUserId.set(null);
+      await component.confirmAction();
+      expect(mockWorkspace.manageUser).not.toHaveBeenCalled();
+    });
+
+    it('ne fait rien si confirmModalAction est null', async () => {
+      component.confirmModalUserId.set('u1');
+      component.confirmModalAction.set(null);
+      await component.confirmAction();
+      expect(mockWorkspace.manageUser).not.toHaveBeenCalled();
+    });
+  });
+
   // ── submitInvite() ─────────────────────────────────────────────────────────
+
+  // ── set-password admin ─────────────────────────────────────────────────────
+
+  describe('openPasswordModal / submitSetPassword', () => {
+    beforeEach(async () => {
+      await component.ngOnInit();
+    });
+
+    it('openPasswordModal initialise les signals et ouvre le modal', () => {
+      component.openPasswordModal('u1');
+      expect(component.showPasswordModal()).toBe(true);
+      expect(component.passwordModalUserId()).toBe('u1');
+      expect(component.passwordModalValue()).toBe('');
+      expect(component.passwordModalShow()).toBe(false);
+      expect(component.passwordModalError()).toBe('');
+    });
+
+    it('togglePasswordModalShow bascule la visibilité', () => {
+      component.togglePasswordModalShow();
+      expect(component.passwordModalShow()).toBe(true);
+      component.togglePasswordModalShow();
+      expect(component.passwordModalShow()).toBe(false);
+    });
+
+    it('passwordModalUser retourne le user actif du modal', () => {
+      component.openPasswordModal('u1');
+      expect(component.passwordModalUser()?.userId).toBe('u1');
+    });
+
+    it('submitSetPassword rejette un mot de passe < 8 caractères', async () => {
+      component.openPasswordModal('u1');
+      component.passwordModalValue.set('court');
+      await component.submitSetPassword();
+      expect(mockWorkspace.manageUser).not.toHaveBeenCalled();
+      expect(component.passwordModalError()).toContain('8 caractères');
+    });
+
+    it("submitSetPassword appelle manageUser avec l'action set_password et le password", async () => {
+      component.openPasswordModal('u1');
+      component.passwordModalValue.set('motdepasseAdmin');
+      await component.submitSetPassword();
+      expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u1', 'set_password', undefined, 'motdepasseAdmin');
+    });
+
+    it('submitSetPassword ferme le modal en cas de succès', async () => {
+      component.openPasswordModal('u1');
+      component.passwordModalValue.set('motdepasseAdmin');
+      await component.submitSetPassword();
+      expect(component.showPasswordModal()).toBe(false);
+    });
+
+    it("submitSetPassword affiche l'erreur en cas d'échec", async () => {
+      mockWorkspace.manageUser.mockReturnValueOnce(of({ success: false, error: 'Boom' }));
+      component.openPasswordModal('u1');
+      component.passwordModalValue.set('motdepasseAdmin');
+      await component.submitSetPassword();
+      expect(component.passwordModalError()).toBe('Boom');
+      expect(component.showPasswordModal()).toBe(true); // modal reste ouvert
+    });
+  });
 
   describe('submitInvite()', () => {
     beforeEach(() => {

@@ -5,8 +5,10 @@ import { of } from 'rxjs';
 import { DayDetailComponent } from './day-detail.component';
 import { EventService } from '../../../core/events/event.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../../core/calendar/calendar-entry.service';
+import { CampaignService } from '../../../core/campaigns/campaign.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { Event } from '../../../models';
+import { AdCampaign, Event } from '../../../models';
 
 const MOCK_LIBRARY_EVENTS: Event[] = [
   {
@@ -20,6 +22,23 @@ const MOCK_LIBRARY_EVENTS: Event[] = [
     id: 'evt-2', event_date: '1938-08-15',
     title: 'Naissance de Marien Ngouabi', status: 'published', workspace_id: 'ws-1',
     description: null, image_path: null,
+    created_by: 'u1', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    updated_by: null, deleted_at: null, deleted_by: null,
+  },
+];
+
+const MOCK_CAMPAIGNS: AdCampaign[] = [
+  {
+    id: 'camp-1', name: 'MTN Congo', advertiser: 'MTN', position: 'header',
+    start_date: '2026-08-01', end_date: '2026-08-31',
+    active: true, image_path: '', link_url: null, workspace_id: 'ws-1',
+    created_by: 'u1', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    updated_by: null, deleted_at: null, deleted_by: null,
+  },
+  {
+    id: 'camp-2', name: 'Airtel Congo', advertiser: 'Airtel', position: 'footer',
+    start_date: '2026-09-01', end_date: '2026-09-30',
+    active: true, image_path: '', link_url: null, workspace_id: 'ws-1',
     created_by: 'u1', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     updated_by: null, deleted_at: null, deleted_by: null,
   },
@@ -47,8 +66,12 @@ describe('DayDetailComponent', () => {
     assignEvent: jest.Mock;
     unassignSlot: jest.Mock;
   };
+  let mockCampaignService: {
+    listCampaigns: jest.Mock;
+  };
   let mockRouter: { navigate: jest.Mock };
   let mockToast: jest.Mocked<Pick<ToastService, 'success' | 'error'>>;
+  let mockAuth: { hasRoleAtLeast: jest.Mock };
 
   beforeEach(async () => {
     mockEventService = {
@@ -59,14 +82,22 @@ describe('DayDetailComponent', () => {
       assignEvent: jest.fn().mockReturnValue(of({ success: true })),
       unassignSlot: jest.fn().mockReturnValue(of({ success: true })),
     };
+    mockCampaignService = {
+      listCampaigns: jest.fn().mockReturnValue(of(MOCK_CAMPAIGNS)),
+    };
     mockRouter = { navigate: jest.fn() };
     mockToast  = { success: jest.fn(), error: jest.fn() };
+    // Default: chef_equipe so save() proceeds. The 'role-gated' describe block
+    // overrides to return false (plain editeur).
+    mockAuth = { hasRoleAtLeast: jest.fn().mockReturnValue(of(true)) };
 
     await TestBed.configureTestingModule({
       imports: [DayDetailComponent],
       providers: [
         { provide: EventService, useValue: mockEventService },
         { provide: CalendarEntryService, useValue: mockCalendarEntryService },
+        { provide: CampaignService, useValue: mockCampaignService },
+        { provide: AuthService, useValue: mockAuth },
         { provide: Router, useValue: mockRouter },
         { provide: ToastService, useValue: mockToast },
         {
@@ -263,6 +294,66 @@ describe('DayDetailComponent', () => {
     it('navigue vers /calendrier', () => {
       component.goBack();
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/calendrier']);
+    });
+  });
+
+  // ── chargement campagnes (lecture seule) ───────────────────────────────────
+
+  describe('availableCampaigns', () => {
+    it('appelle listCampaigns au démarrage', () => {
+      expect(mockCampaignService.listCampaigns).toHaveBeenCalled();
+    });
+
+    it('filtre aux campagnes actives couvrant la date', () => {
+      // camp-1: 2026-08-01 → 2026-08-31 covers 2026-08-15 ✓
+      // camp-2: 2026-09-01 → 2026-09-30 does NOT cover 2026-08-15 ✗
+      expect(component.availableCampaigns().length).toBe(1);
+      expect(component.availableCampaigns()[0].id).toBe('camp-1');
+    });
+  });
+
+  // ── role-gated save (editeur read-only) ────────────────────────────────────
+
+  describe('save() — rôle insuffisant', () => {
+    it("refuse d'appeler assignEvent quand canEditAssignments est false", async () => {
+      mockAuth.hasRoleAtLeast.mockReturnValue(of(false));
+      const tb = TestBed.resetTestingModule();
+      await tb.configureTestingModule({
+        imports: [DayDetailComponent],
+        providers: [
+          { provide: EventService, useValue: mockEventService },
+          { provide: CalendarEntryService, useValue: mockCalendarEntryService },
+          { provide: CampaignService, useValue: mockCampaignService },
+          { provide: AuthService, useValue: mockAuth },
+          { provide: Router, useValue: mockRouter },
+          { provide: ToastService, useValue: mockToast },
+          {
+            provide: ActivatedRoute,
+            useValue: {
+              snapshot: { paramMap: { get: (k: string) => k === 'calendarId' ? 'cal-1' : '2026-08-15' } },
+            },
+          },
+        ],
+        schemas: [NO_ERRORS_SCHEMA],
+      }).compileComponents();
+
+      tb.overrideComponent(DayDetailComponent, { set: { template: '' } });
+      const fix = tb.createComponent(DayDetailComponent);
+      const editeurComp = fix.componentInstance;
+      fix.detectChanges();
+      await editeurComp.ngOnInit();
+
+      mockCalendarEntryService.assignEvent.mockClear();
+      mockCalendarEntryService.unassignSlot.mockClear();
+
+      await editeurComp.save();
+
+      expect(editeurComp.canEditAssignments()).toBe(false);
+      expect(mockCalendarEntryService.assignEvent).not.toHaveBeenCalled();
+      expect(mockCalendarEntryService.unassignSlot).not.toHaveBeenCalled();
+      expect(mockToast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Présidence'),
+      );
     });
   });
 });
