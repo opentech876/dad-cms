@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { filter, firstValueFrom } from 'rxjs';
 import { AppRole } from '../../models';
@@ -22,7 +22,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [TuiIcon, FormsModule],
+  imports: [TuiIcon, FormsModule, RouterLink],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })
@@ -31,9 +31,18 @@ export class ProfileComponent implements OnInit {
   private readonly workspaceService = inject(WorkspaceService);
   private readonly supabase         = inject(SupabaseService);
   private readonly router           = inject(Router);
+  private readonly route            = inject(ActivatedRoute);
   private readonly toast            = inject(ToastService);
 
   private userId = '';
+
+  /**
+   * True when the user landed here because the systemAdminGuard refused to
+   * let them into /admin without an enrolled TOTP factor (URL has
+   * ?mfa_required=1). Drives a top banner that explains why and points to
+   * the Sécurité section.
+   */
+  readonly mfaRequiredBanner = signal(false);
 
   readonly userEmail = signal('');
   readonly fullName  = signal('');
@@ -63,6 +72,12 @@ export class ProfileComponent implements OnInit {
   );
 
   async ngOnInit(): Promise<void> {
+    // If the system-admin guard sent us here because TOTP isn't enrolled yet,
+    // surface a banner so the user knows why and where to look.
+    this.mfaRequiredBanner.set(
+      this.route.snapshot.queryParamMap.get('mfa_required') === '1',
+    );
+
     const user = await firstValueFrom(this.auth.getCurrentUser().pipe(filter(Boolean)));
     this.userId = (user as any).id ?? '';
     this.userEmail.set((user as any).email ?? '');
@@ -297,6 +312,8 @@ export class ProfileComponent implements OnInit {
     this.toast.success('Double authentification activée.');
     this.mfaPendingFactor.set(null);
     this.mfaCode.set('');
+    // The system-admin guard banner can go now — the user has met the bar.
+    this.mfaRequiredBanner.set(false);
     await this.loadMfaFactors();
   }
 

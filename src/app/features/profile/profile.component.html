@@ -8,6 +8,20 @@
     <span class="profile-topbar-title">Mon profil</span>
   </div>
 
+  <!-- ── system_admin AAL2 gate banner ── -->
+  @if (mfaRequiredBanner()) {
+    <div class="profile-pending-box"
+         style="margin: 12px 0; background: var(--warning-soft, rgba(217,143,21,0.08)); border: 1px solid rgba(217,143,21,0.3); color: var(--warning, #b76c00); padding: 14px 16px; border-radius: 6px; display: flex; gap: 12px; align-items: flex-start;">
+      <tui-icon icon="@tui.shield-alert" style="font-size:20px; flex-shrink:0; margin-top:2px;" />
+      <div style="flex:1; font-size:13.5px; line-height:1.5;">
+        <strong style="display:block; margin-bottom:4px;">Double authentification requise</strong>
+        L'accès à l'espace d'administration exige l'activation de la double authentification.
+        Activez-la dans la section <strong>Double authentification</strong> ci-dessous, puis
+        retournez à <a routerLink="/admin" style="color:inherit; text-decoration:underline;">l'administration</a>.
+      </div>
+    </div>
+  }
+
   <!-- ── Hero + Personal info (one visual card) ── -->
   <div class="profile-section-stack profile-section-stack--hero">
 

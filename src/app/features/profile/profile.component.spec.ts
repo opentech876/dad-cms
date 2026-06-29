@@ -1,6 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { ProfileComponent } from './profile.component';
 import { AuthService } from '../../core/auth/auth.service';
@@ -16,6 +16,7 @@ describe('ProfileComponent', () => {
   let mockSupabase: any;
   let mockRouter: { navigate: jest.Mock };
   let mockToast: jest.Mocked<Pick<ToastService, 'success' | 'error'>>;
+  let queryParams: Record<string, string | null>;
 
   const MOCK_PROFILE = { full_name: 'Elvis Destin', phone: '+242 06 000 0001', avatar_url: null };
 
@@ -43,6 +44,7 @@ describe('ProfileComponent', () => {
     } as any;
     mockRouter = { navigate: jest.fn() };
     mockToast  = { success: jest.fn(), error: jest.fn() };
+    queryParams = {};
 
     await TestBed.configureTestingModule({
       imports: [ProfileComponent],
@@ -52,6 +54,14 @@ describe('ProfileComponent', () => {
         { provide: SupabaseService, useValue: mockSupabase },
         { provide: Router,         useValue: mockRouter },
         { provide: ToastService,   useValue: mockToast },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: { get: (key: string) => queryParams[key] ?? null },
+            },
+          },
+        },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
@@ -85,6 +95,41 @@ describe('ProfileComponent', () => {
 
     it('initialise userEmail depuis l\'utilisateur courant', () => {
       expect(component.userEmail()).toBe('elvis@test.com');
+    });
+  });
+
+  // ── bannière MFA requise ──────────────────────────────────────────────────
+
+  describe('bannière "MFA requise" (?mfa_required=1)', () => {
+    async function recreateWithParam(value: string | null) {
+      queryParams['mfa_required'] = value;
+      fixture = TestBed.createComponent(ProfileComponent);
+      component = fixture.componentInstance;
+      await component.ngOnInit();
+    }
+
+    it("n'apparaît pas par défaut", () => {
+      expect(component.mfaRequiredBanner()).toBe(false);
+    });
+
+    it('apparaît quand ?mfa_required=1', async () => {
+      await recreateWithParam('1');
+      expect(component.mfaRequiredBanner()).toBe(true);
+    });
+
+    it("n'apparaît PAS pour une valeur autre que '1'", async () => {
+      await recreateWithParam('yes');
+      expect(component.mfaRequiredBanner()).toBe(false);
+    });
+
+    it("disparaît après une activation TOTP réussie", async () => {
+      await recreateWithParam('1');
+      expect(component.mfaRequiredBanner()).toBe(true);
+      // Set up a pending enrollment so confirmMfaEnrollment proceeds
+      component.mfaPendingFactor.set({ id: 'f1', qr: 'data:', secret: 'X' } as any);
+      component.mfaCode.set('123456');
+      await component.confirmMfaEnrollment();
+      expect(component.mfaRequiredBanner()).toBe(false);
     });
 
     it('initialise role depuis currentRole$', () => {
