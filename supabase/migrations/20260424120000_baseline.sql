@@ -438,22 +438,24 @@ $$;
 -- workspace_members trigger below auto-creates the profile when membership
 -- is granted, covering every onboarding path (invitation, finalize_workspace_creation,
 -- admin_create_workspace).
+--
+-- There is NO first-user-wins (FUW) branch. The first system_admin is seeded
+-- out-of-band via bootstrap.sql (run once by the operator in Supabase Studio);
+-- no signup path automatically awards any privileged role. This trigger only
+-- honours an explicit role passed through invitation metadata
+-- (raw_user_meta_data.role) by the invite-user Edge Function. An anonymous /
+-- self-service signup therefore receives no role at all.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
 DECLARE invited_role TEXT;
 BEGIN
-  IF (SELECT COUNT(*) FROM public.user_roles) = 0 THEN
-    INSERT INTO public.user_roles (user_id, role, expires_at)
-    VALUES (NEW.id, 'owner', NOW() + INTERVAL '24 hours');
-  ELSE
-    invited_role := NEW.raw_user_meta_data ->> 'role';
-    IF invited_role IS NOT NULL THEN
-      BEGIN
-        INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, invited_role::public.app_role)
-        ON CONFLICT (user_id) DO NOTHING;
-      EXCEPTION WHEN invalid_text_representation THEN NULL;
-      END;
-    END IF;
+  invited_role := NEW.raw_user_meta_data ->> 'role';
+  IF invited_role IS NOT NULL THEN
+    BEGIN
+      INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, invited_role::public.app_role)
+      ON CONFLICT (user_id) DO NOTHING;
+    EXCEPTION WHEN invalid_text_representation THEN NULL;
+    END;
   END IF;
   RETURN NEW;
 END;
