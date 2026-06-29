@@ -358,6 +358,94 @@
     }
   </div>
 
+  <!-- ── Pending invitations ── -->
+  @if (pendingInvitations().length > 0) {
+    <div class="card" style="margin-top: 20px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Invitations en attente</div>
+          <div class="card-subtitle">
+            {{ pendingInvitations().length }} invitation(s) envoyée(s) mais non encore acceptée(s).
+          </div>
+        </div>
+      </div>
+
+      @if (invitationActionError()) {
+        <div style="margin: 0 20px 12px 20px; color: var(--danger); font-size: 12.5px;">
+          {{ invitationActionError() }}
+        </div>
+      }
+
+      <div class="table-wrap" style="border-radius: 0; border: none; box-shadow: none">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>E-mail</th>
+              <th>Rôle prévu</th>
+              <th>Invité le</th>
+              <th style="width: 180px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of filteredPendingInvitations(); track user.userId) {
+              <tr style="opacity: 0.92;">
+                <td>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="avatar" style="background: var(--bg-sunken); color: var(--fg-3); font-size: 11px;">
+                      <tui-icon icon="@tui.mail" style="font-size: 14px;" />
+                    </div>
+                    <div>
+                      <div style="font-size: 13.5px; font-weight: 500;">{{ user.email ?? '—' }}</div>
+                      <div style="font-size: 11.5px; color: var(--fg-3);">en attente d'acceptation</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span class="role-badge role-badge--{{ user.role }}">{{ roleLabels[user.role] }}</span>
+                </td>
+                <td style="font-size: 12.5px; color: var(--fg-3);">
+                  @if (user.invitedAt) {
+                    {{ user.invitedAt | date: 'd MMM yyyy' : '' : 'fr' }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>
+                  <div style="display: flex; gap: 2px; align-items: center; justify-content: flex-end;">
+                    <button
+                      class="btn btn-flat btn-sm"
+                      title="Renvoyer le lien d'invitation"
+                      type="button"
+                      [disabled]="invitationActionBusyId() === user.userId"
+                      (click)="resendInvitation(user.userId)"
+                    >
+                      @if (invitationActionBusyId() === user.userId) {
+                        <span class="spinner"></span>
+                      } @else {
+                        <tui-icon icon="@tui.mail" style="font-size: 13px" />
+                      }
+                      Renvoyer
+                    </button>
+                    <button
+                      class="btn btn-flat btn-icon btn-sm"
+                      title="Révoquer l'invitation"
+                      type="button"
+                      style="color: var(--error)"
+                      [disabled]="invitationActionBusyId() === user.userId"
+                      (click)="revokeInvitation(user.userId)"
+                    >
+                      <tui-icon icon="@tui.x" style="font-size: 14px" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
   <!-- ── Permissions matrix ── -->
   <div class="card">
     <div class="card-header">
@@ -485,8 +573,11 @@
         }
         @if (confirmModalAction() === 'block') {
           <p style="font-size: 13px; color: var(--fg-2)">
-            Cet utilisateur ne pourra plus se connecter à l'application. Vous pouvez débloquer son
-            accès à tout moment.
+            Cet utilisateur ne pourra plus se connecter à l'application
+            @if (activeWorkspaceName()) {
+              dans <strong>{{ activeWorkspaceName() }}</strong>
+            }.
+            Vous pouvez débloquer son accès à tout moment.
           </p>
         }
         @if (confirmModalAction() === 'unblock') {
@@ -496,7 +587,14 @@
         }
         @if (confirmModalAction() === 'remove') {
           <p style="font-size: 13px; color: var(--fg-2)">
-            Ce membre perdra tout accès à cet espace de travail. Cette action est irréversible.
+            Ce membre perdra son accès
+            @if (activeWorkspaceName()) {
+              à <strong>{{ activeWorkspaceName() }}</strong>
+            } @else {
+              à cet espace de travail
+            }.
+            Son compte reste actif s'il appartient à d'autres espaces et toutes
+            ses contributions passées restent attribuées à son nom.
           </p>
         }
       </div>

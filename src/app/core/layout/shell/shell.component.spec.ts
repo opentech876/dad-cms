@@ -61,6 +61,7 @@ describe('ShellComponent — navigation par rôle', () => {
             currentRole$: roleSubject.asObservable(),
             getCurrentUser: jest.fn().mockReturnValue(of({ id: 'mock-user-id', email: 'test@example.com' })),
             signOut: jest.fn().mockReturnValue(of(null)),
+            isSystemAdmin: jest.fn().mockReturnValue(of(false)),
           },
         },
         {
@@ -111,17 +112,15 @@ describe('ShellComponent — navigation par rôle', () => {
 
   // ── owner ──────────────────────────────────────────────────────────────────
 
-  it('affiche les 8 navItems pour le rôle owner (recommandations + compagnies inclus)', () => {
+  it('affiche tous les nav items pour le rôle owner (recommandations + compagnies inclus)', () => {
     createComponent('owner');
-    expect(component.visibleNavItems().length).toBe(8);
     const paths = component.visibleNavItems().map(i => i.path);
     expect(paths).toContain('/recommandations');
     expect(paths).toContain('/compagnies');
-  });
-
-  it('affiche les 3 adminItems pour le rôle owner', () => {
-    createComponent('owner');
-    expect(component.visibleAdminItems().length).toBe(3);
+    // Owner sees every section; quick sanity check
+    expect(paths).toContain('/metriques');
+    expect(paths).toContain('/espace-de-travail');
+    expect(paths).toContain('/parametres');
   });
 
   // ── chef_equipe ────────────────────────────────────────────────────────────
@@ -143,12 +142,7 @@ describe('ShellComponent — navigation par rôle', () => {
 
   it("chef_equipe voit 'metriques'", () => {
     createComponent('chef_equipe');
-    expect(component.visibleAdminItems().map((i) => i.path)).toContain('/metriques');
-  });
-
-  it("chef_equipe ne voit pas 'workspace'", () => {
-    createComponent('chef_equipe');
-    expect(component.visibleAdminItems().map((i) => i.path)).not.toContain('/espaces');
+    expect(component.visibleNavItems().map((i) => i.path)).toContain('/metriques');
   });
 
   // ── editeur ────────────────────────────────────────────────────────────────
@@ -168,9 +162,12 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(component.visibleNavItems().map((i) => i.path)).toContain('/evenements');
   });
 
-  it("éditeur voit 'espace-de-travail' et 'parametres' dans les adminItems", () => {
+  it("éditeur voit 'espace-de-travail' et 'parametres' mais pas 'metriques'", () => {
     createComponent('editeur');
-    expect(component.visibleAdminItems().map(i => i.path)).toEqual(['/espace-de-travail', '/parametres']);
+    const paths = component.visibleNavItems().map(i => i.path);
+    expect(paths).toContain('/espace-de-travail');
+    expect(paths).toContain('/parametres');
+    expect(paths).not.toContain('/metriques');
   });
 
   // ── charge_communication ───────────────────────────────────────────────────
@@ -190,9 +187,9 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(component.visibleNavItems().map((i) => i.path)).toContain('/campagnes');
   });
 
-  it("charge_communication ne voit pas 'workspace'", () => {
+  it("charge_communication voit 'metriques' (rôle autorisé)", () => {
     createComponent('charge_communication');
-    expect(component.visibleAdminItems().map((i) => i.path)).not.toContain('/espaces');
+    expect(component.visibleNavItems().map((i) => i.path)).toContain('/metriques');
   });
 
   // ── presidence ─────────────────────────────────────────────────────────────
@@ -243,9 +240,9 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(component.visibleNavItems()).toEqual([]);
   });
 
-  it('retourne des adminItems vides quand aucun rôle n\'est assigné', () => {
+  it('retourne des sections vides quand aucun rôle n\'est assigné', () => {
     createComponent(null);
-    expect(component.visibleAdminItems()).toEqual([]);
+    expect(component.visibleNavSections()).toEqual([]);
   });
 
   // ── workspace name ────────────────────────────────────────────────────────
@@ -460,6 +457,43 @@ describe('ShellComponent — navigation par rôle', () => {
       component.goToResult({ type: 'event', id: 'e1', label: 'Test' });
       expect(component.searchOpen()).toBe(false);
       expect(component.searchTerm()).toBe('');
+    });
+  });
+
+  // ── sidebar resize + mobile drawer ────────────────────────────────────────
+
+  describe('sidebar resize + mobile drawer', () => {
+    it("sidebarWidth a une valeur par défaut dans la plage 200-360", () => {
+      createComponent('owner');
+      const w = component.sidebarWidth();
+      expect(w).toBeGreaterThanOrEqual(200);
+      expect(w).toBeLessThanOrEqual(360);
+    });
+
+    it("openMobileSidebar passe mobileOpen à true et closeMobileSidebar le ferme", () => {
+      createComponent('owner');
+      component.openMobileSidebar();
+      expect(component.mobileOpen()).toBe(true);
+      component.closeMobileSidebar();
+      expect(component.mobileOpen()).toBe(false);
+    });
+
+    it("onWindowResize met à jour isMobile selon innerWidth", () => {
+      createComponent('owner');
+      (window as any).innerWidth = 500;
+      component.onWindowResize();
+      expect(component.isMobile()).toBe(true);
+      (window as any).innerWidth = 1280;
+      component.onWindowResize();
+      expect(component.isMobile()).toBe(false);
+    });
+
+    it("onWindowResize ferme la drawer mobile en repassant en desktop", () => {
+      createComponent('owner');
+      component.mobileOpen.set(true);
+      (window as any).innerWidth = 1280;
+      component.onWindowResize();
+      expect(component.mobileOpen()).toBe(false);
     });
   });
 

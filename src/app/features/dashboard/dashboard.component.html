@@ -55,8 +55,8 @@
     <!-- Right column — mobile preview ───────────────────────── -->
     <div style="background:linear-gradient(135deg, rgba(138,42,35,0.85) 0%, rgba(31,26,20,0.97) 100%), repeating-linear-gradient(45deg, rgba(216,161,85,0.15) 0 2px, transparent 2px 8px); color:#f3e6c8; padding:32px; display:flex; flex-direction:column; justify-content:space-between; border-left:1px solid var(--border-1);">
       <div style="display:flex; justify-content:space-between; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; opacity:0.8;">
-        <span>Aperçu mobile</span>
-        <span>{{ hasFeaturedEvent() ? featuredEvent().day + ' ' + featuredEvent().month : todayDayNum + ' ' + todayMonthCap }}</span>
+        <span>Éphéméride du jour</span>
+        <span>{{ todayDayNum }} {{ todayMonthCap }}</span>
       </div>
       <div style="text-align:center;">
         @if (hasFeaturedEvent()) {
@@ -99,9 +99,9 @@
         <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">{{ stats().yearEvents }} dates renseignées</div>
       </div>
       <div class="card" style="padding:20px;">
-        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Campagnes actives</div>
+        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Encarts actifs</div>
         <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--warning);">{{ stats().activeCampaigns }}</div>
-        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">campagnes diffusées en ce moment</div>
+        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">encarts diffusés en ce moment</div>
       </div>
       <a routerLink="/campagnes" class="card" style="padding:20px; text-decoration:none; color:inherit; display:block;">
         <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Validations en attente</div>
@@ -212,7 +212,7 @@
   <div class="card" style="margin-bottom:20px;">
     <div class="card-header">
       <div>
-        <div class="card-title">Top campagnes</div>
+        <div class="card-title">Top encarts</div>
         <div class="card-subtitle">5 meilleures par impressions cumulées</div>
       </div>
       <a routerLink="/metriques" class="btn btn-flat btn-sm">Voir toutes les statistiques →</a>
@@ -267,7 +267,7 @@
     <a routerLink="/campagnes" class="card quick-action-card">
       <div class="quick-action-icon">📢</div>
       <div>
-        <div class="quick-action-title">Campagnes publicitaires</div>
+        <div class="quick-action-title">Encarts publicitaires</div>
         <div class="quick-action-sub">Créer et planifier</div>
       </div>
     </a>

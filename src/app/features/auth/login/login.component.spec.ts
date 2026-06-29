@@ -11,6 +11,7 @@ describe('LoginComponent', () => {
     signInWithPassword: jest.Mock;
     sendOtp: jest.Mock;
     markPasswordSet: jest.Mock;
+    listMfaFactors: jest.Mock;
   };
   let mockRouter: { navigate: jest.Mock };
 
@@ -19,6 +20,7 @@ describe('LoginComponent', () => {
       signInWithPassword: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } }, error: null }),
       sendOtp:            jest.fn().mockResolvedValue({ data: {}, error: null }),
       markPasswordSet:    jest.fn(),
+      listMfaFactors:     jest.fn().mockResolvedValue({ data: { totp: [], phone: [] }, error: null }),
     };
     mockRouter = { navigate: jest.fn() };
 
@@ -112,6 +114,32 @@ describe('LoginComponent', () => {
       component.setMode('otp');
       expect(component.mode()).toBe('otp');
       expect(component.errorMessage).toBe('');
+    });
+  });
+
+  describe('redirection 2FA après connexion', () => {
+    beforeEach(() => {
+      component.form.controls.email.setValue('a@b.cg');
+      component.form.controls.password.setValue('motdepasse123');
+    });
+
+    it("navigue vers /verifier-2fa quand un facteur TOTP vérifié existe", async () => {
+      mockSupabase.listMfaFactors.mockResolvedValueOnce({
+        data: { totp: [{ id: 'f1', status: 'verified' }], phone: [] },
+        error: null,
+      });
+      await component.submit();
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/verifier-2fa']);
+      expect(mockRouter.navigate).not.toHaveBeenCalledWith(['/dashboard']);
+    });
+
+    it("ignore les facteurs non vérifiés et va directement au dashboard", async () => {
+      mockSupabase.listMfaFactors.mockResolvedValueOnce({
+        data: { totp: [{ id: 'f1', status: 'unverified' }], phone: [] },
+        error: null,
+      });
+      await component.submit();
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/dashboard']);
     });
   });
 

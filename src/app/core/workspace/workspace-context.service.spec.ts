@@ -1,13 +1,24 @@
 import { TestBed } from '@angular/core/testing';
 import { WorkspaceContextService } from './workspace-context.service';
+import { SupabaseService } from '../supabase/supabase.service';
 
 describe('WorkspaceContextService', () => {
   let service: WorkspaceContextService;
+  let rpc: jest.Mock;
+
+  function configure() {
+    rpc = jest.fn().mockResolvedValue({ data: null, error: null });
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: SupabaseService, useValue: { client: { rpc } } },
+      ],
+    });
+    service = TestBed.inject(WorkspaceContextService);
+  }
 
   beforeEach(() => {
     localStorage.clear();
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(WorkspaceContextService);
+    configure();
   });
 
   it('devrait être créé', () => {
@@ -31,9 +42,13 @@ describe('WorkspaceContextService', () => {
   it('restaure la valeur depuis localStorage à la création du service', () => {
     localStorage.setItem('dad-workspace-id', 'ws-stored');
     TestBed.resetTestingModule();
-    TestBed.configureTestingModule({});
-    const fresh = TestBed.inject(WorkspaceContextService);
-    expect(fresh.activeWorkspaceId()).toBe('ws-stored');
+    configure();
+    expect(service.activeWorkspaceId()).toBe('ws-stored');
+  });
+
+  it("appelle touch_workspace_access pour mettre à jour last_accessed_at", () => {
+    service.setActiveWorkspace('ws-1');
+    expect(rpc).toHaveBeenCalledWith('touch_workspace_access', { p_workspace_id: 'ws-1' });
   });
 
   it('setActiveWorkspace écrase la valeur précédente', () => {

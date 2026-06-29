@@ -26,13 +26,13 @@
       @if (results().events.length > 0) {
         <button type="button" class="search-filter-tab" [class.is-active]="filterType() === 'event'"
                 (click)="setFilter('event')">
-          Événements ({{ results().events.length }})
+          Bibliothèque ({{ results().events.length }})
         </button>
       }
       @if (results().campaigns.length > 0) {
         <button type="button" class="search-filter-tab" [class.is-active]="filterType() === 'campaign'"
                 (click)="setFilter('campaign')">
-          Campagnes ({{ results().campaigns.length }})
+          Encarts ({{ results().campaigns.length }})
         </button>
       }
       @if (results().companies.length > 0) {
@@ -64,7 +64,7 @@
     <div class="search-page-group">
       <h3 class="search-page-group-title">
         <tui-icon icon="@tui.book-open" style="font-size:16px;" />
-        Événements
+        Bibliothèque historique
       </h3>
       @for (r of visibleResults().events; track r.id) {
         <button type="button" class="search-page-item" (click)="goToResult(r)">
@@ -82,7 +82,7 @@
     <div class="search-page-group">
       <h3 class="search-page-group-title">
         <tui-icon icon="@tui.megaphone" style="font-size:16px;" />
-        Campagnes publicitaires
+        Encarts publicitaires
       </h3>
       @for (r of visibleResults().campaigns; track r.id) {
         <button type="button" class="search-page-item" (click)="goToResult(r)">

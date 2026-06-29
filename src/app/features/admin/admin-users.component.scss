@@ -1,0 +1,41 @@
+.admin-users-page {
+  max-width: 1100px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 28px;
+}
+
+.admin-users-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .admin-users-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.admin-users-kpi {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md, 8px);
+  padding: 16px;
+}
+
+.admin-users-kpi-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  font-weight: 600;
+}
+
+.admin-users-kpi-value {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 600;
+  margin-top: 6px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}

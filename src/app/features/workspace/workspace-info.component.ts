@@ -1,8 +1,11 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { TuiIcon } from '@taiga-ui/core';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { AdminService } from '../../core/admin/admin.service';
 import { ToastService } from '../../core/services/toast.service';
 import { formatDateLong } from '../../core/utils/date.utils';
 
@@ -14,9 +17,12 @@ import { formatDateLong } from '../../core/utils/date.utils';
   styleUrl: './workspace-info.component.scss',
 })
 export class WorkspaceInfoComponent implements OnInit {
-  private readonly wsService   = inject(WorkspaceService);
-  private readonly authService = inject(AuthService);
-  private readonly toast       = inject(ToastService);
+  private readonly wsService        = inject(WorkspaceService);
+  private readonly workspaceContext = inject(WorkspaceContextService);
+  private readonly authService      = inject(AuthService);
+  private readonly adminService     = inject(AdminService);
+  private readonly toast            = inject(ToastService);
+  private readonly router           = inject(Router);
 
   readonly workspaceId   = signal<string | null>(null);
   readonly workspaceName = signal('');
@@ -29,20 +35,34 @@ export class WorkspaceInfoComponent implements OnInit {
   readonly saving        = signal(false);
   readonly logoUploading = signal(false);
 
-  readonly isOwner = signal(false);
+  /** Workspace owner role (per-workspace, from workspace_members). */
+  readonly isOwner       = signal(false);
+  /** Platform-level admin (global user_roles). */
+  readonly isSystemAdmin = signal(false);
+  /** Either of the above can rename / upload logo. Only system_admin can delete. */
+  readonly canManage     = computed(() => this.isOwner() || this.isSystemAdmin());
+
+  readonly showDeleteModal = signal(false);
+  readonly deleting        = signal(false);
 
   async ngOnInit(): Promise<void> {
     const role = await firstValueFrom(this.authService.currentRole$);
     this.isOwner.set(role === 'owner');
+    this.isSystemAdmin.set(await firstValueFrom(this.authService.isSystemAdmin()));
 
+    // Load the ACTIVE workspace — not whatever workspaces[0] happens to be.
+    // Without this, the page can show details for a workspace the user isn't
+    // currently switched into, which would let them rename / upload-to / delete
+    // the wrong tenant.
+    const activeId = this.workspaceContext.activeWorkspaceId();
     const workspaces = await firstValueFrom(this.wsService.getWorkspaces());
-    const ws = workspaces[0] ?? null;
+    const ws = (activeId ? workspaces.find(w => w.id === activeId) : null) ?? workspaces[0] ?? null;
     this.workspaceId.set(ws?.id ?? null);
     this.workspaceName.set(ws?.name ?? '');
     this.logoUrl.set(ws?.logo_url ?? null);
     this.createdAt.set(ws?.created_at ?? null);
 
-    if (this.isOwner()) {
+    if (this.canManage()) {
       const users = await firstValueFrom(this.wsService.listUsers());
       this.memberCount.set(users.length);
     }
@@ -91,6 +111,33 @@ export class WorkspaceInfoComponent implements OnInit {
       this.logoPreview.set(null);
       this.toast.success('Logo mis à jour.');
     }
+  }
+
+  openDeleteModal(): void {
+    if (!this.isSystemAdmin()) return;
+    this.showDeleteModal.set(true);
+  }
+
+  closeDeleteModal(): void {
+    if (this.deleting()) return;
+    this.showDeleteModal.set(false);
+  }
+
+  async confirmDelete(): Promise<void> {
+    const id = this.workspaceId();
+    if (!id || !this.isSystemAdmin()) return;
+    this.deleting.set(true);
+    const res = await firstValueFrom(this.adminService.softDeleteWorkspace(id));
+    this.deleting.set(false);
+    if (!res.success) {
+      this.toast.error(res.error ?? "Impossible de supprimer l'espace de travail.");
+      return;
+    }
+    this.toast.success('Espace de travail marqué comme supprimé.');
+    this.showDeleteModal.set(false);
+    // Active workspace no longer valid; route back to admin so the system_admin
+    // sees the deleted-list on the platform page.
+    this.router.navigate(['/admin']);
   }
 
   formatDate(iso: string | null): string {

@@ -144,6 +144,63 @@ export class SupabaseService {
     );
   }
 
+  /**
+   * Update the secondary recovery e-mail stored in user_metadata. This is a
+   * global per-user field (not per-workspace) used by the lost-password flow
+   * to find the account when the primary e-mail is unreachable.
+   */
+  async updateSecondaryEmail(secondaryEmail: string | null) {
+    return this.supabase.auth.updateUser({
+      data: { secondary_email: secondaryEmail || null },
+    });
+  }
+
+  // ── MFA / 2FA ─────────────────────────────────────────────────────────
+  // Thin wrappers around supabase.auth.mfa for TOTP factors. Enrollment is
+  // a two-step dance: enrollTotp() returns a QR code + secret; the user
+  // scans, then verifyTotpEnrollment() confirms with a code from their app.
+  // Once verified, every subsequent sign-in needs a TOTP code to reach AAL2.
+
+  /** Start TOTP enrollment. Returns the factor id + a QR code data URL + secret. */
+  async enrollTotp(friendlyName?: string) {
+    return this.supabase.auth.mfa.enroll({
+      factorType: 'totp',
+      friendlyName: friendlyName || 'Authenticator',
+    });
+  }
+
+  /** Confirm enrollment by submitting a 6-digit code from the authenticator app. */
+  async verifyTotpEnrollment(factorId: string, code: string) {
+    const { data: ch, error: chErr } = await this.supabase.auth.mfa.challenge({ factorId });
+    if (chErr || !ch) return { data: null, error: chErr ?? new Error('Challenge échoué') };
+    return this.supabase.auth.mfa.verify({ factorId, challengeId: ch.id, code });
+  }
+
+  /** Issue a fresh challenge against an already-verified factor (login flow). */
+  async challengeTotp(factorId: string) {
+    return this.supabase.auth.mfa.challenge({ factorId });
+  }
+
+  /** Verify a TOTP code against an issued challenge (login flow). */
+  async verifyTotpChallenge(factorId: string, challengeId: string, code: string) {
+    return this.supabase.auth.mfa.verify({ factorId, challengeId, code });
+  }
+
+  /** Remove a TOTP factor from the current user. */
+  async unenrollTotp(factorId: string) {
+    return this.supabase.auth.mfa.unenroll({ factorId });
+  }
+
+  /** List all MFA factors registered on the current user. */
+  async listMfaFactors() {
+    return this.supabase.auth.mfa.listFactors();
+  }
+
+  /** Returns currentLevel (achieved this session) vs nextLevel (required for the user). */
+  async getMfaAssuranceLevel() {
+    return this.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  }
+
   async hasWorkspaceRole(): Promise<boolean> {
     const { data } = await this.supabase.from('user_roles').select('role').limit(1);
     return Array.isArray(data) && data.length > 0;

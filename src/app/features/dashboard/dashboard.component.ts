@@ -203,30 +203,32 @@ export class DashboardComponent implements OnInit {
 
     if (!cal) { this.featuredEventLoading.set(false); return; }
 
+    // Same source as mobile's get_today_content RPC — calendar_entries joined to events.
+    // Soft-deleted events are filtered client-side to mirror the RPC's `e.deleted_at IS NULL`.
     const { data: entries } = await db
       .from('calendar_entries')
-      .select('position, event:events(title, description, event_date)')
+      .select('position, event:events(title, description, event_date, deleted_at)')
       .eq('calendar_id', cal.id)
       .eq('mmdd', mmdd)
       .order('position', { ascending: true });
 
-    const rows = (entries as any[] | null) ?? [];
+    const rows = ((entries as any[] | null) ?? []).filter(r => r.event && r.event.deleted_at === null);
     const primary = rows.find(r => r.position === 1);
     if (!primary?.event) { this.featuredEventLoading.set(false); return; }
 
     const secondary = rows.find(r => r.position === 2);
     const ev = primary.event;
     const desc: string = ev.description ?? '';
-    const dateParts = (ev.event_date as string).split('-');
-    const monthIndex = parseInt(dateParts[1], 10) - 1;
 
+    // Right-side preview shows TODAY's date (the day this event is published on mobile),
+    // not the event's historical event_date — those are intentionally different fields.
     this.featuredEvent.set({
       title: ev.title,
       dropLetter: desc.charAt(0),
       excerpt: desc.slice(1),
-      day: dateParts[2],
-      month: MONTHS_FR_LONG_CAP[monthIndex] ?? '',
-      year: dateParts[0],
+      day: this.todayDayNum,
+      month: this.todayMonthCap,
+      year: String(year),
       also: secondary?.event?.title ?? '',
     });
     this.featuredEventLoading.set(false);

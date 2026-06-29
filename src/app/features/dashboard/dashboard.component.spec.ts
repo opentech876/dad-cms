@@ -59,7 +59,12 @@ function buildClient(options: {
   const calendarForYear = publishedCalendarId ? { id: publishedCalendarId } : null;
   const todayEntries = todayEvents.map((e: any) => ({
     position: e.position,
-    event: { title: e.title, description: e.description, event_date: e.event_date },
+    event: {
+      title: e.title,
+      description: e.description,
+      event_date: e.event_date,
+      deleted_at: e.deleted_at ?? null,
+    },
   }));
 
   return {
@@ -207,19 +212,44 @@ describe('DashboardComponent', () => {
       expect(component.featuredEvent().excerpt).toBe('e Congo accède.');
     });
 
-    it('extrait le jour et le mois depuis event_date', async () => {
+    it("affiche le jour d'aujourd'hui (pas la date historique de l'événement)", async () => {
+      // Event historically happened on 1960-08-15 but is assigned to today's mmdd slot.
+      // The right-side preview must show today (matching what mobile renders),
+      // not the historical event_date — otherwise the date on the right contradicts the left.
       mockSupabase.client = buildClient({
         todayEvents: [{
-          title: 'Test',
+          title: 'Indépendance du Congo',
           description: 'Desc.',
-          event_date: TODAY,
+          event_date: '1960-08-15',
           position: 1,
         }],
       });
 
       await component.ngOnInit();
 
-      expect(component.featuredEvent().day).toBe(TODAY_DAY);
+      // Compute TODAY_DAY at the time of the assertion, not at module load —
+      // protects the spec against the (rare) day rollover happening between
+      // suite startup and the test running.
+      const todayNow = String(new Date().getDate()).padStart(2, '0');
+      expect(component.featuredEvent().day).toBe(todayNow);
+      expect(component.featuredEvent().day).not.toBe('15');
+    });
+
+    it("ignore les événements doux-supprimés (mirroring get_today_content)", async () => {
+      // Mirror mobile's RPC behavior: events with deleted_at != null must not surface.
+      mockSupabase.client = buildClient({
+        todayEvents: [{
+          title: 'Événement supprimé',
+          description: 'Ne devrait pas apparaître.',
+          event_date: TODAY,
+          position: 1,
+          deleted_at: '2026-06-20T10:00:00Z',
+        }],
+      });
+
+      await component.ngOnInit();
+
+      expect(component.featuredEvent().title).toBe('');
     });
 
     it("affiche le titre de l'événement de position 2 dans 'also'", async () => {

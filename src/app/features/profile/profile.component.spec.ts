@@ -13,7 +13,7 @@ describe('ProfileComponent', () => {
   let fixture: ComponentFixture<ProfileComponent>;
   let mockAuth: { getCurrentUser: jest.Mock; currentRole$: any };
   let mockWorkspace: { getMyProfile: jest.Mock; upsertProfile: jest.Mock };
-  let mockSupabase: { updatePassword: jest.Mock; markPasswordSet: jest.Mock; updateEmail: jest.Mock };
+  let mockSupabase: any;
   let mockRouter: { navigate: jest.Mock };
   let mockToast: jest.Mocked<Pick<ToastService, 'success' | 'error'>>;
 
@@ -29,10 +29,18 @@ describe('ProfileComponent', () => {
       upsertProfile: jest.fn().mockReturnValue(of(undefined)),
     };
     mockSupabase = {
-      updatePassword:  jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
-      markPasswordSet: jest.fn(),
-      updateEmail:     jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
-    };
+      updatePassword:        jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
+      markPasswordSet:       jest.fn(),
+      updateEmail:           jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
+      updateSecondaryEmail:  jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
+      listMfaFactors:        jest.fn().mockResolvedValue({ data: { totp: [], phone: [] }, error: null }),
+      enrollTotp:            jest.fn().mockResolvedValue({
+        data: { id: 'factor-1', totp: { qr_code: 'data:image/svg+xml;base64,xxx', secret: 'JBSWY3DPEHPK3PXP', uri: 'otpauth://totp/x' } },
+        error: null,
+      }),
+      verifyTotpEnrollment:  jest.fn().mockResolvedValue({ data: { success: true }, error: null }),
+      unenrollTotp:          jest.fn().mockResolvedValue({ data: null, error: null }),
+    } as any;
     mockRouter = { navigate: jest.fn() };
     mockToast  = { success: jest.fn(), error: jest.fn() };
 

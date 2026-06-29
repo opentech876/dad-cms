@@ -160,6 +160,96 @@ describe('AuthService', () => {
     });
   });
 
+  // ── workspace-scoped role lookup ───────────────────────────────────────────
+
+  describe('rôle scopé à l\'espace de travail actif', () => {
+    let userSubject: BehaviorSubject<any>;
+    let activeWorkspaceSignal: any;
+
+    function setup({ userId, workspaceId, memberRole, globalRole }: {
+      userId: string | null;
+      workspaceId: string | null;
+      memberRole?: string | null;
+      globalRole?: { role: string; expires_at: string | null } | null;
+    }): void {
+      userSubject = new BehaviorSubject<any>(userId ? { id: userId } : null);
+      activeWorkspaceSignal = jest.fn(() => workspaceId);
+      const tableSpy = jest.fn((table: string) => {
+        if (table === 'workspace_members') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  maybeSingle: () =>
+                    Promise.resolve({ data: memberRole ? { role: memberRole } : null, error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+        // user_roles fallback
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: globalRole ?? null, error: null }),
+            }),
+          }),
+        };
+      });
+      const supabaseMock = {
+        currentUser$: userSubject.asObservable(),
+        signOut: jest.fn().mockResolvedValue({ error: null }),
+        client: { from: tableSpy },
+      };
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          AuthService,
+          { provide: SupabaseService, useValue: supabaseMock },
+          { provide: Router, useValue: router },
+          {
+            // Inject the workspace context whose signal we control.
+            provide: (require('../workspace/workspace-context.service') as any).WorkspaceContextService,
+            useValue: { activeWorkspaceId: activeWorkspaceSignal },
+          },
+        ],
+      });
+      service = TestBed.inject(AuthService);
+    }
+
+    it("lit le rôle depuis workspace_members quand un espace est actif", (done) => {
+      setup({ userId: 'u1', workspaceId: 'ws-1', memberRole: 'chef_equipe' });
+      service.currentRole$.subscribe((role) => {
+        if (role !== null) {
+          expect(role).toBe('chef_equipe');
+          done();
+        }
+      });
+    });
+
+    it("retombe sur user_roles quand aucun espace n'est actif (bootstrap)", (done) => {
+      setup({ userId: 'u1', workspaceId: null, globalRole: { role: 'owner', expires_at: null } });
+      service.currentRole$.subscribe((role) => {
+        if (role !== null) {
+          expect(role).toBe('owner');
+          done();
+        }
+      });
+    });
+
+    it("retourne null quand l'utilisateur n'est pas membre de l'espace actif", (done) => {
+      setup({ userId: 'u1', workspaceId: 'ws-1', memberRole: null });
+      // Wait a tick for the async lookup to push null.
+      setTimeout(() => {
+        service.currentRole$.subscribe((role) => {
+          expect(role).toBeNull();
+          done();
+        });
+      }, 0);
+    });
+  });
+
   // ── signOut() ──────────────────────────────────────────────────────────────
 
   describe('signOut()', () => {

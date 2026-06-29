@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { roleGuard } from './core/auth/role.guard';
+import { systemAdminGuard } from './core/auth/system-admin.guard';
 import { onboardingGuard } from './core/onboarding/onboarding.guard';
 
 export const routes: Routes = [
@@ -45,6 +46,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/email-confirmed/email-confirmed.component').then(
         (m) => m.EmailConfirmedComponent,
+      ),
+  },
+  {
+    path: 'verifier-2fa',
+    loadComponent: () =>
+      import('./features/auth/mfa-challenge/mfa-challenge.component').then(
+        (m) => m.MfaChallengeComponent,
       ),
   },
 
@@ -129,6 +137,18 @@ export const routes: Routes = [
         path: 'recherche',
         loadComponent: () =>
           import('./features/search/search.component').then((m) => m.SearchComponent),
+      },
+      {
+        path: 'admin',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
+          import('./features/admin/admin.component').then((m) => m.AdminComponent),
+      },
+      {
+        path: 'admin/utilisateurs',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
+          import('./features/admin/admin-users.component').then((m) => m.AdminUsersComponent),
       },
       {
         path: 'notifications',

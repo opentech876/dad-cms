@@ -12,6 +12,7 @@ describe('UsersComponent', () => {
     listUsers: jest.Mock;
     manageUser: jest.Mock;
     inviteUser: jest.Mock;
+    getWorkspaceSummaries: jest.Mock;
   };
 
   const fakeUsers: UserListEntry[] = [
@@ -19,16 +20,26 @@ describe('UsersComponent', () => {
       id: 'u1', email: 'alice@test.com', full_name: 'Alice Martin',
       phone: null, avatar_url: null, role: 'editeur',
       expires_at: null, banned: false, created_at: '2026-01-15T10:00:00Z',
+      email_confirmed_at: '2026-01-16T09:00:00Z', invited_at: '2026-01-15T10:00:00Z',
     },
     {
       id: 'u2', email: 'bob@test.com', full_name: null,
       phone: null, avatar_url: null, role: 'owner',
       expires_at: null, banned: false, created_at: '2026-01-01T08:00:00Z',
+      email_confirmed_at: '2026-01-01T08:00:00Z', invited_at: '2026-01-01T08:00:00Z',
     },
     {
       id: 'u3', email: 'carol@test.com', full_name: 'Carol Dupont',
       phone: null, avatar_url: null, role: 'charge_communication',
       expires_at: null, banned: false, created_at: '2026-01-20T09:00:00Z',
+      email_confirmed_at: '2026-01-21T11:00:00Z', invited_at: '2026-01-20T09:00:00Z',
+    },
+    // A pending invitation — no email_confirmed_at.
+    {
+      id: 'u4', email: 'david@test.com', full_name: null,
+      phone: null, avatar_url: null, role: 'editeur',
+      expires_at: null, banned: false, created_at: '2026-06-20T14:00:00Z',
+      email_confirmed_at: null, invited_at: '2026-06-20T14:00:00Z',
     },
   ];
 
@@ -37,6 +48,9 @@ describe('UsersComponent', () => {
       listUsers: jest.fn().mockReturnValue(of(fakeUsers)),
       manageUser: jest.fn().mockReturnValue(of({ success: true })),
       inviteUser: jest.fn().mockReturnValue(of({ success: true })),
+      getWorkspaceSummaries: jest.fn().mockReturnValue(of([
+        { id: 'ws-1', name: 'DIOUGA-DIOP Media', logo_url: null, member_count: 4, last_accessed_at: null },
+      ])),
     };
 
     await TestBed.configureTestingModule({
@@ -63,7 +77,7 @@ describe('UsersComponent', () => {
     it('peuple le signal users avec le bon nombre d\'entrées', async () => {
       await component.ngOnInit();
 
-      expect(component.users().length).toBe(3);
+      expect(component.users().length).toBe(4); // 3 actifs + 1 invitation en attente
     });
 
     it('mappe correctement l\'id de la première entrée', async () => {
@@ -221,6 +235,88 @@ describe('UsersComponent', () => {
 
     it('calcule kpiComm comme le nombre de chargés de communication', () => {
       expect(component.kpiComm()).toBe(1);
+    });
+  });
+
+  // ── activeWorkspaceName ───────────────────────────────────────────────────
+
+  describe("activeWorkspaceName", () => {
+    it("est chargé depuis getWorkspaceSummaries au démarrage", async () => {
+      await component.ngOnInit();
+      expect(mockWorkspace.getWorkspaceSummaries).toHaveBeenCalled();
+      expect(component.activeWorkspaceName()).toBe('DIOUGA-DIOP Media');
+    });
+
+    it("reste vide si getWorkspaceSummaries échoue (non-bloquant)", async () => {
+      mockWorkspace.getWorkspaceSummaries.mockReturnValueOnce(of([]));
+      await component.ngOnInit();
+      expect(component.activeWorkspaceName()).toBe('');
+    });
+  });
+
+  // ── Pending invitations ───────────────────────────────────────────────────
+
+  describe('invitations en attente', () => {
+    beforeEach(async () => { await component.ngOnInit(); });
+
+    it('pendingInvitations contient uniquement les utilisateurs sans email_confirmed_at', () => {
+      const pending = component.pendingInvitations();
+      expect(pending.length).toBe(1);
+      expect(pending[0].userId).toBe('u4');
+      expect(pending[0].email).toBe('david@test.com');
+    });
+
+    it('activeUsers exclut les invitations en attente', () => {
+      const active = component.activeUsers();
+      expect(active.length).toBe(3);
+      expect(active.map(u => u.userId)).not.toContain('u4');
+    });
+
+    it("filteredPendingInvitations applique le filtre de recherche", () => {
+      component.searchQuery.set('david');
+      expect(component.filteredPendingInvitations().length).toBe(1);
+      component.searchQuery.set('alice');
+      expect(component.filteredPendingInvitations().length).toBe(0);
+    });
+
+    it("kpiTotal compte uniquement les membres actifs, pas les invitations", () => {
+      expect(component.kpiTotal()).toBe(3); // 3 actifs (Alice + Bob + Carol); David est en attente
+    });
+
+    it("kpiEditors compte uniquement les éditeurs actifs", () => {
+      expect(component.kpiEditors()).toBe(1); // Alice seulement (David en attente est aussi editeur)
+    });
+
+    describe('resendInvitation()', () => {
+      it("appelle manageUser avec l'action resend_invitation", async () => {
+        await component.resendInvitation('u4');
+        expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u4', 'resend_invitation');
+      });
+
+      it('recharge la liste après succès', async () => {
+        mockWorkspace.listUsers.mockClear();
+        await component.resendInvitation('u4');
+        expect(mockWorkspace.listUsers).toHaveBeenCalled();
+      });
+
+      it("affiche l'erreur quand le RPC échoue", async () => {
+        mockWorkspace.manageUser.mockReturnValueOnce(of({ success: false, error: 'rate_limit' }));
+        await component.resendInvitation('u4');
+        expect(component.invitationActionError()).toContain('rate_limit');
+      });
+    });
+
+    describe('revokeInvitation()', () => {
+      it("appelle manageUser avec l'action revoke_invitation", async () => {
+        await component.revokeInvitation('u4');
+        expect(mockWorkspace.manageUser).toHaveBeenCalledWith('u4', 'revoke_invitation');
+      });
+
+      it('recharge la liste après succès', async () => {
+        mockWorkspace.listUsers.mockClear();
+        await component.revokeInvitation('u4');
+        expect(mockWorkspace.listUsers).toHaveBeenCalled();
+      });
     });
   });
 

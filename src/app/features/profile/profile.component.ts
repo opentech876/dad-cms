@@ -16,6 +16,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
   charge_communication:    'Chargé de communication',
   presidence:              'Présidence',
   chef_equipe_commerciale: "Chef d'équipe commerciale",
+  system_admin:            "Administrateur plateforme",
 };
 
 @Component({
@@ -67,12 +68,20 @@ export class ProfileComponent implements OnInit {
     this.userEmail.set((user as any).email ?? '');
     this.role.set(await firstValueFrom(this.auth.currentRole$));
 
+    // Secondary recovery e-mail lives in user_metadata (global per user, not
+    // workspace-scoped) so we read it from the auth user object directly.
+    const metaSecondary = (user as any)?.user_metadata?.secondary_email ?? '';
+    this.secondaryEmail.set(metaSecondary);
+
     const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
     if (profile) {
       this.fullName.set(profile.full_name ?? '');
       this.phone.set(profile.phone ?? '');
       this.avatarUrl.set(profile.avatar_url ?? null);
     }
+
+    // Load MFA factors so the UI knows whether 2FA is already enabled.
+    try { await this.loadMfaFactors(); } catch { /* non-blocking */ }
   }
 
   async saveProfile(): Promise<void> {
@@ -185,6 +194,117 @@ export class ProfileComponent implements OnInit {
   readonly passwordError   = signal('');
 
   toggleShowNewPassword(): void { this.showNewPassword.update(v => !v); }
+
+  // ── Secondary recovery e-mail ──────────────────────────────────────────
+  readonly secondaryEmail        = signal('');
+  readonly secondaryEmailSaving  = signal(false);
+  readonly secondaryEmailError   = signal('');
+
+  async saveSecondaryEmail(): Promise<void> {
+    if (this.secondaryEmailSaving()) return;
+    const value = this.secondaryEmail().trim();
+    this.secondaryEmailError.set('');
+    if (value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
+      this.secondaryEmailError.set("Adresse e-mail invalide.");
+      return;
+    }
+    if (value && value.toLowerCase() === this.userEmail().toLowerCase()) {
+      this.secondaryEmailError.set("L'adresse de secours doit être différente de l'adresse principale.");
+      return;
+    }
+    this.secondaryEmailSaving.set(true);
+    try {
+      const { error } = await this.supabase.updateSecondaryEmail(value || null);
+      if (error) {
+        this.secondaryEmailError.set('Erreur : ' + error.message);
+        return;
+      }
+      this.toast.success(value
+        ? 'Adresse de secours enregistrée.'
+        : 'Adresse de secours supprimée.');
+    } finally {
+      this.secondaryEmailSaving.set(false);
+    }
+  }
+
+  // ── MFA / 2FA enrollment ───────────────────────────────────────────────
+  readonly mfaFactors        = signal<any[]>([]);
+  readonly mfaEnrolling      = signal(false);
+  readonly mfaPendingFactor  = signal<{ id: string; qr: string; secret: string } | null>(null);
+  readonly mfaCode           = signal('');
+  readonly mfaError          = signal('');
+
+  /** True when at least one verified TOTP factor exists. */
+  readonly mfaEnrolled = computed(() => this.mfaFactors().some(f => f.status === 'verified'));
+
+  async loadMfaFactors(): Promise<void> {
+    const { data } = await this.supabase.listMfaFactors();
+    this.mfaFactors.set((data?.totp ?? []) as any[]);
+  }
+
+  async startMfaEnrollment(): Promise<void> {
+    if (this.mfaEnrolling()) return;
+    this.mfaError.set('');
+    this.mfaCode.set('');
+    this.mfaEnrolling.set(true);
+    try {
+      // If a previous enrollment was started but not verified, clean it up
+      // first so the new enroll() succeeds (Supabase rejects duplicates).
+      const { data: existing } = await this.supabase.listMfaFactors();
+      const pending = (existing?.totp ?? []).find((f: any) => f.status === 'unverified');
+      if (pending) await this.supabase.unenrollTotp(pending.id);
+
+      const { data, error } = await this.supabase.enrollTotp('Authenticator');
+      if (error || !data) {
+        this.mfaError.set('Impossible de démarrer l\'enrôlement : ' + (error?.message ?? '?'));
+        return;
+      }
+      this.mfaPendingFactor.set({
+        id: data.id,
+        qr: data.totp.qr_code,
+        secret: data.totp.secret,
+      });
+    } finally {
+      this.mfaEnrolling.set(false);
+    }
+  }
+
+  cancelMfaEnrollment(): void {
+    const pending = this.mfaPendingFactor();
+    if (pending) {
+      // Best-effort cleanup of the half-enrolled factor.
+      void this.supabase.unenrollTotp(pending.id);
+    }
+    this.mfaPendingFactor.set(null);
+    this.mfaCode.set('');
+    this.mfaError.set('');
+  }
+
+  async confirmMfaEnrollment(): Promise<void> {
+    const pending = this.mfaPendingFactor();
+    const code = this.mfaCode().trim();
+    if (!pending || code.length < 6) return;
+    this.mfaError.set('');
+    const { error } = await this.supabase.verifyTotpEnrollment(pending.id, code);
+    if (error) {
+      this.mfaError.set('Code invalide. Réessayez avec le code courant de votre application.');
+      return;
+    }
+    this.toast.success('Double authentification activée.');
+    this.mfaPendingFactor.set(null);
+    this.mfaCode.set('');
+    await this.loadMfaFactors();
+  }
+
+  async disableMfa(factorId: string): Promise<void> {
+    const { error } = await this.supabase.unenrollTotp(factorId);
+    if (error) {
+      this.toast.error('Impossible de désactiver : ' + error.message);
+      return;
+    }
+    this.toast.success('Double authentification désactivée.');
+    await this.loadMfaFactors();
+  }
 
   async changePassword(): Promise<void> {
     if (this.passwordSaving()) return;

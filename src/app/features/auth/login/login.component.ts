@@ -64,6 +64,19 @@ export class LoginComponent {
       }
       // Mark that this user has a password — saves the /profil prompt later.
       this.supabase.markPasswordSet();
+
+      // If the user has a verified TOTP factor, they need to clear the
+      // login-time challenge before reaching AAL2. Route them through
+      // /verifier-2fa instead of straight to the dashboard.
+      try {
+        const { data: factors } = await this.supabase.listMfaFactors();
+        const hasVerified = (factors?.totp ?? []).some((f: any) => f.status === 'verified');
+        if (hasVerified) {
+          this.router.navigate(['/verifier-2fa']);
+          return;
+        }
+      } catch { /* non-blocking — fall through to dashboard */ }
+
       this.router.navigate(['/dashboard']);
       return;
     }

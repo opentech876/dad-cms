@@ -1,6 +1,13 @@
-<div class="shell" [class.shell--collapsed]="collapsed()">
+<div class="shell"
+     [class.shell--collapsed]="collapsed() && !isMobile()"
+     [class.shell--mobile]="isMobile()"
+     [class.shell--mobile-open]="mobileOpen()">
+  @if (isMobile() && mobileOpen()) {
+    <div class="shell-mobile-backdrop" (click)="closeMobileSidebar()"></div>
+  }
   <!-- ───── Sidebar ───── -->
-  <aside class="sidebar scroll-pretty">
+  <aside class="sidebar scroll-pretty"
+         [style.width.px]="!collapsed() && !isMobile() ? sidebarWidth() : null">
     <!-- Logo block -->
     <div class="sidebar-logo">
       <svg class="sidebar-logomark" width="32" height="32" viewBox="0 0 40 40" fill="none">
@@ -110,48 +117,34 @@
       </div>
     }
 
-    <!-- Main nav -->
+    <!-- Main nav — grouped by domain -->
     <nav class="sidebar-nav scroll-pretty">
-      @if (!collapsed()) {
-        <div class="sidebar-section-label">Édition</div>
-      }
-      @for (item of visibleNavItems(); track item.id) {
-        <a
-          class="sidebar-nav-item"
-          [routerLink]="item.path"
-          routerLinkActive="sidebar-nav-item--active"
-          [title]="collapsed() ? item.label : ''"
-        >
-          <tui-icon [icon]="item.icon" class="sidebar-nav-icon" />
+      @for (section of visibleNavSections(); track section.id; let first = $first) {
+        <div class="sidebar-nav-section" [class.sidebar-nav-section--first]="first">
           @if (!collapsed()) {
-            <span class="sidebar-nav-label">{{ item.label }}</span>
-            @if (item.id === 'notifications' && notifUnread() > 0) {
-              <span class="sidebar-nav-badge">{{ notifUnread() > 9 ? '9+' : notifUnread() }}</span>
-            } @else if (item.badge) {
-              <span class="sidebar-nav-badge">{{ item.badge }}</span>
-            }
+            <div class="sidebar-section-label">{{ section.label }}</div>
           }
-        </a>
+          @for (item of section.items; track item.id) {
+            <a
+              class="sidebar-nav-item"
+              [routerLink]="item.path"
+              routerLinkActive="sidebar-nav-item--active"
+              [title]="collapsed() ? item.label : ''"
+              (click)="closeMobileSidebar()"
+            >
+              <tui-icon [icon]="item.icon" class="sidebar-nav-icon" />
+              @if (!collapsed()) {
+                <span class="sidebar-nav-label">{{ item.label }}</span>
+                @if (item.id === 'notifications' && notifUnread() > 0) {
+                  <span class="sidebar-nav-badge">{{ notifUnread() > 9 ? '9+' : notifUnread() }}</span>
+                } @else if (item.badge) {
+                  <span class="sidebar-nav-badge">{{ item.badge }}</span>
+                }
+              }
+            </a>
+          }
+        </div>
       }
-
-      <div class="sidebar-admin-section">
-        @if (!collapsed()) {
-          <div class="sidebar-section-label">Administration</div>
-        }
-        @for (item of visibleAdminItems(); track item.id) {
-          <a
-            class="sidebar-nav-item"
-            [routerLink]="item.path"
-            routerLinkActive="sidebar-nav-item--active"
-            [title]="collapsed() ? item.label : ''"
-          >
-            <tui-icon [icon]="item.icon" class="sidebar-nav-icon" />
-            @if (!collapsed()) {
-              <span class="sidebar-nav-label">{{ item.label }}</span>
-            }
-          </a>
-        }
-      </div>
     </nav>
 
     <!-- User card -->
@@ -174,13 +167,46 @@
         <tui-icon icon="@tui.chevron-right" style="font-size: 12px" />
       </button>
     }
+
+    <!-- Drag-to-resize handle on the right edge (desktop, non-collapsed only) -->
+    @if (!collapsed() && !isMobile()) {
+      <div
+        class="sidebar-resize-handle"
+        (pointerdown)="startResize($event)"
+        title="Glisser pour redimensionner"
+        aria-label="Redimensionner la barre latérale"
+      ></div>
+    }
   </aside>
 
   <!-- ───── Main area ───── -->
   <div class="shell-main">
     <!-- Topbar -->
+    <!-- Thin colored stripe at the very top, derived from active workspace.
+         Visual anchor: same workspace = same color across all sessions. -->
+    @if (currentWorkspaceColor()) {
+      <div class="topbar-workspace-stripe" [style.background]="currentWorkspaceColor()"></div>
+    }
     <header class="topbar">
-      <h1 class="topbar-title">{{ pageTitle() }}</h1>
+      @if (isMobile()) {
+        <button
+          class="btn btn-flat btn-icon btn-sm topbar-burger"
+          type="button"
+          (click)="openMobileSidebar()"
+          aria-label="Ouvrir la navigation"
+        >
+          <tui-icon icon="@tui.menu" style="font-size: 20px" />
+        </button>
+      }
+      <div class="topbar-title-row">
+        <h1 class="topbar-title">{{ pageTitle() }}</h1>
+        @if (currentWorkspace(); as ws) {
+          <span class="topbar-workspace-badge" [title]="'Espace actif : ' + ws.name">
+            <span class="topbar-workspace-dot" [style.background]="currentWorkspaceColor()"></span>
+            {{ ws.name }}
+          </span>
+        }
+      </div>
       <div class="topbar-actions">
         <div class="input-group topbar-search" style="position:relative;">
           <span class="input-icon">
@@ -218,7 +244,7 @@
                 <div class="topbar-search-empty">Aucun résultat pour « {{ searchTerm() }} »</div>
               } @else {
                 @if (searchResults().events.length > 0) {
-                  <div class="topbar-search-group-label">Événements</div>
+                  <div class="topbar-search-group-label">Bibliothèque historique</div>
                   @for (r of searchResults().events; track r.id) {
                     <button type="button" class="topbar-search-item" (click)="goToResult(r)">
                       <tui-icon icon="@tui.book-open" class="topbar-search-item-icon" />
@@ -230,7 +256,7 @@
                   }
                 }
                 @if (searchResults().campaigns.length > 0) {
-                  <div class="topbar-search-group-label">Campagnes</div>
+                  <div class="topbar-search-group-label">Encarts publicitaires</div>
                   @for (r of searchResults().campaigns; track r.id) {
                     <button type="button" class="topbar-search-item" (click)="goToResult(r)">
                       <tui-icon icon="@tui.megaphone" class="topbar-search-item-icon" />

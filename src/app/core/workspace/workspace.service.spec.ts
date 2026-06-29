@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { WorkspaceService } from './workspace.service';
 import { SupabaseService } from '../supabase/supabase.service';
+import { WorkspaceContextService } from './workspace-context.service';
 
 describe('WorkspaceService', () => {
   let service: WorkspaceService;
@@ -29,6 +30,21 @@ describe('WorkspaceService', () => {
         if (table === 'profiles') return makeQuery(profileData ? [profileData] : [], 1);
         return makeQuery([], 4);
       },
+      // RPC mock — returns workspace summaries for get_my_workspace_summaries.
+      // The default mirrors the workspaceData rows with a fixed member_count.
+      rpc: jest.fn((name: string) => {
+        if (name === 'get_my_workspace_summaries') {
+          const rows = (workspaceData ?? []).map((w: any) => ({
+            id: w.id,
+            name: w.name,
+            logo_url: w.logo_url ?? null,
+            member_count: 4,
+            last_accessed_at: w.last_accessed_at ?? null,
+          }));
+          return Promise.resolve({ data: rows, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      }),
     };
   }
 
@@ -42,6 +58,10 @@ describe('WorkspaceService', () => {
       providers: [
         WorkspaceService,
         { provide: SupabaseService, useValue: mockSupabase },
+        {
+          provide: WorkspaceContextService,
+          useValue: { activeWorkspaceId: jest.fn().mockReturnValue('ws-active') },
+        },
       ],
     });
 
@@ -143,14 +163,24 @@ describe('WorkspaceService', () => {
   // ── inviteUser() ───────────────────────────────────────────────────────────
 
   describe('inviteUser()', () => {
-    it("appelle invoke avec 'invite-user', l'email, le rôle et le redirectTo", async () => {
+    it("appelle invoke avec 'invite-user', l'email, le rôle, workspace_id et le redirectTo", async () => {
       await firstValueFrom(service.inviteUser('invite@exemple.com', 'editeur'));
 
       expect(mockSupabase.invoke).toHaveBeenCalledWith('invite-user', {
         email: 'invite@exemple.com',
         role: 'editeur',
+        workspace_id: 'ws-active',
         redirectTo: 'http://localhost:4200/dashboard',
       });
+    });
+
+    it("retourne une erreur claire si aucun workspace n'est actif", async () => {
+      const ctx = TestBed.inject(WorkspaceContextService) as any;
+      ctx.activeWorkspaceId.mockReturnValueOnce(null);
+      const result = await firstValueFrom(service.inviteUser('invite@exemple.com', 'editeur'));
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('espace de travail');
+      expect(mockSupabase.invoke).not.toHaveBeenCalled();
     });
 
     it('retourne success: true en cas de succès', async () => {
@@ -194,7 +224,7 @@ describe('WorkspaceService', () => {
 
       await firstValueFrom(service.listUsers());
 
-      expect(mockSupabase.invoke).toHaveBeenCalledWith('list-users', {});
+      expect(mockSupabase.invoke).toHaveBeenCalledWith('list-users', { workspace_id: 'ws-active' });
     });
 
     it('retourne un tableau de la bonne longueur en cas de succès', async () => {
@@ -234,12 +264,14 @@ describe('WorkspaceService', () => {
   // ── manageUser() ───────────────────────────────────────────────────────────
 
   describe('manageUser()', () => {
-    it("appelle invoke avec 'manage-user', userId et action", async () => {
+    it("appelle invoke avec 'manage-user', userId, action et workspace_id", async () => {
       mockSupabase.invoke.mockResolvedValueOnce({ data: { success: true }, error: null });
 
       await firstValueFrom(service.manageUser('u1', 'block'));
 
-      expect(mockSupabase.invoke).toHaveBeenCalledWith('manage-user', { userId: 'u1', action: 'block' });
+      expect(mockSupabase.invoke).toHaveBeenCalledWith('manage-user', {
+        userId: 'u1', action: 'block', workspace_id: 'ws-active',
+      });
     });
 
     it("inclut le rôle dans le payload quand l'action est update_role", async () => {
@@ -248,8 +280,17 @@ describe('WorkspaceService', () => {
       await firstValueFrom(service.manageUser('u1', 'update_role', 'chef_equipe'));
 
       expect(mockSupabase.invoke).toHaveBeenCalledWith('manage-user', {
-        userId: 'u1', action: 'update_role', role: 'chef_equipe',
+        userId: 'u1', action: 'update_role', role: 'chef_equipe', workspace_id: 'ws-active',
       });
+    });
+
+    it("retourne une erreur claire si aucun workspace n'est actif", async () => {
+      const ctx = TestBed.inject(WorkspaceContextService) as any;
+      ctx.activeWorkspaceId.mockReturnValueOnce(null);
+      const result = await firstValueFrom(service.manageUser('u1', 'block'));
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('espace de travail');
+      expect(mockSupabase.invoke).not.toHaveBeenCalled();
     });
 
     it('retourne success: true en cas de succès', async () => {
@@ -320,8 +361,8 @@ describe('WorkspaceService', () => {
       await firstValueFrom(service.saveAppearance('u1', 'field', 'dark'));
 
       expect(upsertSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ user_id: 'u1', theme: 'field', color_mode: 'dark' }),
-        expect.objectContaining({ onConflict: 'user_id' }),
+        expect.objectContaining({ user_id: 'u1', workspace_id: 'ws-active', theme: 'field', color_mode: 'dark' }),
+        expect.objectContaining({ onConflict: 'user_id,workspace_id' }),
       );
     });
   });

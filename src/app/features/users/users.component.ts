@@ -14,6 +14,9 @@ interface UserRow {
   expiresAt: string | null;
   joinedAt: string;
   banned: boolean;
+  /** null = pending invitation. */
+  emailConfirmedAt: string | null;
+  invitedAt: string | null;
 }
 
 const ROLE_LABELS: Record<AppRole, string> = {
@@ -23,6 +26,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
   charge_communication: 'Chargé comm.',
   presidence: 'Présidence',
   chef_equipe_commerciale: 'Chef d\'équipe comm.',
+  system_admin: 'Admin plateforme',
 };
 
 @Component({
@@ -34,6 +38,11 @@ const ROLE_LABELS: Record<AppRole, string> = {
 })
 export class UsersComponent implements OnInit {
   private workspaceService = inject(WorkspaceService);
+
+  /** Active workspace name — used in destructive confirmation modals so the
+   *  user can't mistake which tenant they're acting on. Fetched once in
+   *  ngOnInit from `getWorkspaceSummaries`. */
+  readonly activeWorkspaceName = signal('');
 
   readonly loading = signal(true);
   readonly users = signal<UserRow[]>([]);
@@ -48,24 +57,52 @@ export class UsersComponent implements OnInit {
 
   readonly isEmpty = computed(() => !this.loading() && this.users().length === 0);
 
-  readonly kpiTotal      = computed(() => this.users().length);
-  readonly kpiOwners     = computed(() => this.users().filter(u => u.role === 'owner').length);
-  readonly kpiEditors    = computed(() => this.users().filter(u => u.role === 'editeur').length);
-  readonly kpiComm       = computed(() => this.users().filter(u => u.role === 'charge_communication').length);
-  readonly kpiPresidence     = computed(() => this.users().filter(u => u.role === 'presidence').length);
-  readonly kpiCommercialLead = computed(() => this.users().filter(u => u.role === 'chef_equipe_commerciale').length);
+  // KPIs count active members only (pending invitations don't inflate the
+  // headcount — they're tracked separately in pendingInvitations()).
+  readonly kpiTotal      = computed(() => this.users().filter(u => !!u.emailConfirmedAt).length);
+  readonly kpiOwners     = computed(() => this.users().filter(u => u.role === 'owner' && !!u.emailConfirmedAt).length);
+  readonly kpiEditors    = computed(() => this.users().filter(u => u.role === 'editeur' && !!u.emailConfirmedAt).length);
+  readonly kpiComm       = computed(() => this.users().filter(u => u.role === 'charge_communication' && !!u.emailConfirmedAt).length);
+  readonly kpiPresidence     = computed(() => this.users().filter(u => u.role === 'presidence' && !!u.emailConfirmedAt).length);
+  readonly kpiCommercialLead = computed(() => this.users().filter(u => u.role === 'chef_equipe_commerciale' && !!u.emailConfirmedAt).length);
 
   readonly searchQuery = signal('');
 
+  /** Pending = invited but never accepted (no email_confirmed_at). */
+  readonly pendingInvitations = computed(() =>
+    this.users().filter(u => !u.emailConfirmedAt),
+  );
+
+  /** Active = email confirmed (real users who can sign in). */
+  readonly activeUsers = computed(() =>
+    this.users().filter(u => !!u.emailConfirmedAt),
+  );
+
   readonly filteredUsers = computed(() => {
     const q = this.searchQuery().trim().toLowerCase();
-    if (!q) return this.users();
-    return this.users().filter(
+    const list = this.activeUsers();
+    if (!q) return list;
+    return list.filter(
       (u) =>
         (u.fullName?.toLowerCase().includes(q) ?? false) ||
         (u.email?.toLowerCase().includes(q) ?? false),
     );
   });
+
+  readonly filteredPendingInvitations = computed(() => {
+    const q = this.searchQuery().trim().toLowerCase();
+    const list = this.pendingInvitations();
+    if (!q) return list;
+    return list.filter(
+      (u) =>
+        (u.fullName?.toLowerCase().includes(q) ?? false) ||
+        (u.email?.toLowerCase().includes(q) ?? false),
+    );
+  });
+
+  /** Tracks the userId currently being resent/revoked, for per-row spinners. */
+  readonly invitationActionBusyId = signal<string | null>(null);
+  readonly invitationActionError  = signal<string>('');
 
   readonly activeMenuUserId = signal<string | null>(null);
 
@@ -99,12 +136,12 @@ export class UsersComponent implements OnInit {
     ['Gérer les rôles',                                   1, 0, 0, 0, 0, 0],
     ['CRUD calendriers',                                  1, 1, 0, 0, 0, 0],
     ['Dupliquer un calendrier',                           1, 1, 0, 0, 0, 0],
-    ['CRUD événements historiques',                       1, 1, 1, 0, 0, 0],
+    ['CRUD entrées de la bibliothèque historique',        1, 1, 1, 0, 0, 0],
     ['Assigner un événement à un jour (calendrier)',      1, 1, 0, 0, 0, 0],
     ['Recommander un événement à un jour (Présidence)',   1, 0, 0, 0, 1, 0],
     ['Appliquer une recommandation Présidence',           1, 1, 1, 0, 0, 0],
     ['CRUD compagnies (annonceurs)',                      1, 0, 0, 0, 0, 1],
-    ['CRUD campagnes publicitaires',                      1, 1, 0, 1, 0, 1],
+    ['CRUD encarts publicitaires',                        1, 1, 0, 1, 0, 1],
     ['Tableaux de bord (lecture seule)',                  1, 1, 1, 1, 1, 1],
   ];
 
@@ -129,6 +166,15 @@ export class UsersComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    // Fetch the active workspace name once — used in destructive modals so
+    // the operator sees exactly which tenant they're acting on.
+    try {
+      const summaries = await firstValueFrom(this.workspaceService.getWorkspaceSummaries());
+      const active = summaries[0]; // RPC orders by last_accessed_at DESC — most recent first
+      if (active) this.activeWorkspaceName.set(active.name);
+    } catch {
+      // Non-blocking — modal copy falls back to generic wording.
+    }
     await this.loadUsers();
   }
 
@@ -144,9 +190,11 @@ export class UsersComponent implements OnInit {
           fullName: e.full_name,
           avatarUrl: e.avatar_url,
           role: e.role as AppRole,
-          expiresAt: e.expires_at,
+          expiresAt: e.expires_at ?? null,
           joinedAt: e.created_at,
           banned: e.banned,
+          emailConfirmedAt: e.email_confirmed_at,
+          invitedAt: e.invited_at,
         })),
     );
     this.loading.set(false);
@@ -245,6 +293,40 @@ export class UsersComponent implements OnInit {
     }
 
     this.closePasswordModal();
+  }
+
+  // ── Pending invitation management ──────────────────────────────────────
+
+  async resendInvitation(userId: string): Promise<void> {
+    if (this.invitationActionBusyId()) return;
+    this.invitationActionBusyId.set(userId);
+    this.invitationActionError.set('');
+    try {
+      const result = await firstValueFrom(this.workspaceService.manageUser(userId, 'resend_invitation'));
+      if (!result.success) {
+        this.invitationActionError.set(result.error ?? "Échec de l'envoi du lien.");
+      } else {
+        await this.loadUsers();
+      }
+    } finally {
+      this.invitationActionBusyId.set(null);
+    }
+  }
+
+  async revokeInvitation(userId: string): Promise<void> {
+    if (this.invitationActionBusyId()) return;
+    this.invitationActionBusyId.set(userId);
+    this.invitationActionError.set('');
+    try {
+      const result = await firstValueFrom(this.workspaceService.manageUser(userId, 'revoke_invitation'));
+      if (!result.success) {
+        this.invitationActionError.set(result.error ?? "Échec de la révocation.");
+      } else {
+        await this.loadUsers();
+      }
+    } finally {
+      this.invitationActionBusyId.set(null);
+    }
   }
 
   openInviteModal(): void {
