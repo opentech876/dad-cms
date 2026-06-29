@@ -33,8 +33,9 @@ export class AuthService {
    *
    * Authoritative source: `workspace_members.role` for the active workspace.
    * Fallback to `user_roles` ONLY when no workspace is active — this covers
-   * the bootstrap path where the first-ever user is a temporary owner with
-   * no workspace yet (about to create one via /espaces).
+   * the seeded `system_admin` (global role, no workspace) and any user who has
+   * a global role but no active workspace yet (e.g. about to create one via
+   * /espaces).
    *
    * Per-workspace lookup is what makes multi-tenant roles real: the same user
    * can be `editeur` in workspace A and `chef_equipe` in workspace B.
@@ -47,8 +48,8 @@ export class AuthService {
         switchMap(([user, workspaceId]) => {
           if (!user) return of(null);
 
-          // Bootstrap path: no active workspace → consult the global user_roles
-          // (used by the temp-owner mechanism and the workspace creation flow).
+          // No active workspace → consult the global user_roles (seeded
+          // system_admin and the workspace creation flow).
           if (!workspaceId) {
             return from(
               this.supabaseService.client
