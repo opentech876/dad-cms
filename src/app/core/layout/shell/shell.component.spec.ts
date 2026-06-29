@@ -43,7 +43,7 @@ describe('ShellComponent — navigation par rôle', () => {
       getMyProfile: jest.fn().mockReturnValue(
         of(profileOverride ?? { full_name: 'Test User', phone: null, avatar_url: null }),
       ),
-      upsertProfile: jest.fn().mockReturnValue(of(undefined)),
+      upsertProfile: jest.fn().mockReturnValue(of({ success: true })),
       getWorkspaceSummaries: jest.fn().mockReturnValue(of(workspacesOverride ?? MOCK_WORKSPACES)),
     };
     mockWorkspaceContext = {
@@ -292,6 +292,8 @@ describe('ShellComponent — navigation par rôle', () => {
 
     it('saveProfile appelle upsertProfile avec le userId, fullName et phone', async () => {
       createComponent('editeur');
+      const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true); // bypass the first-time-invitee password requirement
       await component.ngOnInit();
       component.profileFullName.set('Alice Martin');
       component.profilePhone.set('+242060000000');
@@ -303,6 +305,8 @@ describe('ShellComponent — navigation par rôle', () => {
 
     it('saveProfile ferme la modal après enregistrement', async () => {
       createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true); // bypass the first-time-invitee password requirement
       await component.ngOnInit();
       component.profileFullName.set('Alice Martin');
 
@@ -313,15 +317,31 @@ describe('ShellComponent — navigation par rôle', () => {
 
     // ── Password optional field ──────────────────────────────────────────
 
-    it("saveProfile n'appelle PAS updatePassword si le champ est vide", async () => {
+    it("saveProfile n'appelle PAS updatePassword si l'utilisateur a déjà un mot de passe et laisse le champ vide", async () => {
       createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
       const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true);
       await component.ngOnInit();
       component.profileFullName.set('Alice Martin');
 
       await component.saveProfile();
 
       expect(supabase.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('saveProfile refuse d\'enregistrer sans mot de passe quand aucun n\'est encore défini (cas invité première connexion)', async () => {
+      // hasPasswordSet default = false in beforeEach
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+      component.profilePassword.set('');
+
+      await component.saveProfile();
+
+      expect(supabase.updatePassword).not.toHaveBeenCalled();
+      expect(component.profilePasswordError()).toContain('mot de passe');
+      expect(component.showProfileSetup()).toBe(true);
     });
 
     it('saveProfile appelle updatePassword quand un mot de passe est saisi', async () => {
@@ -350,6 +370,28 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(supabase.updatePassword).not.toHaveBeenCalled();
       expect(component.profilePasswordError()).toContain('8 caractères');
       expect(component.showProfileSetup()).toBe(true);
+    });
+
+    it('saveProfile affiche profileSaveError quand upsertProfile échoue', async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      mockWorkspace.upsertProfile.mockReturnValue(of({ success: false, error: 'DB down' }));
+      const supabase = TestBed.inject(SupabaseService) as any;
+      supabase.hasPasswordSet.mockResolvedValue(true);
+      await component.ngOnInit();
+      component.profileFullName.set('Alice Martin');
+
+      await component.saveProfile();
+
+      expect(component.profileSaveError()).toContain('DB down');
+      expect(component.showProfileSetup()).toBe(true);
+    });
+
+    it('renseigne activeWorkspaceName depuis le workspace actif', async () => {
+      createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
+      await component.ngOnInit();
+
+      // MOCK_WORKSPACES[0].name is "Mon Espace" by convention
+      expect(component.activeWorkspaceName()).toBeTruthy();
     });
   });
 

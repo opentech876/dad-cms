@@ -192,8 +192,12 @@ export class ShellComponent implements OnInit {
   readonly profilePassword = signal('');
   readonly profileSaveLoading = signal(false);
   readonly profilePasswordError = signal('');
+  readonly profileSaveError = signal('');
   readonly showProfilePassword = signal(false);
   toggleShowProfilePassword(): void { this.showProfilePassword.update(v => !v); }
+
+  /** Name of the active workspace — shown in the invitation welcome modal. */
+  readonly activeWorkspaceName = signal('');
 
   readonly hasPasswordNotSet = signal(false);
   readonly passwordBannerDismissed = signal(false);
@@ -371,6 +375,7 @@ export class ShellComponent implements OnInit {
         const stored = localStorage.getItem('dad-workspace-id');
         const active = summaries.find(w => w.id === stored) ?? summaries[0];
         this.workspaceContext.setActiveWorkspace(active.id);
+        this.activeWorkspaceName.set(active.name);
       }
     } catch {
       // Workspace fetch failed — use fallback name
@@ -418,16 +423,29 @@ export class ShellComponent implements OnInit {
   async saveProfile(): Promise<void> {
     if (!this.profileFullName().trim() || this.profileSaveLoading()) return;
     const pwd = this.profilePassword();
-    // Password optional in the profile-setup modal — but if entered, must be ≥ 8.
+    // Required when the user has no password yet — first-time invitees only
+    // get one reliable shot at this since the free-plan OTP fallback is
+    // rate-limited to 2 emails/hr. Optional for existing users who already
+    // have a password but somehow re-hit the setup modal.
+    if (this.hasPasswordNotSet() && !pwd) {
+      this.profilePasswordError.set('Veuillez définir un mot de passe pour finaliser votre inscription.');
+      return;
+    }
     if (pwd && pwd.length < 8) {
       this.profilePasswordError.set('Le mot de passe doit comporter au moins 8 caractères.');
       return;
     }
     this.profilePasswordError.set('');
+    this.profileSaveError.set('');
     this.profileSaveLoading.set(true);
-    await firstValueFrom(
+    const profileRes = await firstValueFrom(
       this.workspaceService.upsertProfile(this.userId, this.profileFullName().trim(), this.profilePhone().trim()),
     );
+    if (!profileRes.success) {
+      this.profileSaveError.set('Erreur lors de l\'enregistrement : ' + (profileRes.error ?? 'inconnue'));
+      this.profileSaveLoading.set(false);
+      return;
+    }
     if (pwd) {
       const { error } = await this.supabase.updatePassword(pwd);
       if (error) {
@@ -436,6 +454,7 @@ export class ShellComponent implements OnInit {
         return;
       }
       this.supabase.markPasswordSet();
+      this.hasPasswordNotSet.set(false);
     }
     this.profileSaveLoading.set(false);
     this.showProfileSetup.set(false);

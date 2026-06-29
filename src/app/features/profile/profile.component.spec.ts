@@ -26,7 +26,7 @@ describe('ProfileComponent', () => {
     };
     mockWorkspace = {
       getMyProfile: jest.fn().mockReturnValue(of(MOCK_PROFILE)),
-      upsertProfile: jest.fn().mockReturnValue(of(undefined)),
+      upsertProfile: jest.fn().mockReturnValue(of({ success: true })),
     };
     mockSupabase = {
       updatePassword:        jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),

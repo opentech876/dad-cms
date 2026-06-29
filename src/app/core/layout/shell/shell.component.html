@@ -347,11 +347,21 @@
   <div class="modal-backdrop" style="z-index:300;">
     <div class="modal" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <span class="modal-title">Compléter votre profil</span>
+        <span class="modal-title">
+          @if (activeWorkspaceName()) {
+            Bienvenue dans {{ activeWorkspaceName() }}
+          } @else {
+            Compléter votre profil
+          }
+        </span>
       </div>
       <div class="modal-body">
         <p style="font-size:13px; color:var(--fg-3); margin-bottom:16px;">
-          Bienvenue ! Veuillez renseigner votre nom avant de continuer.
+          @if (hasPasswordNotSet()) {
+            Pour finaliser votre inscription, renseignez votre nom et choisissez un mot de passe.
+          } @else {
+            Veuillez renseigner votre nom avant de continuer.
+          }
         </p>
         <div class="field" style="margin-bottom:14px;">
           <label class="field-label">Nom complet *</label>
@@ -366,7 +376,13 @@
                  autocomplete="tel" />
         </div>
         <div class="field" style="margin-bottom:20px;">
-          <label class="field-label">Mot de passe (recommandé)</label>
+          <label class="field-label">
+            @if (hasPasswordNotSet()) {
+              Mot de passe *
+            } @else {
+              Mot de passe (recommandé)
+            }
+          </label>
           <div style="position:relative;">
             <input class="input" [type]="showProfilePassword() ? 'text' : 'password'"
                    placeholder="8 caractères minimum"
@@ -381,8 +397,11 @@
             </button>
           </div>
           <span class="field-hint">
-            Définir un mot de passe vous évite de recevoir un code par e-mail à chaque connexion.
-            Vous pourrez le changer depuis votre profil.
+            @if (hasPasswordNotSet()) {
+              Le mot de passe vous permettra de vous reconnecter sans recevoir de code par e-mail. Vous pourrez le changer depuis votre profil.
+            } @else {
+              Définir un mot de passe vous évite de recevoir un code par e-mail à chaque connexion.
+            }
           </span>
           @if (profilePasswordError()) {
             <span style="color: var(--danger); font-size: 12px; margin-top: 4px; display: block;">
@@ -390,6 +409,11 @@
             </span>
           }
         </div>
+        @if (profileSaveError()) {
+          <p style="color: var(--danger); font-size: 13px; margin: 0 0 12px;">
+            {{ profileSaveError() }}
+          </p>
+        }
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary btn-sm" type="button" (click)="saveProfile()"

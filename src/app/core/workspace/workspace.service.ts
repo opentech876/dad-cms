@@ -57,9 +57,9 @@ export class WorkspaceService {
     return explicit ?? this.workspaceContext.activeWorkspaceId();
   }
 
-  upsertProfile(userId: string, fullName: string, phone: string, avatarUrl?: string, workspaceId?: string | null): Observable<void> {
+  upsertProfile(userId: string, fullName: string, phone: string, avatarUrl?: string, workspaceId?: string | null): Observable<{ success: boolean; error?: string }> {
     const workspace_id = this.resolveWorkspaceId(workspaceId);
-    if (!workspace_id) return from(Promise.resolve(undefined));
+    if (!workspace_id) return from(Promise.resolve({ success: false, error: 'Aucun espace de travail actif' }));
     const payload: Record<string, any> = {
       user_id: userId,
       workspace_id,
@@ -69,7 +69,11 @@ export class WorkspaceService {
     if (avatarUrl !== undefined) payload['avatar_url'] = avatarUrl;
     return from(
       this.supabaseService.client.from('profiles').upsert(payload, { onConflict: 'user_id,workspace_id' }),
-    ).pipe(map(() => undefined));
+    ).pipe(
+      map(({ error }: any) =>
+        error ? { success: false, error: error.message } : { success: true },
+      ),
+    );
   }
 
   getMyProfile(userId: string, workspaceId?: string | null): Observable<{ full_name: string | null; phone: string | null; avatar_url: string | null } | null> {

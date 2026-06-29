@@ -88,14 +88,18 @@ export class ProfileComponent implements OnInit {
     if (this.saving()) return;
     this.saving.set(true);
     try {
-      await firstValueFrom(
+      const result = await firstValueFrom(
         this.workspaceService.upsertProfile(
           this.userId,
           this.fullName().trim(),
           this.phone().trim(),
         ),
       );
-      this.toast.success('Profil mis à jour avec succès.');
+      if (result.success) {
+        this.toast.success('Profil mis à jour avec succès.');
+      } else {
+        this.toast.error(result.error ?? 'Impossible de mettre à jour le profil. Veuillez réessayer.');
+      }
     } catch {
       this.toast.error('Impossible de mettre à jour le profil. Veuillez réessayer.');
     } finally {
