@@ -63,25 +63,8 @@ describe('OtpStepComponent', () => {
     it("charge l'email depuis les query params", () => {
       expect(component.email()).toBe('test@exemple.com');
     });
-
-    it('charge la provenance (from) depuis les query params', () => {
-      expect(component.from()).toBe('login');
-    });
   });
 
-  // ─── isSignupMode() ───────────────────────────────────────────────────────
-
-  describe('isSignupMode()', () => {
-    it('retourne true quand from vaut "signup"', () => {
-      component.from.set('signup');
-      expect(component.isSignupMode()).toBe(true);
-    });
-
-    it('retourne false quand from vaut "login"', () => {
-      component.from.set('login');
-      expect(component.isSignupMode()).toBe(false);
-    });
-  });
 
   // ─── verify() via onPaste() ────────────────────────────────────────────────
 
@@ -155,16 +138,9 @@ describe('OtpStepComponent', () => {
   // ─── resendCode() ─────────────────────────────────────────────────────────
 
   describe('resendCode()', () => {
-    it("appelle sendOtp avec shouldCreateUser=true pour le flux onboarding (from=signup)", async () => {
-      component.from.set('signup');
+    it("appelle sendOtp avec l'e-mail courant (compte invité existant uniquement)", async () => {
       await component.resendCode();
-      expect(sendOtpSpy).toHaveBeenCalledWith('test@exemple.com', true);
-    });
-
-    it("appelle sendOtp avec shouldCreateUser=false pour le flux login", async () => {
-      component.from.set('login');
-      await component.resendCode();
-      expect(sendOtpSpy).toHaveBeenCalledWith('test@exemple.com', false);
+      expect(sendOtpSpy).toHaveBeenCalledWith('test@exemple.com');
     });
 
     it('vide tous les slots de chiffres', async () => {

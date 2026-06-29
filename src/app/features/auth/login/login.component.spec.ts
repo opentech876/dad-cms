@@ -95,7 +95,7 @@ describe('LoginComponent', () => {
 
     it('appelle sendOtp et navigue vers /verifier', async () => {
       await component.submit();
-      expect(mockSupabase.sendOtp).toHaveBeenCalledWith('a@b.cg', false);
+      expect(mockSupabase.sendOtp).toHaveBeenCalledWith('a@b.cg');
       expect(mockRouter.navigate).toHaveBeenCalledWith(
         ['/verifier'],
         { queryParams: { email: 'a@b.cg', from: 'login' } },

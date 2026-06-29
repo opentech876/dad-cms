@@ -48,10 +48,16 @@ export class SupabaseService {
     return this.supabase;
   }
 
-  async sendOtp(email: string, shouldCreateUser: boolean = true) {
+  /**
+   * Sends a 6-digit OTP code by e-mail. Used by /login OTP fallback and by
+   * the /verifier resend-code button. Magic-link signup (shouldCreateUser:true)
+   * was removed when /demarrer was deprecated — all account creation now
+   * goes through the system_admin invitation flow.
+   */
+  async sendOtp(email: string) {
     return this.supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser },
+      options: { shouldCreateUser: false },
     });
   }
 

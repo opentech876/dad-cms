@@ -52,16 +52,8 @@ describe('SupabaseService', () => {
   // ── sendOtp() ──────────────────────────────────────────────────────────────
 
   describe('sendOtp()', () => {
-    it("appelle signInWithOtp avec shouldCreateUser=true pour l'onboarding", async () => {
-      await service.sendOtp('test@exemple.com', true);
-      expect(signInWithOtpSpy).toHaveBeenCalledWith({
-        email: 'test@exemple.com',
-        options: { shouldCreateUser: true },
-      });
-    });
-
-    it("appelle signInWithOtp avec shouldCreateUser=false pour le login", async () => {
-      await service.sendOtp('test@exemple.com', false);
+    it("appelle toujours signInWithOtp avec shouldCreateUser=false (les comptes sont créés par invitation system_admin)", async () => {
+      await service.sendOtp('test@exemple.com');
       expect(signInWithOtpSpy).toHaveBeenCalledWith({
         email: 'test@exemple.com',
         options: { shouldCreateUser: false },

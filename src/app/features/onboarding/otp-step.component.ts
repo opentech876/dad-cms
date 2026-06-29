@@ -1,4 +1,4 @@
-import { Component, computed, ElementRef, inject, OnInit, QueryList, signal, ViewChildren } from '@angular/core';
+import { Component, ElementRef, inject, OnInit, QueryList, signal, ViewChildren } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 
@@ -17,16 +17,12 @@ export class OtpStepComponent implements OnInit {
   private supabase = inject(SupabaseService);
 
   readonly email = signal('');
-  readonly from = signal('');
-  readonly isSignupMode = computed(() => this.from() !== 'login');
   readonly digits = signal(['', '', '', '', '', '']);
   readonly isLoading = signal(false);
   readonly errorMessage = signal('');
 
   ngOnInit(): void {
-    const params = this.route.snapshot.queryParamMap;
-    this.email.set(params.get('email') ?? '');
-    this.from.set(params.get('from') ?? '');
+    this.email.set(this.route.snapshot.queryParamMap.get('email') ?? '');
   }
 
   onInput(index: number, event: Event): void {
@@ -66,11 +62,9 @@ export class OtpStepComponent implements OnInit {
   async resendCode(): Promise<void> {
     this.digits.set(['', '', '', '', '', '']);
     this.errorMessage.set('');
-    await this.supabase.sendOtp(this.email(), this.isSignupMode());
-    if (!this.isSignupMode()) {
-      this.inputs.forEach(input => (input.value = ''));
-      this.inputs[0]?.focus();
-    }
+    await this.supabase.sendOtp(this.email());
+    this.inputs.forEach(input => (input.value = ''));
+    this.inputs[0]?.focus();
   }
 
   private async verify(): Promise<void> {

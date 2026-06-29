@@ -82,7 +82,7 @@ export class LoginComponent {
     }
 
     // OTP fallback (existing behavior).
-    const { error } = await this.supabase.sendOtp(email, false);
+    const { error } = await this.supabase.sendOtp(email);
     if (error) {
       const msg = (error.message ?? '').toLowerCase();
       this.errorMessage = msg.includes('rate') || msg.includes('security purposes') || msg.includes('limit')

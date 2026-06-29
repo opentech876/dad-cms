@@ -13,11 +13,6 @@ export const routes: Routes = [
       import('./features/landing/landing.component').then((m) => m.LandingComponent),
   },
   {
-    path: 'demarrer',
-    loadComponent: () =>
-      import('./features/onboarding/email-step.component').then((m) => m.EmailStepComponent),
-  },
-  {
     path: 'verifier',
     loadComponent: () =>
       import('./features/onboarding/otp-step.component').then((m) => m.OtpStepComponent),
