@@ -16,7 +16,7 @@ CREATE EXTENSION IF NOT EXISTS supabase_vault;
 
 -- ─── 2. Enums ───────────────────────────────────────────────
 DO $$ BEGIN
-  CREATE TYPE public.app_role AS ENUM ('owner', 'chef_equipe', 'editeur', 'charge_communication', 'presidence', 'chef_equipe_commerciale');
+  CREATE TYPE public.app_role AS ENUM ('owner', 'chef_equipe', 'editeur', 'charge_communication', 'presidence', 'chef_equipe_commerciale', 'system_admin');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -36,8 +36,12 @@ CREATE TABLE IF NOT EXISTS public.workspaces (
   logo_url    text,
   created_at  timestamptz DEFAULT now(),
   updated_at  timestamptz DEFAULT now(),
-  created_by  uuid REFERENCES auth.users(id)
+  created_by  uuid REFERENCES auth.users(id),
+  deleted_at  timestamptz,
+  deleted_by  uuid REFERENCES auth.users(id)
 );
+CREATE INDEX IF NOT EXISTS workspaces_deleted_at_idx
+  ON public.workspaces (deleted_at) WHERE deleted_at IS NULL;
 
 -- 3.2 workspace_members
 CREATE TABLE IF NOT EXISTS public.workspace_members (
@@ -52,13 +56,17 @@ CREATE TABLE IF NOT EXISTS public.workspace_members (
 
 -- 3.3 profiles
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  full_name   text,
-  phone       text,
-  avatar_url  text,
-  created_at  timestamptz DEFAULT now(),
-  updated_at  timestamptz DEFAULT now()
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  -- Per-tenant identity. A user can have a different display name / phone /
+  -- avatar in each workspace they're a member of.
+  workspace_id uuid NOT NULL REFERENCES public.workspaces(id),
+  full_name    text,
+  phone        text,
+  avatar_url   text,
+  created_at   timestamptz DEFAULT now(),
+  updated_at   timestamptz DEFAULT now(),
+  CONSTRAINT profiles_user_workspace_unique UNIQUE (user_id, workspace_id)
 );
 
 -- 3.4 user_roles
@@ -97,6 +105,12 @@ CREATE TABLE IF NOT EXISTS public.events (
   title         text NOT NULL,
   description   text,
   image_path    text,
+  -- Free text / URL pointing to the historical reference work backing this entry.
+  source        text,
+  -- Name of the human who entered/curated this entry (carried over from the
+  -- Excel "Historien" column on import; defaults to the current user's
+  -- display_name on new rows created from the CMS).
+  historian     text,
   created_by    uuid REFERENCES auth.users(id),
   created_at    timestamptz DEFAULT now(),
   updated_at    timestamptz DEFAULT now(),
@@ -247,18 +261,22 @@ CREATE TABLE IF NOT EXISTS public.content_versions (
 
 -- 3.13 audit_log
 CREATE TABLE IF NOT EXISTS public.audit_log (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  table_name  text NOT NULL,
-  record_id   uuid NOT NULL,
-  action      text NOT NULL CHECK (action IN ('INSERT','UPDATE','DELETE')),
-  actor_id    uuid,
-  old_data    jsonb,
-  new_data    jsonb,
-  changed_at  timestamptz NOT NULL DEFAULT now()
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_name   text NOT NULL,
+  record_id    uuid NOT NULL,
+  action       text NOT NULL CHECK (action IN ('INSERT','UPDATE','DELETE')),
+  actor_id     uuid,
+  old_data     jsonb,
+  new_data     jsonb,
+  changed_at   timestamptz NOT NULL DEFAULT now(),
+  -- NULL = platform-level / legacy row. Visible only to system_admin.
+  -- Non-null rows are workspace-scoped (chef_equipe+ of that workspace).
+  workspace_id uuid REFERENCES public.workspaces(id)
 );
 CREATE INDEX IF NOT EXISTS audit_log_actor_idx        ON public.audit_log (actor_id);
 CREATE INDEX IF NOT EXISTS audit_log_changed_at_idx   ON public.audit_log (changed_at DESC);
 CREATE INDEX IF NOT EXISTS audit_log_table_record_idx ON public.audit_log (table_name, record_id);
+CREATE INDEX IF NOT EXISTS audit_log_workspace_id_idx ON public.audit_log (workspace_id, changed_at DESC);
 
 -- 3.14 notifications
 CREATE TABLE IF NOT EXISTS public.notifications (
@@ -359,10 +377,12 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.has_role_at_least(required_role public.app_role)
-RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+RETURNS boolean LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
 DECLARE user_role public.app_role; role_expires timestamptz;
 BEGIN
   SELECT role, expires_at INTO user_role, role_expires FROM public.user_roles WHERE user_id = auth.uid();
+  -- system_admin is platform-level: trumps all role checks regardless of workspace.
+  IF user_role = 'system_admin' THEN RETURN true; END IF;
   IF role_expires IS NOT NULL AND role_expires < NOW() THEN RETURN false; END IF;
   RETURN CASE
     WHEN user_role = 'owner'                    THEN true
@@ -377,6 +397,35 @@ BEGIN
 END;
 $$;
 
+-- Workspace-scoped overload. Reads the caller's role from workspace_members
+-- for the given workspace_id. Applies the same inheritance rules. This is the
+-- authoritative role check for any RLS policy that can name the row's
+-- workspace_id. The 1-arg legacy overload above stays for backward compat
+-- during the gradual RLS migration to per-workspace authority.
+-- system_admin (read from the global user_roles) trumps everything.
+CREATE OR REPLACE FUNCTION public.has_role_at_least(required_role public.app_role, p_workspace_id uuid)
+RETURNS boolean LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE global_role public.app_role; member_role public.app_role;
+BEGIN
+  SELECT role INTO global_role FROM public.user_roles WHERE user_id = auth.uid();
+  IF global_role = 'system_admin' THEN RETURN true; END IF;
+  IF p_workspace_id IS NULL THEN RETURN false; END IF;
+  SELECT role INTO member_role FROM public.workspace_members
+  WHERE user_id = auth.uid() AND workspace_id = p_workspace_id;
+  IF member_role IS NULL THEN RETURN false; END IF;
+  RETURN CASE
+    WHEN member_role = 'owner'                    THEN true
+    WHEN member_role = 'chef_equipe'              THEN required_role IN ('chef_equipe', 'editeur', 'charge_communication')
+    WHEN member_role = 'chef_equipe_commerciale'  THEN required_role IN ('chef_equipe_commerciale', 'charge_communication')
+    WHEN member_role = 'editeur'                  THEN required_role = 'editeur'
+    WHEN member_role = 'charge_communication'     THEN required_role = 'charge_communication'
+    WHEN member_role = 'presidence'               THEN required_role = 'presidence'
+    ELSE false
+  END;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.has_role_at_least(public.app_role, uuid) TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.cleanup_temporary_owners()
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
 BEGIN
@@ -384,11 +433,15 @@ BEGIN
 END;
 $$;
 
+-- handle_new_user no longer touches profiles — profiles are per-(user, workspace)
+-- and a new auth.users row doesn't yet have a workspace binding. The
+-- workspace_members trigger below auto-creates the profile when membership
+-- is granted, covering every onboarding path (invitation, finalize_workspace_creation,
+-- admin_create_workspace).
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
 DECLARE invited_role TEXT;
 BEGIN
-  INSERT INTO public.profiles (user_id) VALUES (NEW.id) ON CONFLICT (user_id) DO NOTHING;
   IF (SELECT COUNT(*) FROM public.user_roles) = 0 THEN
     INSERT INTO public.user_roles (user_id, role, expires_at)
     VALUES (NEW.id, 'owner', NOW() + INTERVAL '24 hours');
@@ -406,6 +459,18 @@ BEGIN
 END;
 $$;
 
+-- Auto-create an (empty) profile row whenever a user joins a workspace.
+-- Triggered by every code path that touches workspace_members.
+CREATE OR REPLACE FUNCTION public.ensure_profile_for_membership()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  INSERT INTO public.profiles (user_id, workspace_id)
+  VALUES (NEW.user_id, NEW.workspace_id)
+  ON CONFLICT (user_id, workspace_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.is_app_initialized()
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
 BEGIN
@@ -419,8 +484,51 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.get_my_workspace_ids()
 RETURNS SETOF uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
-  SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid();
+  SELECT wm.workspace_id
+  FROM public.workspace_members wm
+  JOIN public.workspaces w ON w.id = wm.workspace_id
+  WHERE wm.user_id = auth.uid() AND w.deleted_at IS NULL;
 $$;
+
+-- One round-trip helper for the workspace switcher: each row has the accurate
+-- per-workspace member count + the caller's own last_accessed_at on that
+-- workspace, ordered most-recently-accessed first. Soft-deleted workspaces
+-- are excluded.
+CREATE OR REPLACE FUNCTION public.get_my_workspace_summaries()
+RETURNS TABLE (id uuid, name text, logo_url text, member_count integer, last_accessed_at timestamptz)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+  WITH my AS (
+    SELECT wm.workspace_id, wm.last_accessed_at
+    FROM public.workspace_members wm
+    JOIN public.workspaces w ON w.id = wm.workspace_id
+    WHERE wm.user_id = auth.uid() AND w.deleted_at IS NULL
+  ),
+  counts AS (
+    SELECT workspace_id, COUNT(*)::int AS member_count
+    FROM public.workspace_members
+    WHERE workspace_id IN (SELECT workspace_id FROM my)
+    GROUP BY workspace_id
+  )
+  SELECT w.id, w.name, w.logo_url, COALESCE(c.member_count, 0), my.last_accessed_at
+  FROM public.workspaces w
+  JOIN my ON my.workspace_id = w.id
+  LEFT JOIN counts c ON c.workspace_id = w.id
+  ORDER BY my.last_accessed_at DESC NULLS LAST, w.name ASC;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_my_workspace_summaries() TO authenticated;
+
+-- Updates the caller's last_accessed_at on the given workspace. Called by
+-- the shell whenever active workspace is set. Drives the order of
+-- get_my_workspace_summaries() (most recent first).
+CREATE OR REPLACE FUNCTION public.touch_workspace_access(p_workspace_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  IF p_workspace_id IS NULL THEN RETURN; END IF;
+  UPDATE public.workspace_members SET last_accessed_at = now()
+  WHERE user_id = auth.uid() AND workspace_id = p_workspace_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.touch_workspace_access(uuid) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.get_first_workspace_for_auth_user()
 RETURNS uuid LANGUAGE sql STABLE SET search_path = 'public' AS $$
@@ -439,30 +547,180 @@ RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_role public.app_role; v_expires timestamptz; v_workspace uuid;
 BEGIN
   SELECT role, expires_at INTO v_role, v_expires FROM public.user_roles WHERE user_id = p_user_id;
-  IF v_role IS NULL OR v_role <> 'owner' THEN RAISE EXCEPTION 'Seul le propriétaire peut créer un espace de travail'; END IF;
-  IF v_expires IS NOT NULL AND v_expires < now() THEN RAISE EXCEPTION 'Session expirée — reconnectez-vous'; END IF;
+  IF v_role IS NULL OR (v_role <> 'owner' AND v_role <> 'system_admin') THEN
+    RAISE EXCEPTION 'Seul le propriétaire ou un administrateur peut créer un espace de travail';
+  END IF;
+  IF v_role = 'owner' AND v_expires IS NOT NULL AND v_expires < now() THEN
+    RAISE EXCEPTION 'Session expirée — reconnectez-vous';
+  END IF;
+
   INSERT INTO public.workspaces (name, created_by) VALUES (TRIM(p_name), p_user_id) RETURNING id INTO v_workspace;
-  UPDATE public.user_roles SET expires_at = NULL WHERE user_id = p_user_id;
-  INSERT INTO public.profiles (user_id, full_name, phone)
-  VALUES (p_user_id, NULLIF(TRIM(COALESCE(p_full_name, '')), ''), NULLIF(TRIM(COALESCE(p_phone, '')), ''))
-  ON CONFLICT (user_id) DO UPDATE
-    SET full_name = EXCLUDED.full_name, phone = EXCLUDED.phone, updated_at = now();
-  INSERT INTO public.workspace_members (workspace_id, user_id, role) VALUES (v_workspace, p_user_id, 'owner');
+  UPDATE public.user_roles SET expires_at = NULL WHERE user_id = p_user_id AND role = 'owner';
+
+  -- Membership first so the workspace_members trigger creates the per-tenant
+  -- profile row, then we update it with the values from the onboarding form.
+  INSERT INTO public.workspace_members (workspace_id, user_id, role)
+  VALUES (v_workspace, p_user_id, 'owner');
+
+  UPDATE public.profiles
+  SET full_name = NULLIF(TRIM(COALESCE(p_full_name, '')), ''),
+      phone     = NULLIF(TRIM(COALESCE(p_phone, '')), ''),
+      updated_at = now()
+  WHERE user_id = p_user_id AND workspace_id = v_workspace;
+
   RETURN v_workspace;
 END;
 $$;
 
+-- ─── 5.b system_admin RPCs ──────────────────────────────────
+-- Platform-level (system_admin) helpers. Each asserts the caller is
+-- system_admin before touching the workspaces table. SECURITY DEFINER lets
+-- them bypass RLS on workspaces / workspace_members.
+CREATE OR REPLACE FUNCTION public._assert_system_admin()
+RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'system_admin') THEN
+    RAISE EXCEPTION 'Rôle system_admin requis' USING ERRCODE = '42501';
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_list_workspaces()
+RETURNS TABLE (
+  id uuid, name text, logo_url text, member_count integer,
+  created_at timestamptz, created_by uuid, created_by_email text, deleted_at timestamptz
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  PERFORM public._assert_system_admin();
+  RETURN QUERY
+    SELECT w.id, w.name, w.logo_url,
+           COALESCE((SELECT COUNT(*)::int FROM public.workspace_members wm WHERE wm.workspace_id = w.id), 0),
+           w.created_at, w.created_by,
+           (SELECT u.email::text FROM auth.users u WHERE u.id = w.created_by),
+           w.deleted_at
+    FROM public.workspaces w
+    ORDER BY w.deleted_at NULLS FIRST, w.created_at DESC;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_list_workspaces() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.admin_soft_delete_workspace(p_workspace_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  PERFORM public._assert_system_admin();
+  UPDATE public.workspaces SET deleted_at = now(), deleted_by = auth.uid(), updated_at = now()
+  WHERE id = p_workspace_id AND deleted_at IS NULL;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_soft_delete_workspace(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.admin_restore_workspace(p_workspace_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  PERFORM public._assert_system_admin();
+  UPDATE public.workspaces SET deleted_at = NULL, deleted_by = NULL, updated_at = now()
+  WHERE id = p_workspace_id AND deleted_at IS NOT NULL;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_restore_workspace(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.admin_rename_workspace(p_workspace_id uuid, p_name text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  PERFORM public._assert_system_admin();
+  IF p_name IS NULL OR length(trim(p_name)) = 0 THEN
+    RAISE EXCEPTION 'Le nom de l''espace est requis' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.workspaces SET name = trim(p_name), updated_at = now() WHERE id = p_workspace_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_rename_workspace(uuid, text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.admin_create_workspace(p_name text, p_owner_user_id uuid DEFAULT NULL)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_owner uuid; v_workspace uuid;
+BEGIN
+  PERFORM public._assert_system_admin();
+  IF p_name IS NULL OR length(trim(p_name)) = 0 THEN
+    RAISE EXCEPTION 'Le nom de l''espace est requis' USING ERRCODE = '22023';
+  END IF;
+  v_owner := COALESCE(p_owner_user_id, auth.uid());
+  INSERT INTO public.workspaces (name, created_by) VALUES (trim(p_name), auth.uid()) RETURNING id INTO v_workspace;
+  INSERT INTO public.workspace_members (workspace_id, user_id, role)
+  VALUES (v_workspace, v_owner, 'owner') ON CONFLICT (workspace_id, user_id) DO NOTHING;
+  RETURN v_workspace;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_create_workspace(text, uuid) TO authenticated;
+
+-- Returns every user that exists in the platform, with the workspaces they
+-- belong to and their roles per workspace. Powers /admin/utilisateurs.
+CREATE OR REPLACE FUNCTION public.admin_list_all_users()
+RETURNS TABLE (
+  user_id            uuid,
+  email              text,
+  display_name       text,
+  global_role        public.app_role,
+  email_confirmed_at timestamptz,
+  banned             boolean,
+  created_at         timestamptz,
+  memberships        jsonb
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  PERFORM public._assert_system_admin();
+  RETURN QUERY
+  WITH any_profile AS (
+    SELECT DISTINCT ON (user_id) user_id, full_name
+    FROM public.profiles ORDER BY user_id, created_at ASC
+  ),
+  ws_list AS (
+    SELECT wm.user_id,
+      jsonb_agg(jsonb_build_object(
+        'workspace_id', wm.workspace_id, 'workspace_name', w.name,
+        'role', wm.role, 'joined_at', wm.joined_at,
+        'deleted', (w.deleted_at IS NOT NULL)
+      ) ORDER BY wm.joined_at DESC) AS memberships
+    FROM public.workspace_members wm
+    JOIN public.workspaces w ON w.id = wm.workspace_id
+    GROUP BY wm.user_id
+  )
+  SELECT u.id, u.email::text, p.full_name, ur.role,
+         u.email_confirmed_at,
+         (u.banned_until IS NOT NULL AND u.banned_until > now()),
+         u.created_at,
+         COALESCE(wl.memberships, '[]'::jsonb)
+  FROM auth.users u
+  LEFT JOIN any_profile p ON p.user_id = u.id
+  LEFT JOIN public.user_roles ur ON ur.user_id = u.id
+  LEFT JOIN ws_list wl ON wl.user_id = u.id
+  ORDER BY u.created_at DESC;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_list_all_users() TO authenticated;
+
 -- ─── 6. Audit logging ───────────────────────────────────────
+-- Captures workspace_id from the source row when present (every workspace-
+-- scoped table has one). Tables without workspace_id leave it NULL and the
+-- row becomes visible only to system_admin under RLS.
 CREATE OR REPLACE FUNCTION public.log_audit_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE _record_id uuid; _old_data jsonb; _new_data jsonb;
+DECLARE
+  _record_id    uuid; _old_data jsonb; _new_data jsonb; _workspace_id uuid;
 BEGIN
-  IF TG_OP = 'DELETE' THEN _record_id := OLD.id; _old_data := to_jsonb(OLD); _new_data := NULL;
-  ELSIF TG_OP = 'INSERT' THEN _record_id := NEW.id; _old_data := NULL; _new_data := to_jsonb(NEW);
-  ELSE _record_id := NEW.id; _old_data := to_jsonb(OLD); _new_data := to_jsonb(NEW);
+  IF TG_OP = 'DELETE' THEN
+    _record_id := OLD.id; _old_data := to_jsonb(OLD); _new_data := NULL;
+    BEGIN _workspace_id := (_old_data ->> 'workspace_id')::uuid; EXCEPTION WHEN OTHERS THEN _workspace_id := NULL; END;
+  ELSIF TG_OP = 'INSERT' THEN
+    _record_id := NEW.id; _old_data := NULL; _new_data := to_jsonb(NEW);
+    BEGIN _workspace_id := (_new_data ->> 'workspace_id')::uuid; EXCEPTION WHEN OTHERS THEN _workspace_id := NULL; END;
+  ELSE
+    _record_id := NEW.id; _old_data := to_jsonb(OLD); _new_data := to_jsonb(NEW);
+    BEGIN _workspace_id := (_new_data ->> 'workspace_id')::uuid; EXCEPTION WHEN OTHERS THEN _workspace_id := NULL; END;
   END IF;
-  INSERT INTO public.audit_log (table_name, record_id, action, actor_id, old_data, new_data)
-  VALUES (TG_TABLE_NAME, _record_id, TG_OP, auth.uid(), _old_data, _new_data);
+  INSERT INTO public.audit_log (table_name, record_id, action, actor_id, old_data, new_data, workspace_id)
+  VALUES (TG_TABLE_NAME, _record_id, TG_OP, auth.uid(), _old_data, _new_data, _workspace_id);
   RETURN CASE TG_OP WHEN 'DELETE' THEN OLD ELSE NEW END;
 END;
 $$;
@@ -1144,6 +1402,11 @@ CREATE TRIGGER trg_companies_timestamps      BEFORE UPDATE ON public.companies F
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+DROP TRIGGER IF EXISTS workspace_members_ensure_profile ON public.workspace_members;
+CREATE TRIGGER workspace_members_ensure_profile
+  AFTER INSERT ON public.workspace_members
+  FOR EACH ROW EXECUTE FUNCTION public.ensure_profile_for_membership();
+
 -- ─── 12. Enable RLS ─────────────────────────────────────────
 ALTER TABLE public.workspaces              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workspace_members       ENABLE ROW LEVEL SECURITY;
@@ -1177,10 +1440,20 @@ CREATE POLICY "workspace_members_select" ON public.workspace_members FOR SELECT
   USING (workspace_id IN (SELECT public.get_my_workspace_ids()));
 
 -- profiles
-CREATE POLICY "Profiles - Read own"      ON public.profiles FOR SELECT TO authenticated USING (user_id = auth.uid());
-CREATE POLICY "Profiles - Owner read all" ON public.profiles FOR SELECT TO authenticated USING (public.current_user_role() = 'owner'::public.app_role);
-CREATE POLICY "Profiles - Insert own"    ON public.profiles FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Profiles - Update own"    ON public.profiles FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+-- Per-tenant profile access:
+-- - A user can always read/update their own rows in any workspace.
+-- - Workspace members can read other members' profile in the same workspace.
+-- - system_admin can read every profile across the platform.
+CREATE POLICY "Profiles - Read own" ON public.profiles FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+CREATE POLICY "Profiles - Workspace members can read" ON public.profiles FOR SELECT TO authenticated
+  USING (workspace_id IN (SELECT public.get_my_workspace_ids()));
+CREATE POLICY "Profiles - System admin reads all" ON public.profiles FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'system_admin'));
+CREATE POLICY "Profiles - Insert own in own workspace" ON public.profiles FOR INSERT TO authenticated
+  WITH CHECK (user_id = auth.uid() AND workspace_id IN (SELECT public.get_my_workspace_ids()));
+CREATE POLICY "Profiles - Update own" ON public.profiles FOR UPDATE TO authenticated
+  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 -- user_roles
 CREATE POLICY "User Roles - Read own role" ON public.user_roles FOR SELECT TO authenticated USING (user_id = auth.uid());
@@ -1229,13 +1502,27 @@ CREATE POLICY "Ad Clicks - Read workspace" ON public.ad_campaign_device_clicks F
       AND ac.workspace_id IN (SELECT public.get_my_workspace_ids())
   ));
 
+-- Explicit table grants so RLS (above) is the actual gate, not the GRANT layer.
+-- ad_campaign_device_views was missing these on the live project — caused CMS reads
+-- to fail with 42501 "permission denied for table" before RLS could evaluate.
+GRANT ALL ON TABLE public.ad_campaign_device_views  TO anon, authenticated;
+GRANT ALL ON TABLE public.ad_campaign_device_clicks TO anon, authenticated;
+
 -- content_versions
 CREATE POLICY "Content Versions - Read all"      ON public.content_versions FOR SELECT TO authenticated, anon USING (true);
 CREATE POLICY "Content Versions - No direct write" ON public.content_versions TO authenticated USING (false) WITH CHECK (false);
 
 -- audit_log
-CREATE POLICY "Audit log - Read for senior roles" ON public.audit_log FOR SELECT
-  USING (public.has_role_at_least('chef_equipe'::public.app_role));
+-- Workspace-scoped audit visibility. A chef_equipe+ of a workspace sees that
+-- workspace's audit events; system_admin sees everything (short-circuited in
+-- has_role_at_least). Legacy rows without workspace_id are system_admin-only.
+CREATE POLICY "Audit log - Read scoped to workspace senior roles" ON public.audit_log FOR SELECT
+  USING (
+    workspace_id IS NULL
+      AND public.has_role_at_least('chef_equipe'::public.app_role)
+    OR
+      public.has_role_at_least('chef_equipe'::public.app_role, workspace_id)
+  );
 
 -- devices (mirroring the duplicated policies from prod)
 CREATE POLICY "Allow anon insert devices"             ON public.devices FOR INSERT TO anon WITH CHECK (true);

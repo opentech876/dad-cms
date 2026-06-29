@@ -69,6 +69,8 @@ export class EventService {
             title: dto.title,
             description: dto.description ?? null,
             image_path: dto.image_path ?? null,
+            source: dto.source ?? null,
+            historian: dto.historian ?? null,
             status: 'draft',
             workspace_id: wsId,
             created_by: user?.id ?? null,
@@ -85,7 +87,7 @@ export class EventService {
     );
   }
 
-  updateEvent(id: string, patch: Partial<Pick<Event, 'title' | 'description' | 'image_path' | 'status' | 'event_date'>>): Observable<{ success: boolean; error?: string }> {
+  updateEvent(id: string, patch: Partial<Pick<Event, 'title' | 'description' | 'image_path' | 'status' | 'event_date' | 'source' | 'historian'>>): Observable<{ success: boolean; error?: string }> {
     return from(
       this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
         this.supabase.client
@@ -138,6 +140,8 @@ export class EventService {
             title:       dto.title,
             description: dto.description ?? null,
             image_path:  null,
+            source:      dto.source ?? null,
+            historian:   dto.historian ?? null,
             status:      'draft' as const,
             workspace_id: wsId,
             created_by:  user?.id ?? null,

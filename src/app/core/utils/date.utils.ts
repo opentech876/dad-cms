@@ -76,3 +76,30 @@ export function formatDayMonthLong(iso: string | null | undefined): string {
   const monthName = MONTHS_FR_LONG[parseInt(m, 10) - 1] ?? '';
   return `${parseInt(d, 10)} ${monthName}`;
 }
+
+/**
+ * Lowercase + strip accents. Used to normalize both search queries and
+ * indexed text so French accents don't break substring matching.
+ */
+export function normalizeSearchable(s: string | null | undefined): string {
+  return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+/**
+ * Expand a yyyy-mm-dd date into every searchable form a user might type:
+ * the ISO form, the French dd/mm/yyyy form, the French month name, and the
+ * bare year. Result is already normalized (lowercased, accent-stripped) so
+ * the caller can match it directly against `normalizeSearchable(query)`.
+ *
+ * `1960-08-15` →  "1960-08-15 15/08/1960 15 aout 1960 aout 1960 1960"
+ */
+export function dateSearchHaystack(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const m = iso.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const [, y, mm, dd] = m;
+  const monthName = MONTHS_FR_LONG[parseInt(mm, 10) - 1] ?? '';
+  return normalizeSearchable(
+    `${y}-${mm}-${dd} ${dd}/${mm}/${y} ${parseInt(dd, 10)} ${monthName} ${y} ${monthName} ${y} ${y}`
+  );
+}

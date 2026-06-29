@@ -6,6 +6,8 @@ import {
   formatDateTime,
   formatRelativeFr,
   formatDayMonthLong,
+  normalizeSearchable,
+  dateSearchHaystack,
 } from './date.utils';
 
 describe('date.utils', () => {
@@ -103,6 +105,44 @@ describe('date.utils', () => {
   describe('formatDayMonthLong', () => {
     it('formate "2026-08-15" en "15 août"', () => {
       expect(formatDayMonthLong('2026-08-15')).toBe('15 août');
+    });
+  });
+
+  describe('normalizeSearchable', () => {
+    it('met en minuscules', () => {
+      expect(normalizeSearchable('Brazzaville')).toBe('brazzaville');
+    });
+
+    it("supprime les accents", () => {
+      expect(normalizeSearchable('événement')).toBe('evenement');
+      expect(normalizeSearchable('août')).toBe('aout');
+      expect(normalizeSearchable('Présidence')).toBe('presidence');
+    });
+
+    it('gère null et undefined', () => {
+      expect(normalizeSearchable(null)).toBe('');
+      expect(normalizeSearchable(undefined)).toBe('');
+    });
+  });
+
+  describe('dateSearchHaystack', () => {
+    it("inclut l'ISO, le format jj/mm/aaaa, et le mois en français", () => {
+      const out = dateSearchHaystack('1960-08-15');
+      expect(out).toContain('1960-08-15');
+      expect(out).toContain('15/08/1960');
+      expect(out).toContain('aout'); // accent-stripped by design
+      expect(out).toContain('1960');
+    });
+
+    it('renvoie une chaîne vide pour une date invalide', () => {
+      expect(dateSearchHaystack('not-a-date')).toBe('');
+      expect(dateSearchHaystack(null)).toBe('');
+      expect(dateSearchHaystack('')).toBe('');
+    });
+
+    it("permet de chercher par nom de mois en français", () => {
+      const out = dateSearchHaystack('1960-12-25');
+      expect(out).toContain('decembre');
     });
   });
 });
