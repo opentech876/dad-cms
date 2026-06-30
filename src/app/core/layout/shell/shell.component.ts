@@ -88,20 +88,40 @@ export class ShellComponent implements OnInit {
     const hue = Math.abs(hash) % 360;
     return `hsl(${hue}, 62%, 52%)`;
   });
-  readonly workspaceName = computed(() => this.currentWorkspace()?.name ?? 'Day After Day');
+  /**
+   * Current URL, kept reactive via the NavigationEnd subscription in
+   * ngOnInit. Drives the "platform mode" detection — when the sysadmin is
+   * on /admin/* the workspace switcher displays "Administration plateforme"
+   * as the active entry, even if they also belong to one or more workspaces.
+   */
+  readonly currentUrl = signal(this.router.url);
+  readonly inPlatformMode = computed(() =>
+    this.isSystemAdmin() && this.currentUrl().startsWith('/admin'),
+  );
+
+  readonly workspaceName = computed(() =>
+    this.inPlatformMode()
+      ? 'Administration plateforme'
+      : (this.currentWorkspace()?.name ?? 'Day After Day'),
+  );
   readonly workspaceInitials = computed(() => {
+    if (this.inPlatformMode()) return 'AP';
     const name = this.currentWorkspace()?.name ?? 'Day After Day';
     const parts = name.trim().split(/\s+/);
     return ((parts[0]?.[0] ?? 'D') + (parts[1]?.[0] ?? parts[0]?.[1] ?? 'A')).toUpperCase();
   });
   readonly workspaceMemberLabel = computed(() => {
+    if (this.inPlatformMode()) return 'Cross-workspace';
     const count = this.currentWorkspace()?.member_count ?? 0;
     return count === 1 ? '1 membre' : `${count} membres`;
   });
   readonly workspaceMenuOpen = signal(false);
-  readonly otherWorkspaces = computed(() =>
-    this.workspaces().filter(w => w.id !== this.currentWorkspace()?.id),
-  );
+  readonly otherWorkspaces = computed(() => {
+    // In platform mode the "active" entry is the synthetic platform one, so
+    // every real workspace counts as an "other" entry the user can switch to.
+    if (this.inPlatformMode()) return this.workspaces();
+    return this.workspaces().filter(w => w.id !== this.currentWorkspace()?.id);
+  });
 
   toggleWorkspaceMenu(): void {
     this.workspaceMenuOpen.update(v => !v);
@@ -127,14 +147,29 @@ export class ShellComponent implements OnInit {
    * current URL with a one-shot RouteReuseStrategy override + onSameUrlNavigation,
    * forcing every workspace-scoped component to re-init and re-fetch under the
    * new tenant. Cheaper than `window.location.reload()` — no JS bundle re-parse.
+   *
+   * If we were in /admin (platform mode), we jump out to /dashboard so the user
+   * lands inside the chosen workspace, not in an admin section that has nothing
+   * to do with it.
    */
   async switchWorkspace(id: string): Promise<void> {
-    if (id === this.currentWorkspace()?.id) { this.closeWorkspaceMenu(); return; }
+    if (id === this.currentWorkspace()?.id && !this.inPlatformMode()) { this.closeWorkspaceMenu(); return; }
     this.workspaceContext.setActiveWorkspace(id);
     this.closeWorkspaceMenu();
-    const target = this.router.url;
+    const target = this.inPlatformMode() ? '/dashboard' : this.router.url;
     this.routeReuse.triggerRefresh();
     await this.router.navigateByUrl(target);
+  }
+
+  /**
+   * Sysadmin-only entry in the switcher: jumps into platform admin mode by
+   * routing to /admin. The "active" workspace state isn't cleared — the user
+   * just visits a different URL. inPlatformMode() = true while on /admin/*.
+   */
+  async enterPlatformMode(): Promise<void> {
+    this.closeWorkspaceMenu();
+    if (this.router.url.startsWith('/admin')) return;
+    await this.router.navigateByUrl('/admin');
   }
 
   collapsed = signal(false);
@@ -357,7 +392,10 @@ export class ShellComponent implements OnInit {
     this.applyTitleFromUrl(this.router.url);
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-    ).subscribe(e => this.applyTitleFromUrl(e.urlAfterRedirects));
+    ).subscribe(e => {
+      this.applyTitleFromUrl(e.urlAfterRedirects);
+      this.currentUrl.set(e.urlAfterRedirects);
+    });
 
     // Debounced topbar search — fires SearchService after 300ms of idle typing.
     this.searchInput$.pipe(

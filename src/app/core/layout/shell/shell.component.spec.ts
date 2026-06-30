@@ -667,6 +667,64 @@ describe('ShellComponent — navigation par rôle', () => {
     });
   });
 
+  // ── platform admin mode (sysadmin in switcher) ────────────────────────────
+
+  describe('mode Administration plateforme', () => {
+    it("inPlatformMode est faux par défaut (URL = /dashboard, pas sysadmin)", async () => {
+      createComponent('editeur');
+      await component.ngOnInit();
+      expect(component.inPlatformMode()).toBe(false);
+    });
+
+    it("inPlatformMode est vrai quand sysadmin et URL commence par /admin", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/admin/utilisateurs');
+      expect(component.inPlatformMode()).toBe(true);
+    });
+
+    it("inPlatformMode est faux pour un sysadmin hors /admin", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/dashboard');
+      expect(component.inPlatformMode()).toBe(false);
+    });
+
+    it("workspaceName affiche 'Administration plateforme' en mode plateforme", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/admin');
+      expect(component.workspaceName()).toBe('Administration plateforme');
+      expect(component.workspaceInitials()).toBe('AP');
+    });
+
+    it("enterPlatformMode navigue vers /admin", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      mockRouter.navigateByUrl.mockClear();
+      await component.enterPlatformMode();
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/admin');
+    });
+
+    it("enterPlatformMode ne re-navigue pas si déjà sur /admin", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      mockRouter.url = '/admin/utilisateurs';
+      mockRouter.navigateByUrl.mockClear();
+      await component.enterPlatformMode();
+      expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    it("switchWorkspace depuis le mode plateforme route vers /dashboard", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/admin');
+      mockRouter.navigateByUrl.mockClear();
+      await component.switchWorkspace('ws-1');
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
+    });
+  });
+
   // ── workspace context ─────────────────────────────────────────────────────
 
   it("setActiveWorkspace est appelé avec l'id du premier workspace au démarrage", async () => {
