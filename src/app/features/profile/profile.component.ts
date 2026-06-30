@@ -71,6 +71,15 @@ export class ProfileComponent implements OnInit {
     this.fullName().trim() || this.userEmail(),
   );
 
+  /**
+   * True when the user is a `system_admin`. Drives the per-section
+   * conditional rendering: sysadmin identity is workspace-agnostic, so the
+   * phone + avatar surfaces are hidden (they'd persist via upsertProfile
+   * which needs a workspace), and name is sourced from / saved to
+   * auth.users.raw_user_meta_data.full_name instead.
+   */
+  readonly isSysadmin = computed(() => this.role() === 'system_admin');
+
   async ngOnInit(): Promise<void> {
     // If the system-admin guard sent us here because TOTP isn't enrolled yet,
     // surface a banner so the user knows why and where to look.
@@ -88,11 +97,19 @@ export class ProfileComponent implements OnInit {
     const metaSecondary = (user as any)?.user_metadata?.secondary_email ?? '';
     this.secondaryEmail.set(metaSecondary);
 
-    const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
-    if (profile) {
-      this.fullName.set(profile.full_name ?? '');
-      this.phone.set(profile.phone ?? '');
-      this.avatarUrl.set(profile.avatar_url ?? null);
+    if (this.isSysadmin()) {
+      // Sysadmin name lives in user_metadata (platform-level identity), not
+      // in profiles (workspace-scoped). Hydrate from there and skip the
+      // workspace-scoped profile lookup entirely.
+      const metaFullName = (user as any)?.user_metadata?.full_name ?? '';
+      this.fullName.set(metaFullName);
+    } else {
+      const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
+      if (profile) {
+        this.fullName.set(profile.full_name ?? '');
+        this.phone.set(profile.phone ?? '');
+        this.avatarUrl.set(profile.avatar_url ?? null);
+      }
     }
 
     // Load MFA factors so the UI knows whether 2FA is already enabled.
@@ -103,17 +120,31 @@ export class ProfileComponent implements OnInit {
     if (this.saving()) return;
     this.saving.set(true);
     try {
-      const result = await firstValueFrom(
-        this.workspaceService.upsertProfile(
-          this.userId,
-          this.fullName().trim(),
-          this.phone().trim(),
-        ),
-      );
-      if (result.success) {
-        this.toast.success('Profil mis à jour avec succès.');
+      // Sysadmin saves name to auth.users.raw_user_meta_data.full_name (no
+      // workspace_id to anchor against). Everyone else writes to the
+      // workspace-scoped profiles row via upsertProfile.
+      if (this.isSysadmin()) {
+        const { error } = await this.supabase.client.auth.updateUser({
+          data: { full_name: this.fullName().trim() },
+        });
+        if (error) {
+          this.toast.error('Impossible de mettre à jour le profil : ' + error.message);
+        } else {
+          this.toast.success('Profil mis à jour avec succès.');
+        }
       } else {
-        this.toast.error(result.error ?? 'Impossible de mettre à jour le profil. Veuillez réessayer.');
+        const result = await firstValueFrom(
+          this.workspaceService.upsertProfile(
+            this.userId,
+            this.fullName().trim(),
+            this.phone().trim(),
+          ),
+        );
+        if (result.success) {
+          this.toast.success('Profil mis à jour avec succès.');
+        } else {
+          this.toast.error(result.error ?? 'Impossible de mettre à jour le profil. Veuillez réessayer.');
+        }
       }
     } catch {
       this.toast.error('Impossible de mettre à jour le profil. Veuillez réessayer.');

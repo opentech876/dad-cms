@@ -35,22 +35,24 @@
             {{ initials() }}
           }
         </div>
-        <label class="profile-avatar-upload-btn" title="Changer la photo de profil">
-          <tui-icon icon="@tui.camera" style="font-size:13px;" />
-          <input type="file" accept="image/jpeg,image/png,image/webp"
-                 style="display:none" (change)="onAvatarChange($event)" />
-        </label>
-        @if (avatarFile()) {
-          <button class="profile-avatar-confirm-btn btn btn-primary"
-                  type="button"
-                  [disabled]="avatarUploading()"
-                  (click)="uploadAvatar()">
-            @if (avatarUploading()) {
-              <span class="spinner" style="width:10px;height:10px;border-width:2px;"></span>
-            } @else {
-              <tui-icon icon="@tui.check" style="font-size:11px;" />
-            }
-          </button>
+        @if (!isSysadmin()) {
+          <label class="profile-avatar-upload-btn" title="Changer la photo de profil">
+            <tui-icon icon="@tui.camera" style="font-size:13px;" />
+            <input type="file" accept="image/jpeg,image/png,image/webp"
+                   style="display:none" (change)="onAvatarChange($event)" />
+          </label>
+          @if (avatarFile()) {
+            <button class="profile-avatar-confirm-btn btn btn-primary"
+                    type="button"
+                    [disabled]="avatarUploading()"
+                    (click)="uploadAvatar()">
+              @if (avatarUploading()) {
+                <span class="spinner" style="width:10px;height:10px;border-width:2px;"></span>
+              } @else {
+                <tui-icon icon="@tui.check" style="font-size:11px;" />
+              }
+            </button>
+          }
         }
       </div>
       <div class="profile-hero-info">
@@ -72,7 +74,13 @@
         </div>
         <div>
           <div class="settings-section-title">Informations personnelles</div>
-          <div class="settings-section-sub">Votre nom affiché dans l'interface et votre numéro de contact</div>
+          <div class="settings-section-sub">
+            @if (isSysadmin()) {
+              Votre nom affiché dans l'interface d'administration
+            } @else {
+              Votre nom affiché dans l'interface et votre numéro de contact
+            }
+          </div>
         </div>
       </div>
 
@@ -85,14 +93,16 @@
                    [value]="fullName()"
                    (input)="fullName.set($any($event.target).value)" />
           </div>
-          <div class="field">
-            <label class="field-label" for="phone">Téléphone</label>
-            <input id="phone" class="input" type="tel"
-                   placeholder="+242 06 000 0000"
-                   [value]="phone()"
-                   (input)="phone.set($any($event.target).value)" />
-            <span class="field-hint">Utilisé pour le contact au sein de l'équipe</span>
-          </div>
+          @if (!isSysadmin()) {
+            <div class="field">
+              <label class="field-label" for="phone">Téléphone</label>
+              <input id="phone" class="input" type="tel"
+                     placeholder="+242 06 000 0000"
+                     [value]="phone()"
+                     (input)="phone.set($any($event.target).value)" />
+              <span class="field-hint">Utilisé pour le contact au sein de l'équipe</span>
+            </div>
+          }
         </div>
       </div>
 
