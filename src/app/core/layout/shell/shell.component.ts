@@ -196,6 +196,21 @@ export class ShellComponent implements OnInit {
   readonly showProfilePassword = signal(false);
   toggleShowProfilePassword(): void { this.showProfilePassword.update(v => !v); }
 
+  // ── Sysadmin first-run setup modal ───────────────────────────────────────
+  // Separate from the workspace-scoped profile-setup modal because the
+  // seeded system_admin has no workspace and the upsertProfile path would
+  // fail with "Aucun espace de travail actif". This modal writes the name
+  // straight to auth.users.raw_user_meta_data.full_name (a true platform
+  // identity field, not workspace-scoped).
+  readonly showSysadminSetup       = signal(false);
+  readonly sysadminName            = signal('');
+  readonly sysadminPassword        = signal('');
+  readonly sysadminSaveLoading     = signal(false);
+  readonly sysadminPasswordError   = signal('');
+  readonly sysadminSaveError       = signal('');
+  readonly showSysadminPassword    = signal(false);
+  toggleShowSysadminPassword(): void { this.showSysadminPassword.update(v => !v); }
+
   /** Name of the active workspace — shown in the invitation welcome modal. */
   readonly activeWorkspaceName = signal('');
 
@@ -368,33 +383,52 @@ export class ShellComponent implements OnInit {
     this.userInitials = ((parts[0]?.[0] ?? 'A') + (parts[1]?.[0] ?? parts[0]?.[1] ?? '')).toUpperCase();
     this.userName = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 
-    try {
-      const summaries = await firstValueFrom(this.workspaceService.getWorkspaceSummaries());
-      this.workspaces.set(summaries);
-      if (summaries.length > 0) {
-        const stored = localStorage.getItem('dad-workspace-id');
-        const active = summaries.find(w => w.id === stored) ?? summaries[0];
-        this.workspaceContext.setActiveWorkspace(active.id);
-        this.activeWorkspaceName.set(active.name);
-      }
-    } catch {
-      // Workspace fetch failed — use fallback name
-    }
+    // Resolve the platform-level role early. system_admin is workspace-
+    // agnostic: it bypasses the workspace summary + per-workspace profile
+    // loading paths (which would either return empty or fail), reads its
+    // display name from auth.users.raw_user_meta_data.full_name instead.
+    const isSysadmin = await firstValueFrom(this.auth.isSystemAdmin());
 
-    try {
-      const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
-      if (profile !== null) {
-        if (profile.full_name) {
-          this.userName = profile.full_name;
-          const parts = profile.full_name.trim().split(/\s+/);
-          this.userInitials = ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'AA';
-        } else {
-          this.profilePhone.set(profile.phone ?? '');
-          this.showProfileSetup.set(true);
-        }
+    if (isSysadmin) {
+      const metaFullName = ((user as any).user_metadata?.full_name as string | undefined) ?? '';
+      if (metaFullName.trim()) {
+        this.userName = metaFullName.trim();
+        const np = metaFullName.trim().split(/\s+/);
+        this.userInitials = ((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA';
+      } else {
+        // First sysadmin sign-in: name not yet set. Surface the sysadmin
+        // setup modal — the workspace-scoped one would just fail.
+        this.showSysadminSetup.set(true);
       }
-    } catch {
-      // Profile check failed — skip setup modal
+    } else {
+      try {
+        const summaries = await firstValueFrom(this.workspaceService.getWorkspaceSummaries());
+        this.workspaces.set(summaries);
+        if (summaries.length > 0) {
+          const stored = localStorage.getItem('dad-workspace-id');
+          const active = summaries.find(w => w.id === stored) ?? summaries[0];
+          this.workspaceContext.setActiveWorkspace(active.id);
+          this.activeWorkspaceName.set(active.name);
+        }
+      } catch {
+        // Workspace fetch failed — use fallback name
+      }
+
+      try {
+        const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
+        if (profile !== null) {
+          if (profile.full_name) {
+            this.userName = profile.full_name;
+            const np = profile.full_name.trim().split(/\s+/);
+            this.userInitials = ((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA';
+          } else {
+            this.profilePhone.set(profile.phone ?? '');
+            this.showProfileSetup.set(true);
+          }
+        }
+      } catch {
+        // Profile check failed — skip setup modal
+      }
     }
 
     try {
@@ -406,6 +440,45 @@ export class ShellComponent implements OnInit {
 
     const pwdSet = await this.supabase.hasPasswordSet();
     this.hasPasswordNotSet.set(!pwdSet);
+  }
+
+  /**
+   * Save handler for the sysadmin first-run setup modal. Writes the chosen
+   * name to auth.users.raw_user_meta_data.full_name (true platform identity,
+   * not workspace-scoped) and sets the initial password in one
+   * `auth.updateUser` call. Password is required — sysadmin needs a
+   * non-OTP login path because the free-plan OTP quota is 2/h.
+   */
+  async saveSysadminSetup(): Promise<void> {
+    if (!this.sysadminName().trim() || this.sysadminSaveLoading()) return;
+    const pwd = this.sysadminPassword();
+    if (!pwd || pwd.length < 8) {
+      this.sysadminPasswordError.set('Le mot de passe doit comporter au moins 8 caractères.');
+      return;
+    }
+    this.sysadminPasswordError.set('');
+    this.sysadminSaveError.set('');
+    this.sysadminSaveLoading.set(true);
+
+    const fullName = this.sysadminName().trim();
+    const { error } = await this.supabase.client.auth.updateUser({
+      data:     { full_name: fullName },
+      password: pwd,
+    });
+
+    if (error) {
+      this.sysadminSaveError.set("Échec de l'enregistrement : " + error.message);
+      this.sysadminSaveLoading.set(false);
+      return;
+    }
+
+    this.supabase.markPasswordSet();
+    this.hasPasswordNotSet.set(false);
+    this.userName = fullName;
+    const np = fullName.split(/\s+/);
+    this.userInitials = ((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA';
+    this.sysadminSaveLoading.set(false);
+    this.showSysadminSetup.set(false);
   }
 
   private applyTitleFromUrl(url: string | undefined | null): void {

@@ -342,6 +342,68 @@
   </div>
 }
 
+<!-- Sysadmin first-run setup modal — shown for system_admin without a name
+     set in user_metadata yet. Workspace-agnostic, writes to auth.users
+     directly (no profiles table). -->
+@if (showSysadminSetup()) {
+  <div class="modal-backdrop" style="z-index:300;">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Bienvenue, Administrateur</span>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:var(--fg-3); margin-bottom:16px;">
+          Pour terminer la configuration de votre compte, renseignez votre nom et
+          choisissez un mot de passe. Vous pourrez activer la double authentification
+          ensuite depuis votre profil — elle sera exigée à l'entrée dans l'administration.
+        </p>
+        <div class="field" style="margin-bottom:14px;">
+          <label class="field-label">Nom complet *</label>
+          <input class="input" type="text" placeholder="Prénom Nom"
+                 [value]="sysadminName()" (input)="sysadminName.set($any($event.target).value)"
+                 autocomplete="name" />
+        </div>
+        <div class="field" style="margin-bottom:20px;">
+          <label class="field-label">Mot de passe *</label>
+          <div style="position:relative;">
+            <input class="input" [type]="showSysadminPassword() ? 'text' : 'password'"
+                   placeholder="8 caractères minimum"
+                   [value]="sysadminPassword()" (input)="sysadminPassword.set($any($event.target).value)"
+                   autocomplete="new-password" minlength="8"
+                   style="padding-right:42px;" />
+            <button type="button" class="shell-eye-btn"
+                    (click)="toggleShowSysadminPassword()"
+                    [attr.aria-label]="showSysadminPassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+                    tabindex="-1">
+              <tui-icon [icon]="showSysadminPassword() ? '@tui.eye-off' : '@tui.eye'" style="font-size:15px;" />
+            </button>
+          </div>
+          <span class="field-hint">
+            Définir un mot de passe vous évite de recevoir un code par e-mail à chaque connexion.
+          </span>
+          @if (sysadminPasswordError()) {
+            <span style="color: var(--danger); font-size: 12px; margin-top: 4px; display: block;">
+              {{ sysadminPasswordError() }}
+            </span>
+          }
+        </div>
+        @if (sysadminSaveError()) {
+          <p style="color: var(--danger); font-size: 13px; margin: 0 0 12px;">
+            {{ sysadminSaveError() }}
+          </p>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-sm" type="button" (click)="saveSysadminSetup()"
+                [disabled]="!sysadminName().trim() || sysadminPassword().length < 8 || sysadminSaveLoading()">
+          @if (sysadminSaveLoading()) { <span class="spinner"></span> }
+          Enregistrer
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
 <!-- Profile setup modal — shown when invited user has no full_name yet -->
 @if (showProfileSetup()) {
   <div class="modal-backdrop" style="z-index:300;">

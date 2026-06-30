@@ -30,6 +30,7 @@ describe('ShellComponent — navigation par rôle', () => {
     role: AppRole | null,
     profileOverride?: { full_name: string | null; phone: string | null; avatar_url: string | null },
     workspacesOverride?: WorkspaceSummary[],
+    opts?: { isSysadmin?: boolean; userMetadata?: Record<string, unknown>; updateUserResult?: any },
   ): void {
     roleSubject = new BehaviorSubject<AppRole | null>(role);
     mockRouter = {
@@ -50,6 +51,7 @@ describe('ShellComponent — navigation par rôle', () => {
       activeWorkspaceId: jest.fn().mockReturnValue('ws-1'),
       setActiveWorkspace: jest.fn(),
     };
+    const updateUserSpy = jest.fn().mockResolvedValue(opts?.updateUserResult ?? { data: { user: {} }, error: null });
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -59,9 +61,13 @@ describe('ShellComponent — navigation par rôle', () => {
           provide: AuthService,
           useValue: {
             currentRole$: roleSubject.asObservable(),
-            getCurrentUser: jest.fn().mockReturnValue(of({ id: 'mock-user-id', email: 'test@example.com' })),
+            getCurrentUser: jest.fn().mockReturnValue(of({
+              id: 'mock-user-id',
+              email: 'test@example.com',
+              user_metadata: opts?.userMetadata ?? {},
+            })),
             signOut: jest.fn().mockReturnValue(of(null)),
-            isSystemAdmin: jest.fn().mockReturnValue(of(false)),
+            isSystemAdmin: jest.fn().mockReturnValue(of(opts?.isSysadmin ?? false)),
           },
         },
         {
@@ -86,6 +92,7 @@ describe('ShellComponent — navigation par rôle', () => {
             updatePassword: jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
             markPasswordSet: jest.fn(),
             hasPasswordSet: jest.fn().mockResolvedValue(false),
+            client: { auth: { updateUser: updateUserSpy } },
           },
         },
         {
@@ -392,6 +399,91 @@ describe('ShellComponent — navigation par rôle', () => {
 
       // MOCK_WORKSPACES[0].name is "Mon Espace" by convention
       expect(component.activeWorkspaceName()).toBeTruthy();
+    });
+  });
+
+  // ── sysadmin first-run setup modal ─────────────────────────────────────────
+
+  describe('modal de configuration sysadmin (première connexion)', () => {
+    it("affiche le modal sysadmin quand l'utilisateur est system_admin et que user_metadata.full_name est vide", async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: {},
+      });
+      await component.ngOnInit();
+      expect(component.showSysadminSetup()).toBe(true);
+      // Le modal workspace-scoped ne doit PAS apparaître pour un sysadmin sans workspace
+      expect(component.showProfileSetup()).toBe(false);
+    });
+
+    it("n'affiche PAS le modal sysadmin si user_metadata.full_name est déjà renseigné", async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'Elvis Destin OLEMBE' },
+      });
+      await component.ngOnInit();
+      expect(component.showSysadminSetup()).toBe(false);
+      // Le nom doit être hydraté depuis user_metadata
+      expect(component.userName).toBe('Elvis Destin OLEMBE');
+    });
+
+    it("saveSysadminSetup appelle auth.updateUser avec full_name et password", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: {} });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.sysadminName.set('Elvis Destin OLEMBE');
+      component.sysadminPassword.set('motdepasse123');
+
+      await component.saveSysadminSetup();
+
+      expect(supabase.client.auth.updateUser).toHaveBeenCalledWith({
+        data: { full_name: 'Elvis Destin OLEMBE' },
+        password: 'motdepasse123',
+      });
+      expect(supabase.markPasswordSet).toHaveBeenCalled();
+      expect(component.showSysadminSetup()).toBe(false);
+      expect(component.userName).toBe('Elvis Destin OLEMBE');
+    });
+
+    it("saveSysadminSetup refuse un mot de passe trop court et garde le modal ouvert", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: {} });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.sysadminName.set('Alice');
+      component.sysadminPassword.set('court');
+
+      await component.saveSysadminSetup();
+
+      expect(supabase.client.auth.updateUser).not.toHaveBeenCalled();
+      expect(component.sysadminPasswordError()).toContain('8 caractères');
+      expect(component.showSysadminSetup()).toBe(true);
+    });
+
+    it("saveSysadminSetup expose une erreur si updateUser échoue", async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: {},
+        updateUserResult: { data: null, error: { message: 'API down' } },
+      });
+      await component.ngOnInit();
+      component.sysadminName.set('Alice');
+      component.sysadminPassword.set('motdepasse123');
+
+      await component.saveSysadminSetup();
+
+      expect(component.sysadminSaveError()).toContain('API down');
+      expect(component.showSysadminSetup()).toBe(true);
+    });
+
+    it("ne charge ni les workspaces ni le profil workspace-scoped pour un sysadmin", async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'Existing' },
+      });
+      await component.ngOnInit();
+
+      expect(mockWorkspace.getWorkspaceSummaries).not.toHaveBeenCalled();
+      expect(mockWorkspace.getMyProfile).not.toHaveBeenCalled();
     });
   });
 
