@@ -101,4 +101,24 @@ export class AdminService {
       map(({ error }: any) => (error ? { success: false, error: error.message } : { success: true })),
     );
   }
+
+  /**
+   * system_admin invites an `owner` (UI label: "Administrateur") into the
+   * target workspace. The `role` field is fixed server-side — sysadmin can
+   * only invite at this tier through this entry point, not arbitrary roles.
+   * Delegates to the same invite-user Edge Function regular workspace
+   * inviters use; the EF distinguishes inviter type and applies the right
+   * authorization branch.
+   */
+  inviteManager(workspaceId: string, email: string): Observable<{ success: boolean; error?: string }> {
+    return from(
+      this.supabase.invoke<{ id: string; email: string }>('invite-user', {
+        email,
+        role: 'owner',
+        workspace_id: workspaceId,
+      }),
+    ).pipe(
+      map(({ error }) => (error ? { success: false, error: error.message } : { success: true })),
+    );
+  }
 }

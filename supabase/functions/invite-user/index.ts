@@ -15,6 +15,14 @@ const VALID_ROLES = [
   'chef_equipe_commerciale',
 ];
 
+// Roles a workspace owner / chef_equipe is NEVER allowed to mint via this
+// flow. `owner` and `system_admin` are platform-management concerns:
+//   • `owner` (UI: "Administrateur" of a workspace) is reserved for
+//     system_admin — the platform admin chooses who runs each workspace.
+//   • `system_admin` is not invitable from this endpoint at all; it's only
+//     ever seeded via bootstrap.sql or promoted by an existing sysadmin.
+const WORKSPACE_INVITER_FORBIDDEN_ROLES = ['owner', 'system_admin'];
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -39,12 +47,14 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', user.id)
       .single();
 
-    if (!roleData || !['owner', 'chef_equipe'].includes(roleData.role)) {
-      throw new Error('Accès refusé : rôle owner ou chef_equipe requis');
+    if (!roleData || !['system_admin', 'owner', 'chef_equipe'].includes(roleData.role)) {
+      throw new Error('Accès refusé : rôle insuffisant');
     }
     if (roleData.expires_at && new Date(roleData.expires_at) < new Date()) {
       throw new Error('Session expirée — reconnectez-vous');
     }
+
+    const isSysadmin = roleData.role === 'system_admin';
 
     const { email, role, redirectTo, workspace_id } = await req.json();
 
@@ -54,21 +64,39 @@ Deno.serve(async (req: Request) => {
       throw new Error("L'identifiant de l'espace de travail est requis");
     }
 
-    // Verify the inviter is actually a member of the target workspace AND has
-    // permission inside that workspace. The global user_roles check above is
-    // a coarse gate; this is the per-workspace gate that prevents an owner of
-    // workspace A from inviting into workspace B.
-    const { data: inviterMembership } = await supabase
-      .from('workspace_members')
-      .select('role')
-      .eq('workspace_id', workspace_id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!inviterMembership || !['owner', 'chef_equipe'].includes(inviterMembership.role)) {
+    // Role-mint authorization (the meat of the "who can grant what" rule):
+    //   • system_admin invites only `owner` (the "Administrateur" of a
+    //     workspace, called Manager-tier in the UI labels we use elsewhere).
+    //   • workspace inviters (owner / chef_equipe) cannot mint `owner` or
+    //     `system_admin` — platform-management roles stay platform-managed.
+    if (isSysadmin && role !== 'owner') {
       throw new Error(
-        "Vous devez être propriétaire ou chef d'équipe de cet espace pour y inviter quelqu'un",
+        "Un administrateur plateforme ne peut inviter qu'un Administrateur d'espace",
       );
+    }
+    if (!isSysadmin && WORKSPACE_INVITER_FORBIDDEN_ROLES.includes(role)) {
+      throw new Error(
+        "Seul un administrateur plateforme peut désigner un Administrateur d'espace",
+      );
+    }
+
+    // Per-workspace membership check. system_admin is platform-level and is
+    // by design NOT a member of the workspaces it manages — skip the check
+    // for them. Workspace inviters must still be owner/chef_equipe of the
+    // target workspace, so an owner of workspace A can't invite into B.
+    if (!isSysadmin) {
+      const { data: inviterMembership } = await supabase
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', workspace_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!inviterMembership || !['owner', 'chef_equipe'].includes(inviterMembership.role)) {
+        throw new Error(
+          "Vous devez être propriétaire ou chef d'équipe de cet espace pour y inviter quelqu'un",
+        );
+      }
     }
 
     // Send the invite. Stash the role + workspace_id in user_metadata so the

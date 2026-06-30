@@ -38,6 +38,15 @@ export class AdminComponent implements OnInit {
   readonly renameValue    = signal('');
   readonly renameSaving   = signal(false);
 
+  // Invite-manager modal (sysadmin-only path to mint a workspace `owner`)
+  readonly inviteWorkspaceId   = signal<string | null>(null);
+  readonly inviteWorkspaceName = signal('');
+  readonly inviteEmail         = signal('');
+  readonly inviteSaving        = signal(false);
+  readonly inviteError         = signal('');
+  readonly inviteSuccess       = signal('');
+  readonly showInviteModal = computed(() => this.inviteWorkspaceId() !== null);
+
   async ngOnInit(): Promise<void> {
     await this.reload();
   }
@@ -133,6 +142,45 @@ export class AdminComponent implements OnInit {
       }
     } finally {
       this.renameSaving.set(false);
+    }
+  }
+
+  // ── Invite manager (system_admin → owner) ─────────────────────────────
+
+  openInviteManager(workspaceId: string, workspaceName: string): void {
+    this.inviteWorkspaceId.set(workspaceId);
+    this.inviteWorkspaceName.set(workspaceName);
+    this.inviteEmail.set('');
+    this.inviteError.set('');
+    this.inviteSuccess.set('');
+  }
+
+  closeInviteManager(): void {
+    if (this.inviteSaving()) return;
+    this.inviteWorkspaceId.set(null);
+    this.inviteWorkspaceName.set('');
+    this.inviteEmail.set('');
+    this.inviteError.set('');
+    this.inviteSuccess.set('');
+  }
+
+  async submitInviteManager(): Promise<void> {
+    const workspaceId = this.inviteWorkspaceId();
+    const email = this.inviteEmail().trim();
+    if (!workspaceId || !email || this.inviteSaving()) return;
+    this.inviteSaving.set(true);
+    this.inviteError.set('');
+    this.inviteSuccess.set('');
+    try {
+      const res = await firstValueFrom(this.admin.inviteManager(workspaceId, email));
+      if (!res.success) {
+        this.inviteError.set(res.error ?? "Échec de l'invitation.");
+        return;
+      }
+      this.inviteSuccess.set(`Invitation envoyée à ${email}.`);
+      this.inviteEmail.set('');
+    } finally {
+      this.inviteSaving.set(false);
     }
   }
 
