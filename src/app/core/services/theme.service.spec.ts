@@ -172,12 +172,15 @@ describe('ThemeService', () => {
       expect(svc.theme()).toBe('archive');
     });
 
-    it("utilise 'system' comme mode par défaut si localStorage est vide", () => {
+    it("utilise 'light' comme mode par défaut si localStorage est vide", () => {
+      // The default was changed from 'system' to 'light' to give the app a
+      // predictable light-first identity. Users on dark-preferring OSes who
+      // want dark can pick it explicitly; their choice persists.
       localStorage.clear();
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({});
       const svc = TestBed.inject(ThemeService);
-      expect(svc.colorMode()).toBe('system');
+      expect(svc.colorMode()).toBe('light');
     });
   });
 

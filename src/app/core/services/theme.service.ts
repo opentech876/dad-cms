@@ -9,7 +9,12 @@ const STORAGE_KEY_MODE  = 'dad-color-mode';
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   readonly theme    = signal<ThemeId>  (this._load(STORAGE_KEY_THEME,  'archive')  as ThemeId);
-  readonly colorMode = signal<ColorMode>(this._load(STORAGE_KEY_MODE,  'system')   as ColorMode);
+  // Default to explicit 'light' rather than 'system': the app's editorial
+  // identity is light-first, and the dark variant has known contrast traps
+  // we haven't audited end-to-end yet. Users on dark-preferring OSes who
+  // want dark can still pick it from the theme settings; their choice is
+  // persisted in localStorage and takes precedence over this default.
+  readonly colorMode = signal<ColorMode>(this._load(STORAGE_KEY_MODE,  'light')    as ColorMode);
 
   constructor() {
     effect(() => this._apply(this.theme(), this.colorMode()));
