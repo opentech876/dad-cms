@@ -40,7 +40,7 @@
           font-weight: 600;
         "
       >
-        Propriétaires
+        Administrateurs
       </div>
       <div
         style="
@@ -191,7 +191,7 @@
     </div>
     <select class="select" style="width: 170px; height: 36px; font-size: 13px">
       <option>Tous les rôles</option>
-      <option>Propriétaire</option>
+      <option>Administrateur</option>
       <option>Chef d'équipe</option>
       <option>Éditeur</option>
       <option>Chargé comm.</option>
@@ -266,7 +266,7 @@
                 </td>
                 <td>
                   @if (user.role === 'owner') {
-                    <span class="badge badge-accent">★ Propriétaire</span>
+                    <span class="badge badge-accent">★ Administrateur</span>
                   }
                   @if (user.role === 'chef_equipe') {
                     <span class="badge badge-info">Chef d'équipe</span>
@@ -459,7 +459,7 @@
         <thead>
           <tr>
             <th>Action</th>
-            <th style="text-align: center">Propriétaire</th>
+            <th style="text-align: center">Administrateur</th>
             <th style="text-align: center">Chef d'équipe</th>
             <th style="text-align: center">Éditeur</th>
             <th style="text-align: center">Chargé comm.</th>

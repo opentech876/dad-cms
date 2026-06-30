@@ -10,7 +10,7 @@ import { SupabaseService } from '../../core/supabase/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
 
 const ROLE_LABELS: Record<AppRole, string> = {
-  owner:                   'Propriétaire',
+  owner:                   'Administrateur',
   chef_equipe:             "Chef d'équipe",
   editeur:                 'Éditeur',
   charge_communication:    'Chargé de communication',
