@@ -1,7 +1,8 @@
 <div class="shell"
      [class.shell--collapsed]="collapsed() && !isMobile()"
      [class.shell--mobile]="isMobile()"
-     [class.shell--mobile-open]="mobileOpen()">
+     [class.shell--mobile-open]="mobileOpen()"
+     [attr.data-platform-mode]="inPlatformMode() ? 'true' : null">
   @if (isMobile() && mobileOpen()) {
     <div class="shell-mobile-backdrop" (click)="closeMobileSidebar()"></div>
   }

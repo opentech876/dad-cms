@@ -723,6 +723,16 @@ describe('ShellComponent — navigation par rôle', () => {
       await component.switchWorkspace('ws-1');
       expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
     });
+
+    it("inPlatformMode reste faux pour un non-sysadmin même sur une URL /admin", async () => {
+      // A non-admin shouldn't be able to reach /admin (systemAdminGuard blocks
+      // them), but if the URL signal is mis-set for any reason, the styling
+      // pivot must NOT engage.
+      createComponent('owner');
+      await component.ngOnInit();
+      component.currentUrl.set('/admin');
+      expect(component.inPlatformMode()).toBe(false);
+    });
   });
 
   // ── workspace context ─────────────────────────────────────────────────────
