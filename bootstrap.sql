@@ -56,9 +56,18 @@ BEGIN
 
     -- Confirmed e-mail user with no password. OTP / magic-link is the only
     -- sign-in path until the operator sets a password in the profile modal.
+    --
+    -- Token columns set to '' explicitly: they're nullable in Postgres but
+    -- GoTrue's Go layer refuses to scan NULLs into string fields, so a fresh
+    -- seed with NULLs makes every subsequent /otp and /token request 500 with
+    -- "converting NULL to string is unsupported".
     INSERT INTO auth.users (
       instance_id, id, aud, role, email, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+      raw_app_meta_data, raw_user_meta_data,
+      confirmation_token, recovery_token,
+      email_change, email_change_token_new, email_change_token_current,
+      reauthentication_token, phone_change, phone_change_token,
+      created_at, updated_at
     ) VALUES (
       '00000000-0000-0000-0000-000000000000',
       v_user_id,
@@ -68,11 +77,28 @@ BEGIN
       now(),
       '{"provider":"email","providers":["email"]}'::jsonb,
       '{}'::jsonb,                       -- no `role` key: handle_new_user assigns nothing
+      '', '',                            -- confirmation_token, recovery_token
+      '', '', '',                        -- email_change*, email_change_token_new/_current
+      '', '', '',                        -- reauthentication_token, phone_change, phone_change_token
       now(),
       now()
     )
     ON CONFLICT (id) DO NOTHING;
   END IF;
+
+  -- Repair pass: if a previous run inserted the auth.users row before this
+  -- patch existed (or any other path left NULLs in these columns), backfill
+  -- to '' so GoTrue can scan the row without crashing.
+  UPDATE auth.users
+  SET confirmation_token         = COALESCE(confirmation_token,         ''),
+      recovery_token             = COALESCE(recovery_token,             ''),
+      email_change_token_new     = COALESCE(email_change_token_new,     ''),
+      email_change_token_current = COALESCE(email_change_token_current, ''),
+      email_change               = COALESCE(email_change,               ''),
+      reauthentication_token     = COALESCE(reauthentication_token,     ''),
+      phone_change               = COALESCE(phone_change,               ''),
+      phone_change_token         = COALESCE(phone_change_token,         '')
+  WHERE id = v_user_id;
 
   -- ── Identity row (outside the IF so a partial previous run is repaired). ──
   -- Without an auth.identities row for the email provider, GoTrue rejects
