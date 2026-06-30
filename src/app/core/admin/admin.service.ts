@@ -3,6 +3,26 @@ import { Observable, from } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { SupabaseService } from '../supabase/supabase.service';
 
+/** Aggregate platform-level stats returned by admin_dashboard_stats(). */
+export interface AdminDashboardStats {
+  workspaces: { active: number; deleted: number };
+  users: { total: number; confirmed: number; pending: number; system_admins: number };
+  recent_workspaces: Array<{
+    id: string;
+    name: string;
+    created_at: string;
+    deleted_at: string | null;
+    member_count: number;
+  }>;
+  pending_invitations: Array<{
+    id: string;
+    email: string | null;
+    created_at: string;
+    invited_role: string;
+    workspace_id: string | null;
+  }>;
+}
+
 /** A row in the system_admin workspaces table view. */
 export interface AdminWorkspace {
   id: string;
@@ -46,6 +66,20 @@ export interface AdminUser {
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   private supabase = inject(SupabaseService);
+
+  /**
+   * One-round-trip platform stats for /admin (the dashboard landing).
+   * The RPC asserts system_admin server-side; the caller already passed the
+   * systemAdminGuard, so this is belt-and-suspenders.
+   */
+  dashboardStats(): Observable<AdminDashboardStats> {
+    return from(this.supabase.client.rpc('admin_dashboard_stats')).pipe(
+      map(({ data, error }: any) => {
+        if (error) throw error;
+        return data as AdminDashboardStats;
+      }),
+    );
+  }
 
   listAllUsers(): Observable<AdminUser[]> {
     return from(this.supabase.client.rpc('admin_list_all_users')).pipe(

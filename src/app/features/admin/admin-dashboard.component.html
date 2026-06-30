@@ -1,0 +1,131 @@
+<div class="admin-dashboard">
+
+  <header class="admin-dashboard-header">
+    <div>
+      <h1 class="admin-dashboard-title">Administration plateforme</h1>
+      <p class="admin-dashboard-sub">Vue d'ensemble cross-workspace.</p>
+    </div>
+    <div class="admin-dashboard-actions">
+      <button class="btn btn-flat btn-sm" type="button" (click)="reload()" [disabled]="loading()">
+        <tui-icon icon="@tui.refresh-cw" style="font-size:14px;" />
+        Rafraîchir
+      </button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="admin-dashboard-loading">
+      <span class="spinner"></span> Chargement…
+    </div>
+  } @else if (error(); as err) {
+    <div class="admin-dashboard-error">
+      <tui-icon icon="@tui.alert-triangle" style="font-size:16px;" />
+      <span>{{ err }}</span>
+    </div>
+  } @else if (stats(); as s) {
+
+    <!-- ── KPI tiles ──────────────────────────────────────────────────────── -->
+    <div class="admin-kpi-grid">
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-card-icon">
+          <tui-icon icon="@tui.building" style="font-size:20px;" />
+        </div>
+        <div>
+          <div class="admin-kpi-card-value">{{ s.workspaces.active }}</div>
+          <div class="admin-kpi-card-label">Espaces actifs</div>
+        </div>
+        @if (s.workspaces.deleted > 0) {
+          <div class="admin-kpi-card-sub">{{ s.workspaces.deleted }} archivé(s)</div>
+        }
+      </div>
+
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-card-icon">
+          <tui-icon icon="@tui.users" style="font-size:20px;" />
+        </div>
+        <div>
+          <div class="admin-kpi-card-value">{{ s.users.total }}</div>
+          <div class="admin-kpi-card-label">Utilisateurs</div>
+        </div>
+        <div class="admin-kpi-card-sub">
+          {{ s.users.confirmed }} actif(s) · {{ s.users.pending }} en attente
+        </div>
+      </div>
+
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-card-icon">
+          <tui-icon icon="@tui.shield" style="font-size:20px;" />
+        </div>
+        <div>
+          <div class="admin-kpi-card-value">{{ s.users.system_admins }}</div>
+          <div class="admin-kpi-card-label">Administrateur(s) plateforme</div>
+        </div>
+      </div>
+
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-card-icon">
+          <tui-icon icon="@tui.user-check" style="font-size:20px;" />
+        </div>
+        <div>
+          <div class="admin-kpi-card-value">{{ totalMemberships() }}</div>
+          <div class="admin-kpi-card-label">Membres (toutes workspaces)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Two-column lists ──────────────────────────────────────────────── -->
+    <div class="admin-dashboard-columns">
+
+      <!-- Recent workspaces -->
+      <section class="admin-list-card">
+        <header class="admin-list-card-header">
+          <h2 class="admin-list-card-title">Espaces récents</h2>
+          <a routerLink="/admin/espaces" class="admin-list-card-link">Tout afficher →</a>
+        </header>
+        @if (s.recent_workspaces.length === 0) {
+          <div class="admin-list-empty">Aucun espace de travail créé pour le moment.</div>
+        } @else {
+          <ul class="admin-list">
+            @for (w of s.recent_workspaces; track w.id) {
+              <li class="admin-list-item" [class.admin-list-item--deleted]="!!w.deleted_at">
+                <div class="admin-list-item-main">
+                  <span class="admin-list-item-name">{{ w.name }}</span>
+                  <span class="admin-list-item-meta">
+                    {{ w.member_count }} membre(s)
+                    @if (w.deleted_at) { · supprimé }
+                  </span>
+                </div>
+                <span class="admin-list-item-date">{{ w.created_at | date:'shortDate':'':'fr' }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      <!-- Pending invitations -->
+      <section class="admin-list-card">
+        <header class="admin-list-card-header">
+          <h2 class="admin-list-card-title">Invitations en attente</h2>
+          <a routerLink="/admin/utilisateurs" class="admin-list-card-link">Tout afficher →</a>
+        </header>
+        @if (s.pending_invitations.length === 0) {
+          <div class="admin-list-empty">Aucune invitation en attente.</div>
+        } @else {
+          <ul class="admin-list">
+            @for (inv of s.pending_invitations; track inv.id) {
+              <li class="admin-list-item">
+                <div class="admin-list-item-main">
+                  <span class="admin-list-item-name">{{ inv.email }}</span>
+                  <span class="admin-list-item-meta">
+                    @if (inv.invited_role) { Rôle : {{ inv.invited_role }} }
+                  </span>
+                </div>
+                <span class="admin-list-item-date">{{ inv.created_at | date:'shortDate':'':'fr' }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    </div>
+  }
+</div>

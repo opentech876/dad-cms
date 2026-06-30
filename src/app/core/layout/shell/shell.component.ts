@@ -344,8 +344,9 @@ export class ShellComponent implements OnInit {
     id: 'plateforme',
     label: 'Plateforme',
     items: [
-      { id: 'admin',             label: 'Espaces de travail', icon: '@tui.shield', path: '/admin',             roles: [] },
-      { id: 'admin-utilisateurs', label: 'Tous les utilisateurs', icon: '@tui.users', path: '/admin/utilisateurs', roles: [] },
+      { id: 'admin-dashboard',    label: 'Tableau de bord',       icon: '@tui.layout-dashboard', path: '/admin',              roles: [] },
+      { id: 'admin-espaces',      label: 'Espaces de travail',    icon: '@tui.building',         path: '/admin/espaces',      roles: [] },
+      { id: 'admin-utilisateurs', label: 'Tous les utilisateurs', icon: '@tui.users',            path: '/admin/utilisateurs', roles: [] },
     ],
   };
 
@@ -380,7 +381,8 @@ export class ShellComponent implements OnInit {
     profil:              'Mon profil',
     parametres:          'Paramètres',
     'espace-de-travail': 'Espace de travail',
-    admin:                   'Administration plateforme · Espaces',
+    admin:                   'Administration plateforme · Tableau de bord',
+    'admin/espaces':         'Administration plateforme · Espaces',
     'admin/utilisateurs':    'Administration plateforme · Utilisateurs',
   };
 

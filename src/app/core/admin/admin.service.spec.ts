@@ -75,6 +75,26 @@ describe('AdminService', () => {
     expect(rpc).toHaveBeenCalledWith('admin_restore_workspace', { p_workspace_id: 'ws-1' });
   });
 
+  describe('dashboardStats()', () => {
+    it('appelle admin_dashboard_stats et renvoie le payload', async () => {
+      const payload = {
+        workspaces: { active: 1, deleted: 0 },
+        users: { total: 1, confirmed: 1, pending: 0, system_admins: 1 },
+        recent_workspaces: [],
+        pending_invitations: [],
+      };
+      rpc.mockResolvedValueOnce({ data: payload, error: null });
+      const res = await firstValueFrom(service.dashboardStats());
+      expect(rpc).toHaveBeenCalledWith('admin_dashboard_stats');
+      expect(res).toEqual(payload);
+    });
+
+    it("propage l'erreur RPC", async () => {
+      rpc.mockResolvedValueOnce({ data: null, error: new Error('Rôle system_admin requis') });
+      await expect(firstValueFrom(service.dashboardStats())).rejects.toThrow('system_admin');
+    });
+  });
+
   describe('inviteManager()', () => {
     it("invoque l'EF invite-user avec role='owner' (sysadmin → manager)", async () => {
       invoke.mockResolvedValueOnce({ data: { id: 'u-2', email: 'mgr@x.com' }, error: null });

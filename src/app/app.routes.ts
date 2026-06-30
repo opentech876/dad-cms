@@ -137,6 +137,12 @@ export const routes: Routes = [
         path: 'admin',
         canActivate: [systemAdminGuard],
         loadComponent: () =>
+          import('./features/admin/admin-dashboard.component').then((m) => m.AdminDashboardComponent),
+      },
+      {
+        path: 'admin/espaces',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
           import('./features/admin/admin.component').then((m) => m.AdminComponent),
       },
       {

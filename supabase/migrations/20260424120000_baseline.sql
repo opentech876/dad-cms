@@ -656,6 +656,54 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_create_workspace(text, uuid) TO authenticated;
 
+-- One-round-trip platform-level stats that power the /admin landing dashboard.
+-- Returns a JSONB blob with workspaces (active/deleted counts), users (total,
+-- confirmed, pending, system_admins), the 5 most recent workspaces and the 5
+-- most recent pending invitations. system_admin-only via _assert_system_admin.
+CREATE OR REPLACE FUNCTION public.admin_dashboard_stats()
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_result jsonb;
+BEGIN
+  PERFORM public._assert_system_admin();
+  SELECT jsonb_build_object(
+    'workspaces', jsonb_build_object(
+      'active',  (SELECT COUNT(*) FROM public.workspaces WHERE deleted_at IS NULL),
+      'deleted', (SELECT COUNT(*) FROM public.workspaces WHERE deleted_at IS NOT NULL)
+    ),
+    'users', jsonb_build_object(
+      'total',         (SELECT COUNT(*) FROM auth.users),
+      'confirmed',     (SELECT COUNT(*) FROM auth.users WHERE email_confirmed_at IS NOT NULL),
+      'pending',       (SELECT COUNT(*) FROM auth.users WHERE email_confirmed_at IS NULL),
+      'system_admins', (SELECT COUNT(*) FROM public.user_roles WHERE role = 'system_admin')
+    ),
+    'recent_workspaces', COALESCE((
+      SELECT jsonb_agg(row_to_json(t))
+      FROM (
+        SELECT w.id, w.name, w.created_at, w.deleted_at,
+               (SELECT COUNT(*) FROM public.workspace_members wm WHERE wm.workspace_id = w.id) AS member_count
+        FROM public.workspaces w
+        ORDER BY w.created_at DESC
+        LIMIT 5
+      ) t
+    ), '[]'::jsonb),
+    'pending_invitations', COALESCE((
+      SELECT jsonb_agg(row_to_json(t))
+      FROM (
+        SELECT u.id, u.email, u.created_at,
+               COALESCE((u.raw_user_meta_data ->> 'role'), '') AS invited_role,
+               (u.raw_user_meta_data ->> 'workspace_id') AS workspace_id
+        FROM auth.users u
+        WHERE u.email_confirmed_at IS NULL
+        ORDER BY u.created_at DESC
+        LIMIT 5
+      ) t
+    ), '[]'::jsonb)
+  ) INTO v_result;
+  RETURN v_result;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_dashboard_stats() TO authenticated;
+
 -- Returns every user that exists in the platform, with the workspaces they
 -- belong to and their roles per workspace. Powers /admin/utilisateurs.
 CREATE OR REPLACE FUNCTION public.admin_list_all_users()
