@@ -227,8 +227,10 @@
   <div class="shell-main">
     <!-- Topbar -->
     <!-- Thin colored stripe at the very top, derived from active workspace.
-         Visual anchor: same workspace = same color across all sessions. -->
-    @if (currentWorkspaceColor()) {
+         Visual anchor: same workspace = same color across all sessions.
+         Hidden in platform-admin mode (there is no "active workspace"
+         when the sysadmin is operating cross-workspace). -->
+    @if (!inPlatformMode() && currentWorkspaceColor()) {
       <div class="topbar-workspace-stripe" [style.background]="currentWorkspaceColor()"></div>
     }
     <header class="topbar">
@@ -244,7 +246,10 @@
       }
       <div class="topbar-title-row">
         <h1 class="topbar-title">{{ pageTitle() }}</h1>
-        @if (currentWorkspace(); as ws) {
+        <!-- Workspace-scoped pill next to the page title. Hidden in
+             platform-admin mode: the sysadmin is not operating inside
+             any workspace, so showing the last-used one is misleading. -->
+        @if (!inPlatformMode() && currentWorkspace(); as ws) {
           <span class="topbar-workspace-badge" [title]="'Espace actif : ' + ws.name">
             <span class="topbar-workspace-dot" [style.background]="currentWorkspaceColor()"></span>
             {{ ws.name }}
