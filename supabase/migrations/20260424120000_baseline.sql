@@ -722,8 +722,12 @@ BEGIN
   PERFORM public._assert_system_admin();
   RETURN QUERY
   WITH any_profile AS (
-    SELECT DISTINCT ON (user_id) user_id, full_name
-    FROM public.profiles ORDER BY user_id, created_at ASC
+    -- Qualify with the alias — user_id / created_at are also OUT parameters
+    -- of the enclosing RETURNS TABLE(...), so unqualified references are
+    -- ambiguous and Postgres refuses to plan the query.
+    SELECT DISTINCT ON (pf.user_id) pf.user_id, pf.full_name
+    FROM public.profiles pf
+    ORDER BY pf.user_id, pf.created_at ASC
   ),
   ws_list AS (
     SELECT wm.user_id,
