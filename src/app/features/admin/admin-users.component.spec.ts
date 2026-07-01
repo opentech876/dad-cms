@@ -1,6 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AdminUsersComponent } from './admin-users.component';
 import { AdminService, AdminUser } from '../../core/admin/admin.service';
 
@@ -72,5 +72,24 @@ describe('AdminUsersComponent', () => {
   it('compte les system_admin', async () => {
     await component.ngOnInit();
     expect(component.systemAdminCount()).toBe(1);
+  });
+
+  it('remplit la bannière d\'erreur et vide la liste si le RPC échoue', async () => {
+    admin.listAllUsers.mockReturnValueOnce(throwError(() => new Error('boom')));
+    await component.ngOnInit();
+    expect(component.error()).toBe('boom');
+    expect(component.users()).toEqual([]);
+    expect(component.loading()).toBe(false);
+  });
+
+  it('reload() efface l\'erreur et recharge les données', async () => {
+    admin.listAllUsers.mockReturnValueOnce(throwError(() => new Error('boom')));
+    await component.ngOnInit();
+    expect(component.error()).toBe('boom');
+
+    admin.listAllUsers.mockReturnValueOnce(of(FAKE_USERS));
+    await component.reload();
+    expect(component.error()).toBeNull();
+    expect(component.users().length).toBe(3);
   });
 });

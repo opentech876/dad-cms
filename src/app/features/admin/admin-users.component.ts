@@ -17,6 +17,7 @@ export class AdminUsersComponent implements OnInit {
   readonly loading     = signal(true);
   readonly users       = signal<AdminUser[]>([]);
   readonly searchQuery = signal('');
+  readonly error       = signal<string | null>(null);
 
   readonly filteredUsers = computed(() => {
     const q = this.searchQuery().trim().toLowerCase();
@@ -34,11 +35,22 @@ export class AdminUsersComponent implements OnInit {
   readonly orphanCount      = computed(() => this.users().filter(u => u.memberships.length === 0).length);
 
   async ngOnInit(): Promise<void> {
+    await this.reload();
+  }
+
+  async reload(): Promise<void> {
     this.loading.set(true);
+    this.error.set(null);
     try {
       const users = await firstValueFrom(this.admin.listAllUsers());
       this.users.set(users);
-    } catch {
+    } catch (e: any) {
+      // Previously this silently reset users to []. That left the page
+      // showing "no users" with no clue why — hiding the actual failure
+      // (auth, RLS, network). Surface both the console error and a
+      // human-readable banner so we can debug from the UI.
+      console.error('[admin-users] listAllUsers failed:', e);
+      this.error.set(e?.message ?? 'Impossible de charger la liste des utilisateurs.');
       this.users.set([]);
     } finally {
       this.loading.set(false);
