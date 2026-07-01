@@ -53,7 +53,7 @@
         <p>Aucune notification</p>
       </div>
     } @else {
-      @for (notif of filtered(); track notif.id; let first = $first) {
+      @for (notif of paged(); track notif.id; let first = $first) {
         <div
           class="notif-item"
           [class.notif-item--unread]="!notif.read_at"
@@ -88,5 +88,47 @@
       }
     }
   </div>
+
+  <!-- ── Pagination ── -->
+  @if (!loading() && totalPages() > 1) {
+    <nav class="notif-pagination" aria-label="Pagination des notifications">
+      <span class="notif-pagination-range">{{ pageRangeLabel() }}</span>
+      <div class="notif-pagination-controls">
+        <button class="notif-page-btn"
+                type="button"
+                [disabled]="currentPage() === 1"
+                (click)="goToPage(1)"
+                title="Première page"
+                aria-label="Première page">
+          <tui-icon icon="@tui.chevrons-left" style="font-size:14px;" />
+        </button>
+        <button class="notif-page-btn"
+                type="button"
+                [disabled]="currentPage() === 1"
+                (click)="goToPage(currentPage() - 1)"
+                title="Page précédente"
+                aria-label="Page précédente">
+          <tui-icon icon="@tui.chevron-left" style="font-size:14px;" />
+        </button>
+        <span class="notif-page-label">Page {{ currentPage() }} / {{ totalPages() }}</span>
+        <button class="notif-page-btn"
+                type="button"
+                [disabled]="currentPage() === totalPages()"
+                (click)="goToPage(currentPage() + 1)"
+                title="Page suivante"
+                aria-label="Page suivante">
+          <tui-icon icon="@tui.chevron-right" style="font-size:14px;" />
+        </button>
+        <button class="notif-page-btn"
+                type="button"
+                [disabled]="currentPage() === totalPages()"
+                (click)="goToPage(totalPages())"
+                title="Dernière page"
+                aria-label="Dernière page">
+          <tui-icon icon="@tui.chevrons-right" style="font-size:14px;" />
+        </button>
+      </div>
+    </nav>
+  }
 
 </div>
