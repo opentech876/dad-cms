@@ -43,14 +43,6 @@ export const routes: Routes = [
         (m) => m.EmailConfirmedComponent,
       ),
   },
-  {
-    path: 'verifier-2fa',
-    loadComponent: () =>
-      import('./features/auth/mfa-challenge/mfa-challenge.component').then(
-        (m) => m.MfaChallengeComponent,
-      ),
-  },
-
   // ── Workspace (auth requise, pas d'onboardingGuard — c'est la destination) ─
   {
     path: 'espaces',

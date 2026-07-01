@@ -117,27 +117,14 @@ describe('LoginComponent', () => {
     });
   });
 
-  describe('redirection 2FA après connexion', () => {
+  describe('après connexion par mot de passe', () => {
     beforeEach(() => {
       component.form.controls.email.setValue('a@b.cg');
       component.form.controls.password.setValue('motdepasse123');
     });
 
-    it("navigue vers /verifier-2fa quand un facteur TOTP vérifié existe", async () => {
-      mockSupabase.listMfaFactors.mockResolvedValueOnce({
-        data: { totp: [{ id: 'f1', status: 'verified' }], phone: [] },
-        error: null,
-      });
-      await component.submit();
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/verifier-2fa']);
-      expect(mockRouter.navigate).not.toHaveBeenCalledWith(['/dashboard']);
-    });
-
-    it("ignore les facteurs non vérifiés et va directement au dashboard", async () => {
-      mockSupabase.listMfaFactors.mockResolvedValueOnce({
-        data: { totp: [{ id: 'f1', status: 'unverified' }], phone: [] },
-        error: null,
-      });
+    // MFA is currently disabled. Password sign-in always goes to /dashboard.
+    it("navigue toujours vers /dashboard (pas de détour /verifier-2fa)", async () => {
       await component.submit();
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/dashboard']);
     });

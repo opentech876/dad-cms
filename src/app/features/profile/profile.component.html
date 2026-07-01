@@ -8,19 +8,8 @@
     <span class="profile-topbar-title">Mon profil</span>
   </div>
 
-  <!-- ── system_admin AAL2 gate banner ── -->
-  @if (mfaRequiredBanner()) {
-    <div class="profile-pending-box"
-         style="margin: 12px 0; background: var(--warning-soft, rgba(217,143,21,0.08)); border: 1px solid rgba(217,143,21,0.3); color: var(--warning, #b76c00); padding: 14px 16px; border-radius: 6px; display: flex; gap: 12px; align-items: flex-start;">
-      <tui-icon icon="@tui.shield-alert" style="font-size:20px; flex-shrink:0; margin-top:2px;" />
-      <div style="flex:1; font-size:13.5px; line-height:1.5;">
-        <strong style="display:block; margin-bottom:4px;">Double authentification requise</strong>
-        L'accès à l'espace d'administration exige l'activation de la double authentification.
-        Activez-la dans la section <strong>Double authentification</strong> ci-dessous, puis
-        retournez à <a routerLink="/admin" style="color:inherit; text-decoration:underline;">l'administration</a>.
-      </div>
-    </div>
-  }
+  <!-- (MFA disabled — the AAL2 gate banner + Double authentification section
+       were removed. See systemAdminGuard for the disable note.) -->
 
   <!-- ── Hero + Personal info (one visual card) ── -->
   <div class="profile-section-stack profile-section-stack--hero">
@@ -285,83 +274,9 @@
       </button>
     </div>
 
-    <!-- ── Double authentification (TOTP) ── -->
-    <div class="settings-section">
-      <div class="settings-section-header">
-        <div class="settings-section-icon">
-          <tui-icon icon="@tui.shield-check" style="font-size:18px;" />
-        </div>
-        <div>
-          <div class="settings-section-title">Double authentification</div>
-          <div class="settings-section-sub">
-            Ajoutez une couche de sécurité supplémentaire à votre compte avec une application
-            d'authentification (Google Authenticator, Authy, 1Password…).
-          </div>
-        </div>
-      </div>
+    <!-- MFA section removed (feature disabled). The TS-side methods are
+         kept so re-enabling is a one-block un-comment. -->
 
-      @if (mfaEnrolled() && !mfaPendingFactor()) {
-        <div class="profile-pending-box" style="background:var(--success-soft); border-color:rgba(34,120,60,0.2); color:var(--success);">
-          <tui-icon icon="@tui.check-circle" style="font-size:18px; flex-shrink:0;" />
-          <div style="flex:1;">
-            <strong>Double authentification activée.</strong>
-            Un code à 6 chiffres vous sera demandé à chaque connexion.
-          </div>
-          @for (f of mfaFactors(); track f.id) {
-            @if (f.status === 'verified') {
-              <button class="btn btn-flat btn-sm" type="button" style="color:var(--danger);"
-                      (click)="disableMfa(f.id)">
-                Désactiver
-              </button>
-            }
-          }
-        </div>
-      } @else if (mfaPendingFactor(); as pending) {
-        <div style="display:flex; flex-direction:column; gap:14px;">
-          <p style="font-size:13px; color:var(--fg-2); line-height:1.55; margin:0;">
-            <strong>1.</strong> Ouvrez votre application d'authentification et scannez ce QR code,
-            ou copiez le secret manuellement :
-          </p>
-          <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
-            <img [src]="pending.qr" alt="QR code" style="width:160px; height:160px; border:1px solid var(--border-1); border-radius:8px; padding:6px; background:#fff;" />
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label class="field-label">Secret (saisie manuelle)</label>
-              <code style="font-family:var(--font-mono); font-size:13px; padding:8px 10px; background:var(--bg-sunken); border:1px solid var(--border-1); border-radius:4px; letter-spacing:0.08em;">
-                {{ pending.secret }}
-              </code>
-            </div>
-          </div>
-          <div class="field" style="margin-top:6px;">
-            <label class="field-label">2. Saisissez le code à 6 chiffres affiché par votre application</label>
-            <input class="input" type="text" inputmode="numeric" maxlength="6"
-                   placeholder="123 456"
-                   style="font-family:var(--font-mono); letter-spacing:0.3em; font-size:18px;"
-                   [value]="mfaCode()" (input)="mfaCode.set($any($event.target).value)"
-                   (keydown.enter)="confirmMfaEnrollment()" />
-          </div>
-          @if (mfaError()) {
-            <div style="color:var(--danger); font-size:12.5px;">{{ mfaError() }}</div>
-          }
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-primary btn-sm" type="button"
-                    [disabled]="mfaCode().length < 6"
-                    (click)="confirmMfaEnrollment()">
-              Activer la double authentification
-            </button>
-            <button class="btn btn-flat btn-sm" type="button" (click)="cancelMfaEnrollment()">
-              Annuler
-            </button>
-          </div>
-        </div>
-      } @else {
-        <button class="btn btn-primary btn-sm" type="button"
-                [disabled]="mfaEnrolling()"
-                (click)="startMfaEnrollment()">
-          @if (mfaEnrolling()) { <span class="spinner"></span> }
-          Activer la double authentification
-        </button>
-      }
-    </div>
   </div>
 
 </div>
