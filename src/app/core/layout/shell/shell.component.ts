@@ -389,16 +389,17 @@ export class ShellComponent implements OnInit {
   };
 
   /** "Compte" utility section — Profil / Paramètres / Notifications.
-   *  Rendered ONLY in platform mode (workspace mode already surfaces those
-   *  items via the existing per-domain sections; adding a Compte section
-   *  there would duplicate them). */
+   *  Rendered ONLY in platform mode. The paths point at /admin/* aliases
+   *  (defined in app.routes.ts) so clicking them keeps the URL under
+   *  /admin and inPlatformMode stays true — otherwise the shell would
+   *  drop back into workspace mode and the palette would revert. */
   private readonly accountSection: NavSection = {
     id: 'compte',
     label: 'Compte',
     items: [
-      { id: 'notifications', label: 'Notifications', icon: '@tui.bell',     path: '/notifications', roles: [] },
-      { id: 'profil',        label: 'Mon profil',    icon: '@tui.user',     path: '/profil',        roles: [] },
-      { id: 'parametres',    label: 'Paramètres',    icon: '@tui.settings', path: '/parametres',    roles: [] },
+      { id: 'admin-notifications', label: 'Notifications', icon: '@tui.bell',     path: '/admin/notifications', roles: [] },
+      { id: 'admin-profil',        label: 'Mon profil',    icon: '@tui.user',     path: '/admin/profil',        roles: [] },
+      { id: 'admin-parametres',    label: 'Paramètres',    icon: '@tui.settings', path: '/admin/parametres',    roles: [] },
     ],
   };
 
@@ -447,6 +448,9 @@ export class ShellComponent implements OnInit {
     admin:                   'Administration plateforme · Tableau de bord',
     'admin/espaces':         'Administration plateforme · Espaces',
     'admin/utilisateurs':    'Administration plateforme · Utilisateurs',
+    'admin/notifications':   'Administration plateforme · Notifications',
+    'admin/profil':          'Administration plateforme · Mon profil',
+    'admin/parametres':      'Administration plateforme · Paramètres',
   };
 
   async ngOnInit(): Promise<void> {

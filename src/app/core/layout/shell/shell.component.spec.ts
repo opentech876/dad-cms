@@ -760,10 +760,12 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(paths).not.toContain('/dashboard');
       expect(paths).not.toContain('/calendrier');
       expect(paths).not.toContain('/evenements');
-      // Mais les items Compte (profil, paramètres, notifications) sont là
-      expect(paths).toContain('/profil');
-      expect(paths).toContain('/parametres');
-      expect(paths).toContain('/notifications');
+      // Les items Compte pointent sur les alias /admin/* pour rester
+      // en mode plateforme (sinon inPlatformMode retombe à false et le
+      // thème repasse en mode workspace).
+      expect(paths).toContain('/admin/profil');
+      expect(paths).toContain('/admin/parametres');
+      expect(paths).toContain('/admin/notifications');
     });
 
     it("en mode workspace, la sidebar montre les sections workspace (pas la section Plateforme)", async () => {

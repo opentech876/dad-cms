@@ -138,9 +138,9 @@
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 11px; flex: none;
 }
-.sidebar-workspace-info { display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; }
-.sidebar-workspace-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sidebar-workspace-sub { font-size: 10px; color: var(--sidebar-fg); opacity: 0.7; }
+.sidebar-workspace-info { display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; max-width: 100%; overflow: hidden; }
+.sidebar-workspace-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.sidebar-workspace-sub  { font-size: 10px; color: var(--sidebar-fg); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* Nav */
 .sidebar-nav {
