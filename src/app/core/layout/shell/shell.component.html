@@ -66,7 +66,13 @@
                 type="button"
                 [attr.aria-expanded]="workspaceMenuOpen()"
                 (click)="toggleWorkspaceMenu()">
-          <div class="sidebar-workspace-icon">{{ workspaceInitials() }}</div>
+          <div class="sidebar-workspace-icon"
+               [style.background]="inPlatformMode()
+                 ? 'linear-gradient(135deg, #1d4ed8, #3b82f6)'
+                 : (currentWorkspaceColor() ?? 'var(--sidebar-accent)')"
+               [style.color]="'#fff'">
+            {{ workspaceInitials() }}
+          </div>
           <div class="sidebar-workspace-info">
             <span class="sidebar-workspace-name">{{ workspaceName() }}</span>
             <span class="sidebar-workspace-sub">{{ workspaceMemberLabel() }}</span>
@@ -130,7 +136,12 @@
                              color:var(--fg-1); font-size:13px;"
                       onmouseover="this.style.background='var(--bg-sunken)'"
                       onmouseout="this.style.background='transparent'">
-                <div class="sidebar-workspace-icon" style="width:28px; height:28px; font-size:11px;">
+                <div class="sidebar-workspace-icon"
+                     [style.width.px]="28"
+                     [style.height.px]="28"
+                     [style.font-size.px]="11"
+                     [style.background]="workspaceColorFor(w.id)"
+                     [style.color]="'#fff'">
                   {{ workspaceInitialsFor(w.name) }}
                 </div>
                 <div style="display:flex; flex-direction:column; min-width:0; flex:1;">

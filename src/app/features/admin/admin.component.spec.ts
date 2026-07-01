@@ -22,7 +22,7 @@ describe('AdminComponent', () => {
   let component: AdminComponent;
   let fixture: ComponentFixture<AdminComponent>;
   let admin: jest.Mocked<Pick<AdminService, 'listWorkspaces' | 'createWorkspace' | 'softDeleteWorkspace' | 'restoreWorkspace' | 'renameWorkspace' | 'inviteManager'>>;
-  let mockContext: { setActiveWorkspace: jest.Mock };
+  let mockContext: { setActiveWorkspace: jest.Mock; notifyWorkspacesChanged: jest.Mock };
   let mockRouter: { navigate: jest.Mock };
   let mockReuse: { triggerRefresh: jest.Mock };
 
@@ -35,7 +35,7 @@ describe('AdminComponent', () => {
       renameWorkspace:     jest.fn().mockReturnValue(of({ success: true })),
       inviteManager:       jest.fn().mockReturnValue(of({ success: true })),
     };
-    mockContext = { setActiveWorkspace: jest.fn() };
+    mockContext = { setActiveWorkspace: jest.fn(), notifyWorkspacesChanged: jest.fn() };
     mockRouter  = { navigate: jest.fn() };
     mockReuse   = { triggerRefresh: jest.fn() };
 

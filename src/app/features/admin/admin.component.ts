@@ -88,6 +88,8 @@ export class AdminComponent implements OnInit {
       if (!res.success) { this.createError.set(res.error ?? 'Échec de la création.'); return; }
       this.showCreateModal.set(false);
       await this.reload();
+      // Nudge the shell so its switcher dropdown picks the new row up.
+      this.context.notifyWorkspacesChanged();
     } finally {
       this.createSaving.set(false);
     }
@@ -98,7 +100,10 @@ export class AdminComponent implements OnInit {
     this.busyWorkspaceId.set(workspaceId);
     try {
       const res = await firstValueFrom(this.admin.softDeleteWorkspace(workspaceId));
-      if (res.success) await this.reload();
+      if (res.success) {
+        await this.reload();
+        this.context.notifyWorkspacesChanged();
+      }
     } finally {
       this.busyWorkspaceId.set(null);
     }
@@ -109,7 +114,10 @@ export class AdminComponent implements OnInit {
     this.busyWorkspaceId.set(workspaceId);
     try {
       const res = await firstValueFrom(this.admin.restoreWorkspace(workspaceId));
-      if (res.success) await this.reload();
+      if (res.success) {
+        await this.reload();
+        this.context.notifyWorkspacesChanged();
+      }
     } finally {
       this.busyWorkspaceId.set(null);
     }
@@ -137,6 +145,7 @@ export class AdminComponent implements OnInit {
       const res = await firstValueFrom(this.admin.renameWorkspace(id, name));
       if (res.success) {
         await this.reload();
+        this.context.notifyWorkspacesChanged();
         this.renameTargetId.set(null);
         this.renameValue.set('');
       }

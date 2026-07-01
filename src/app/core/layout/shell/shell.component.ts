@@ -83,11 +83,20 @@ export class ShellComponent implements OnInit {
   readonly currentWorkspaceColor = computed<string | null>(() => {
     const ws = this.currentWorkspace();
     if (!ws) return null;
+    return this.workspaceColorFor(ws.id);
+  });
+
+  /**
+   * Deterministic hue per workspace id. Same id → same color forever, so
+   * the switcher dropdown items keep their color across sessions and the
+   * user can build "blue = Tenant A, orange = Tenant B" muscle memory.
+   */
+  workspaceColorFor(id: string): string {
     let hash = 0;
-    for (let i = 0; i < ws.id.length; i++) hash = (hash * 31 + ws.id.charCodeAt(i)) | 0;
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
     const hue = Math.abs(hash) % 360;
     return `hsl(${hue}, 62%, 52%)`;
-  });
+  }
   /**
    * Current URL, kept reactive via the NavigationEnd subscription in
    * ngOnInit. Drives the "platform mode" detection — when the URL is under
@@ -166,6 +175,27 @@ export class ShellComponent implements OnInit {
     const target = this.inPlatformMode() ? '/dashboard' : this.router.url;
     this.routeReuse.triggerRefresh();
     await this.router.navigateByUrl(target);
+  }
+
+  /**
+   * Fetch the caller's workspace memberships and repopulate the switcher.
+   * Idempotent: safe to call at any time (initial load, workspacesChanged$
+   * emission, post-create in /admin/espaces, etc.). Preserves whatever
+   * workspace was active if it still exists in the list.
+   */
+  private async _reloadWorkspaceSummaries(): Promise<void> {
+    try {
+      const summaries = await firstValueFrom(this.workspaceService.getWorkspaceSummaries());
+      this.workspaces.set(summaries);
+      if (summaries.length > 0) {
+        const stored = localStorage.getItem('dad-workspace-id');
+        const active = summaries.find(w => w.id === stored) ?? summaries[0];
+        this.workspaceContext.setActiveWorkspace(active.id);
+        this.activeWorkspaceName.set(active.name);
+      }
+    } catch {
+      // Non-blocking — leave whatever we had cached.
+    }
   }
 
   /**
@@ -473,20 +503,16 @@ export class ShellComponent implements OnInit {
         // setup modal — the workspace-scoped one would just fail.
         this.showSysadminSetup.set(true);
       }
-    } else {
-      try {
-        const summaries = await firstValueFrom(this.workspaceService.getWorkspaceSummaries());
-        this.workspaces.set(summaries);
-        if (summaries.length > 0) {
-          const stored = localStorage.getItem('dad-workspace-id');
-          const active = summaries.find(w => w.id === stored) ?? summaries[0];
-          this.workspaceContext.setActiveWorkspace(active.id);
-          this.activeWorkspaceName.set(active.name);
-        }
-      } catch {
-        // Workspace fetch failed — use fallback name
-      }
+    }
 
+    // Load workspace summaries for BOTH branches. A sysadmin can also be a
+    // member of one or more workspaces (either invited as manager, or
+    // impersonating into a workspace to help operate it) — they need the
+    // switcher to be populated. For a sysadmin with zero memberships the
+    // fetch just returns [] and nothing changes.
+    await this._reloadWorkspaceSummaries();
+
+    if (!isSysadmin) {
       try {
         const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
         if (profile !== null) {
@@ -503,6 +529,11 @@ export class ShellComponent implements OnInit {
         // Profile check failed — skip setup modal
       }
     }
+
+    // Live-reload the switcher whenever a workspace is created / renamed /
+    // soft-deleted from anywhere in the app (currently /admin/espaces).
+    this.workspaceContext.workspacesChanged$
+      .subscribe(() => { void this._reloadWorkspaceSummaries(); });
 
     try {
       const count = await firstValueFrom(this.notifService.unreadCount());

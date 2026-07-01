@@ -1,6 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { BehaviorSubject, EMPTY, of } from 'rxjs';
+import { BehaviorSubject, EMPTY, of, Subject } from 'rxjs';
 import { Router } from '@angular/router';
 import { ShellComponent } from './shell.component';
 import { AuthService } from '../../auth/auth.service';
@@ -20,7 +20,12 @@ describe('ShellComponent — navigation par rôle', () => {
   let mockWorkspace: { getMyProfile: jest.Mock; upsertProfile: jest.Mock; getWorkspaceSummaries: jest.Mock };
   let mockRouter: { events: any; navigate: jest.Mock; navigateByUrl: jest.Mock; url: string };
   let mockRouteReuse: { triggerRefresh: jest.Mock };
-  let mockWorkspaceContext: { activeWorkspaceId: jest.Mock; setActiveWorkspace: jest.Mock };
+  let mockWorkspaceContext: {
+    activeWorkspaceId: jest.Mock;
+    setActiveWorkspace: jest.Mock;
+    workspacesChanged$: Subject<void>;
+    notifyWorkspacesChanged: jest.Mock;
+  };
 
   const MOCK_WORKSPACES: WorkspaceSummary[] = [
     { id: 'ws-1', name: 'DIOUGA-DIOP Media', logo_url: null, member_count: 5, last_accessed_at: null },
@@ -47,9 +52,12 @@ describe('ShellComponent — navigation par rôle', () => {
       upsertProfile: jest.fn().mockReturnValue(of({ success: true })),
       getWorkspaceSummaries: jest.fn().mockReturnValue(of(workspacesOverride ?? MOCK_WORKSPACES)),
     };
+    const workspacesChanged$ = new Subject<void>();
     mockWorkspaceContext = {
       activeWorkspaceId: jest.fn().mockReturnValue('ws-1'),
       setActiveWorkspace: jest.fn(),
+      workspacesChanged$,
+      notifyWorkspacesChanged: jest.fn(() => workspacesChanged$.next()),
     };
     const updateUserSpy = jest.fn().mockResolvedValue(opts?.updateUserResult ?? { data: { user: {} }, error: null });
 
@@ -475,14 +483,19 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(component.showSysadminSetup()).toBe(true);
     });
 
-    it("ne charge ni les workspaces ni le profil workspace-scoped pour un sysadmin", async () => {
+    it("ne charge PAS le profil workspace-scoped pour un sysadmin (mais bien la liste des workspaces)", async () => {
+      // The sysadmin can also be a member of one or more workspaces (invited
+      // as manager, or impersonating). We load the summaries so the switcher
+      // is populated; we skip getMyProfile because sysadmin identity lives
+      // in auth.users.raw_user_meta_data, not in the workspace-scoped
+      // profiles table.
       createComponent(null, undefined, undefined, {
         isSysadmin: true,
         userMetadata: { full_name: 'Existing' },
       });
       await component.ngOnInit();
 
-      expect(mockWorkspace.getWorkspaceSummaries).not.toHaveBeenCalled();
+      expect(mockWorkspace.getWorkspaceSummaries).toHaveBeenCalled();
       expect(mockWorkspace.getMyProfile).not.toHaveBeenCalled();
     });
   });
@@ -760,6 +773,36 @@ describe('ShellComponent — navigation par rôle', () => {
       const sectionIds = component.visibleNavSections().map(s => s.id);
       expect(sectionIds).not.toContain('plateforme');
       expect(sectionIds).not.toContain('compte');
+    });
+  });
+
+  // ── workspace switcher: live-reload + color coding ─────────────────────────
+
+  describe('switcher live-reload et couleurs', () => {
+    it("workspaceColorFor renvoie une couleur HSL déterministe par id", () => {
+      createComponent('owner');
+      const c1 = component.workspaceColorFor('ws-abc');
+      const c2 = component.workspaceColorFor('ws-abc');
+      const c3 = component.workspaceColorFor('ws-xyz');
+      expect(c1).toMatch(/^hsl\(\d+, 62%, 52%\)$/);
+      expect(c1).toBe(c2);
+      expect(c1).not.toBe(c3);
+    });
+
+    it("recharge les workspaces quand notifyWorkspacesChanged est déclenché", async () => {
+      createComponent('owner');
+      await component.ngOnInit();
+      // Fresh mock so we count only post-init calls
+      mockWorkspace.getWorkspaceSummaries.mockClear();
+      mockWorkspaceContext.notifyWorkspacesChanged();
+      // The subscribe callback calls the async _reloadWorkspaceSummaries;
+      // let its firstValueFrom + set() settle before we assert.
+      await Promise.resolve();
+      await Promise.resolve();
+      // NB: ngOnInit runs twice in this test bed (once via fixture.detectChanges,
+      // once via the explicit await), so there are two subscribers — hence 2
+      // reloads per emit. In production there's only one.
+      expect(mockWorkspace.getWorkspaceSummaries).toHaveBeenCalled();
     });
   });
 
