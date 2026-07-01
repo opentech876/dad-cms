@@ -90,14 +90,21 @@ export class ShellComponent implements OnInit {
   });
   /**
    * Current URL, kept reactive via the NavigationEnd subscription in
-   * ngOnInit. Drives the "platform mode" detection — when the sysadmin is
-   * on /admin/* the workspace switcher displays "Administration plateforme"
-   * as the active entry, even if they also belong to one or more workspaces.
+   * ngOnInit. Drives the "platform mode" detection — when the URL is under
+   * /admin, the sidebar + switcher pivot to platform-admin appearance.
    */
   readonly currentUrl = signal(this.router.url);
-  readonly inPlatformMode = computed(() =>
-    this.isSystemAdmin() && this.currentUrl().startsWith('/admin'),
-  );
+
+  /**
+   * True when the URL is under /admin. Deliberately does NOT re-check
+   * `isSystemAdmin()` — `systemAdminGuard` has already blocked any
+   * non-sysadmin from reaching that URL. Removing the isSystemAdmin
+   * dependency also eliminates a first-frame race: on a hard load of
+   * /admin the async user_roles query returns `false` initially, and
+   * gating on it made the sidebar flash the workspace layout before
+   * settling on the platform layout.
+   */
+  readonly inPlatformMode = computed(() => this.currentUrl().startsWith('/admin'));
 
   readonly workspaceName = computed(() =>
     this.inPlatformMode()
@@ -337,30 +344,56 @@ export class ShellComponent implements OnInit {
     },
   ];
 
-  /** Platform-level admin section, only surfaced when the user has the
-   *  global system_admin role. It sits outside the per-workspace sections
-   *  because system_admin is by design not workspace-scoped. */
+  /** Platform-level admin section — only rendered while the sysadmin is
+   *  in platform mode (URL under /admin). Labels are explicit about being
+   *  "plateforme" so if a mode transition renders both sections briefly,
+   *  the two "Tableau de bord" links are still distinguishable. */
   private readonly platformSection: NavSection = {
     id: 'plateforme',
     label: 'Plateforme',
     items: [
-      { id: 'admin-dashboard',    label: 'Tableau de bord',       icon: '@tui.layout-dashboard', path: '/admin',              roles: [] },
-      { id: 'admin-espaces',      label: 'Espaces de travail',    icon: '@tui.building',         path: '/admin/espaces',      roles: [] },
-      { id: 'admin-utilisateurs', label: 'Tous les utilisateurs', icon: '@tui.users',            path: '/admin/utilisateurs', roles: [] },
+      { id: 'admin-dashboard',    label: 'Tableau de bord plateforme', icon: '@tui.layout-dashboard', path: '/admin',              roles: [] },
+      { id: 'admin-espaces',      label: 'Espaces de travail',         icon: '@tui.building',         path: '/admin/espaces',      roles: [] },
+      { id: 'admin-utilisateurs', label: 'Tous les utilisateurs',      icon: '@tui.users',            path: '/admin/utilisateurs', roles: [] },
     ],
   };
 
+  /** "Compte" utility section — Profil / Paramètres / Notifications.
+   *  Rendered ONLY in platform mode (workspace mode already surfaces those
+   *  items via the existing per-domain sections; adding a Compte section
+   *  there would duplicate them). */
+  private readonly accountSection: NavSection = {
+    id: 'compte',
+    label: 'Compte',
+    items: [
+      { id: 'notifications', label: 'Notifications', icon: '@tui.bell',     path: '/notifications', roles: [] },
+      { id: 'profil',        label: 'Mon profil',    icon: '@tui.user',     path: '/profil',        roles: [] },
+      { id: 'parametres',    label: 'Paramètres',    icon: '@tui.settings', path: '/parametres',    roles: [] },
+    ],
+  };
+
+  /**
+   * Mode-aware sidebar:
+   *   • platform mode → platformSection + accountSection only. Workspace
+   *     items don't belong here — clicking one would just teleport the
+   *     user out of admin.
+   *   • workspace mode → the existing role-filtered workspace sections.
+   *     platformSection intentionally hidden even for a sysadmin; they
+   *     re-enter platform mode via the workspace switcher's "Administration
+   *     plateforme" entry.
+   */
   readonly visibleNavSections = computed<NavSection[]>(() => {
+    if (this.inPlatformMode()) {
+      return [this.platformSection, this.accountSection];
+    }
     const role = this.currentRole();
     if (!role && !this.isSystemAdmin()) return [];
-    const sections = this.navSections
+    return this.navSections
       .map(s => ({
         ...s,
         items: s.items.filter((i: NavItem) => i.roles.length === 0 || (role ? i.roles.includes(role) : false)),
       }))
       .filter(s => s.items.length > 0);
-    // Prepend the platform-admin section when the user is a system_admin.
-    return this.isSystemAdmin() ? [this.platformSection, ...sections] : sections;
   });
 
   /** Flat list of all role-visible nav items, in section order. Useful for cross-checks. */

@@ -724,14 +724,42 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
     });
 
-    it("inPlatformMode reste faux pour un non-sysadmin même sur une URL /admin", async () => {
-      // A non-admin shouldn't be able to reach /admin (systemAdminGuard blocks
-      // them), but if the URL signal is mis-set for any reason, the styling
-      // pivot must NOT engage.
+    // inPlatformMode is now purely URL-driven — systemAdminGuard blocks
+    // non-sysadmins from ever reaching /admin, so we trust the URL and
+    // avoid an isSystemAdmin race on first paint.
+    it("inPlatformMode ne dépend que de l'URL (le guard filtre les rôles)", async () => {
       createComponent('owner');
       await component.ngOnInit();
       component.currentUrl.set('/admin');
+      expect(component.inPlatformMode()).toBe(true);
+      component.currentUrl.set('/dashboard');
       expect(component.inPlatformMode()).toBe(false);
+    });
+
+    it("en mode plateforme, la sidebar montre UNIQUEMENT Plateforme + Compte (pas les sections workspace)", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/admin');
+      const sectionIds = component.visibleNavSections().map(s => s.id);
+      expect(sectionIds).toEqual(['plateforme', 'compte']);
+      // Aucun item workspace-scoped (dashboard, calendrier, evenements, etc.)
+      const paths = component.visibleNavItems().map(i => i.path);
+      expect(paths).not.toContain('/dashboard');
+      expect(paths).not.toContain('/calendrier');
+      expect(paths).not.toContain('/evenements');
+      // Mais les items Compte (profil, paramètres, notifications) sont là
+      expect(paths).toContain('/profil');
+      expect(paths).toContain('/parametres');
+      expect(paths).toContain('/notifications');
+    });
+
+    it("en mode workspace, la sidebar montre les sections workspace (pas la section Plateforme)", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/dashboard');
+      const sectionIds = component.visibleNavSections().map(s => s.id);
+      expect(sectionIds).not.toContain('plateforme');
+      expect(sectionIds).not.toContain('compte');
     });
   });
 
