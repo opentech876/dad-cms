@@ -456,9 +456,15 @@ export class ShellComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     // Wire the topbar-title subscription FIRST so we don't miss any NavigationEnd
     // that fires while the rest of ngOnInit awaits profile / workspace data.
-    // Also seed from the current URL since the initial NavigationEnd may have
-    // already fired by the time this component instantiates.
+    // Also seed BOTH the title and currentUrl from router.url — the initial
+    // NavigationEnd may have already fired before this component instantiated,
+    // and the property-initializer read of router.url (line above signal())
+    // can happen before Angular's initial navigation resolves, leaving
+    // currentUrl at '/'. That would keep inPlatformMode false on hard reloads
+    // of /admin, causing the switcher to render the previous workspace's
+    // color/name instead of the platform "AP" icon.
     this.applyTitleFromUrl(this.router.url);
+    this.currentUrl.set(this.router.url);
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
     ).subscribe(e => {

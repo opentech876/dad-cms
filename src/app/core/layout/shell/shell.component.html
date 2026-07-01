@@ -74,8 +74,8 @@
             {{ workspaceInitials() }}
           </div>
           <div class="sidebar-workspace-info">
-            <span class="sidebar-workspace-name">{{ workspaceName() }}</span>
-            <span class="sidebar-workspace-sub">{{ workspaceMemberLabel() }}</span>
+            <span class="sidebar-workspace-name" [title]="workspaceName()">{{ workspaceName() }}</span>
+            <span class="sidebar-workspace-sub" [title]="workspaceMemberLabel()">{{ workspaceMemberLabel() }}</span>
           </div>
           <tui-icon
             [icon]="workspaceMenuOpen() ? '@tui.chevron-up' : '@tui.chevron-down'"
@@ -95,6 +95,7 @@
             @if (isSystemAdmin() && !inPlatformMode()) {
               <button role="menuitem"
                       type="button"
+                      title="Administration plateforme · Cross-workspace"
                       (click)="enterPlatformMode()"
                       style="display:flex; align-items:center; gap:10px; width:100%;
                              padding:8px 10px; border:none; background:transparent;
@@ -129,6 +130,7 @@
             @for (w of otherWorkspaces(); track w.id) {
               <button role="menuitem"
                       type="button"
+                      [title]="w.name"
                       (click)="switchWorkspace(w.id)"
                       style="display:flex; align-items:center; gap:10px; width:100%;
                              padding:8px 10px; border:none; background:transparent;
