@@ -146,15 +146,18 @@
                     }
                   </td>
                   <td>
-                    @if (user.memberships.length === 0) {
+                    <!-- Hide deleted-workspace memberships: they're noise
+                         and take up space that a busy operator doesn't
+                         need. Deletion events belong in the audit log. -->
+                    @let activeMs = activeMemberships(user);
+                    @if (activeMs.length === 0) {
                       <span class="admin-users-tag admin-users-tag--warning">Aucun</span>
                     } @else {
                       <div class="admin-users-ws-tags">
-                        @for (m of user.memberships; track m.workspace_id) {
+                        @for (m of activeMs; track m.workspace_id) {
                           <span class="admin-users-tag"
                                 [class.admin-users-tag--owner]="m.role === 'owner'"
-                                [class.admin-users-tag--deleted]="m.deleted"
-                                [attr.title]="m.role + (m.deleted ? ' · espace supprimé' : '')">
+                                [attr.title]="'Rôle : ' + m.role">
                             {{ m.workspace_name }}
                             <span class="admin-users-tag-sub">· {{ m.role }}</span>
                           </span>

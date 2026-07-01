@@ -298,7 +298,6 @@
   &--success { background: var(--success-soft, rgba(34,197,94,0.1)); color: var(--success); border-color: transparent; }
   &--warning { background: var(--warning-soft, rgba(234,179,8,0.12)); color: var(--warning); border-color: transparent; }
   &--danger  { background: var(--danger-soft,  rgba(239,68,68,0.1));  color: var(--danger);  border-color: transparent; }
-  &--deleted { opacity: 0.5; text-decoration: line-through; }
 }
 
 .admin-users-tag-sub {

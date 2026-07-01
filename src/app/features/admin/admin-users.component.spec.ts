@@ -95,4 +95,38 @@ describe('AdminUsersComponent', () => {
     expect(component.error()).toBeNull();
     expect(component.users().length).toBe(3);
   });
+
+  describe('activeMemberships() + orphanCount() ignorent les espaces supprimés', () => {
+    // Two memberships: one active, one on a deleted workspace.
+    const USER_WITH_MIXED: AdminUser = {
+      user_id: 'u-mix', email: 'mix@test.com', display_name: 'Mix User',
+      global_role: 'editeur', email_confirmed_at: '2026-05-01T00:00:00Z',
+      banned: false, created_at: '2026-05-01T00:00:00Z',
+      last_sign_in_at: '2026-06-30T00:00:00Z',
+      memberships: [
+        { workspace_id: 'ws-alive', workspace_name: 'Actif',    role: 'editeur', joined_at: '2026-05-01T00:00:00Z', deleted: false },
+        { workspace_id: 'ws-dead',  workspace_name: 'Supprimé', role: 'owner',   joined_at: '2026-04-01T00:00:00Z', deleted: true  },
+      ],
+    };
+    // All memberships deleted — effectively orphaned.
+    const USER_ALL_DELETED: AdminUser = {
+      user_id: 'u-orphan', email: 'orphan@test.com', display_name: null,
+      global_role: null, email_confirmed_at: '2026-05-01T00:00:00Z',
+      banned: false, created_at: '2026-05-01T00:00:00Z',
+      last_sign_in_at: null,
+      memberships: [
+        { workspace_id: 'ws-x', workspace_name: 'Old', role: 'owner', joined_at: '2026-04-01T00:00:00Z', deleted: true },
+      ],
+    };
+
+    it('activeMemberships() ne renvoie que les memberships non supprimés', () => {
+      expect(component.activeMemberships(USER_WITH_MIXED).map(m => m.workspace_id)).toEqual(['ws-alive']);
+    });
+
+    it('orphanCount() compte comme orphelin un utilisateur dont tous les memberships sont supprimés', async () => {
+      admin.listAllUsers.mockReturnValueOnce(of([USER_WITH_MIXED, USER_ALL_DELETED, ...FAKE_USERS]));
+      await component.reload();
+      expect(component.orphanCount()).toBe(1); // Only USER_ALL_DELETED
+    });
+  });
 });
