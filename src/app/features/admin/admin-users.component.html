@@ -116,6 +116,7 @@
                 <th>Rôle plateforme</th>
                 <th>Espaces de travail</th>
                 <th>Statut</th>
+                <th>Dernière connexion</th>
                 <th>Créé le</th>
               </tr>
             </thead>
@@ -176,6 +177,15 @@
                       <span class="admin-users-tag admin-users-tag--success">
                         <span class="admin-users-status-dot admin-users-status-dot--success"></span>
                         Actif
+                      </span>
+                    }
+                  </td>
+                  <td class="admin-users-date-cell">
+                    @if (user.last_sign_in_at) {
+                      {{ user.last_sign_in_at | date:'d MMM yyyy, HH:mm':'':'fr' }}
+                    } @else {
+                      <span class="admin-users-never" title="Cet utilisateur ne s'est jamais connecté">
+                        Jamais
                       </span>
                     }
                   </td>

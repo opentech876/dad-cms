@@ -9,18 +9,21 @@ const FAKE_USERS: AdminUser[] = [
     user_id: 'u1', email: 'admin@open-tech.cg', display_name: 'Elvis O.',
     global_role: 'system_admin', email_confirmed_at: '2026-01-01T08:00:00Z',
     banned: false, created_at: '2026-01-01T08:00:00Z',
+    last_sign_in_at: '2026-07-01T09:15:00Z',
     memberships: [{ workspace_id: 'ws-1', workspace_name: 'DIOUGA-DIOP Media', role: 'owner', joined_at: '2026-01-01T08:00:00Z', deleted: false }],
   },
   {
     user_id: 'u2', email: 'editor@test.com', display_name: 'Alice Martin',
     global_role: 'editeur', email_confirmed_at: '2026-02-01T08:00:00Z',
     banned: false, created_at: '2026-02-01T08:00:00Z',
+    last_sign_in_at: '2026-06-15T11:00:00Z',
     memberships: [{ workspace_id: 'ws-1', workspace_name: 'DIOUGA-DIOP Media', role: 'editeur', joined_at: '2026-02-01T08:00:00Z', deleted: false }],
   },
   {
     user_id: 'u3', email: 'pending@test.com', display_name: null,
     global_role: 'editeur', email_confirmed_at: null,
     banned: false, created_at: '2026-06-20T14:00:00Z',
+    last_sign_in_at: null,  // Invited but never signed in yet.
     memberships: [{ workspace_id: 'ws-1', workspace_name: 'DIOUGA-DIOP Media', role: 'editeur', joined_at: '2026-06-20T14:00:00Z', deleted: false }],
   },
 ];

@@ -715,6 +715,7 @@ RETURNS TABLE (
   email_confirmed_at timestamptz,
   banned             boolean,
   created_at         timestamptz,
+  last_sign_in_at    timestamptz,
   memberships        jsonb
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
@@ -744,6 +745,7 @@ BEGIN
          u.email_confirmed_at,
          (u.banned_until IS NOT NULL AND u.banned_until > now()),
          u.created_at,
+         u.last_sign_in_at,
          COALESCE(wl.memberships, '[]'::jsonb)
   FROM auth.users u
   LEFT JOIN any_profile p ON p.user_id = u.id
