@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { filter, firstValueFrom } from 'rxjs';
 import { AppRole } from '../../models';
@@ -22,7 +22,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [TuiIcon, FormsModule, RouterLink],
+  imports: [TuiIcon, FormsModule],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })
@@ -30,7 +30,6 @@ export class ProfileComponent implements OnInit {
   private readonly auth             = inject(AuthService);
   private readonly workspaceService = inject(WorkspaceService);
   private readonly supabase         = inject(SupabaseService);
-  private readonly router           = inject(Router);
   private readonly route            = inject(ActivatedRoute);
   private readonly toast            = inject(ToastService);
 
@@ -182,10 +181,6 @@ export class ProfileComponent implements OnInit {
     } finally {
       this.avatarUploading.set(false);
     }
-  }
-
-  goBack(): void {
-    this.router.navigate(['/dashboard']);
   }
 
   // ── Email change ─────────────────────────────────────────────────────────

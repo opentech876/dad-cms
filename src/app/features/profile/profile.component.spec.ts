@@ -196,15 +196,6 @@ describe('ProfileComponent', () => {
     });
   });
 
-  // ── navigation ─────────────────────────────────────────────────────────────
-
-  describe('goBack()', () => {
-    it('navigue vers /dashboard', () => {
-      component.goBack();
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/dashboard']);
-    });
-  });
-
   // ── changePassword() ───────────────────────────────────────────────────────
 
   describe('changePassword()', () => {
