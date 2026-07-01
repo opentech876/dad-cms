@@ -4,8 +4,10 @@
 // existing theme variables so it doesn't look broken before then.
 
 .admin-dashboard {
+  width: 100%;
   padding: 24px 28px;
   max-width: 1200px;
+  margin: 0 auto;
 }
 
 .admin-dashboard-header {
