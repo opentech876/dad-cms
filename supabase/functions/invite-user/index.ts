@@ -64,16 +64,16 @@ Deno.serve(async (req: Request) => {
       throw new Error("L'identifiant de l'espace de travail est requis");
     }
 
-    // Role-mint authorization (the meat of the "who can grant what" rule):
-    //   • system_admin invites only `owner` (the "Administrateur" of a
-    //     workspace, called Manager-tier in the UI labels we use elsewhere).
-    //   • workspace inviters (owner / chef_equipe) cannot mint `owner` or
-    //     `system_admin` — platform-management roles stay platform-managed.
-    if (isSysadmin && role !== 'owner') {
-      throw new Error(
-        "Un administrateur plateforme ne peut inviter qu'un Administrateur d'espace",
-      );
-    }
+    // Role-mint authorization ("who can grant what"):
+    //   • system_admin can mint any WORKSPACE-tier role — `owner`
+    //     (Administrateur) via /admin, or any lower tier when they've
+    //     impersonated into a workspace and are acting as its admin.
+    //     `system_admin` itself is intentionally NOT in VALID_ROLES so
+    //     no caller can request it here — that role is only ever seeded
+    //     via bootstrap.sql or promoted by an existing sysadmin through a
+    //     separate flow.
+    //   • Workspace inviters (owner / chef_equipe) cannot mint `owner`
+    //     — platform-management concerns stay platform-managed.
     if (!isSysadmin && WORKSPACE_INVITER_FORBIDDEN_ROLES.includes(role)) {
       throw new Error(
         "Seul un administrateur plateforme peut désigner un Administrateur d'espace",
