@@ -92,10 +92,13 @@ CREATE TABLE IF NOT EXISTS public.calendars (
   updated_by    uuid REFERENCES auth.users(id),
   deleted_by    uuid REFERENCES auth.users(id),
   published_at  timestamptz,
-  workspace_id  uuid NOT NULL REFERENCES public.workspaces(id),
-  CONSTRAINT calendars_year_workspace_unique UNIQUE (year, workspace_id)
+  workspace_id  uuid NOT NULL REFERENCES public.workspaces(id)
 );
-CREATE INDEX IF NOT EXISTS idx_calendars_workspace_year_live
+-- Partial unique index: at most one ACTIVE calendar per (workspace, year).
+-- Soft-deleted rows are ignored so a workspace that trashed its 2024
+-- calendar can create a new one for the same year. Also serves as the
+-- workspace-year lookup index for the picker.
+CREATE UNIQUE INDEX IF NOT EXISTS calendars_year_workspace_unique_live
   ON public.calendars (workspace_id, year) WHERE deleted_at IS NULL;
 
 -- 3.6 events
@@ -1432,6 +1435,60 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.list_deleted_calendars() TO authenticated;
+
+-- Hard-delete RPCs for the calendar Corbeille. Only rows already soft-
+-- deleted are eligible. Children (calendar_entries + presidency_recommendations)
+-- are deleted explicitly since the schema doesn't cascade them.
+
+CREATE FUNCTION public.purge_calendar(p_calendar_id uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE
+  v_workspace_id uuid;
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  SELECT workspace_id INTO v_workspace_id
+  FROM public.calendars
+  WHERE id = p_calendar_id
+    AND deleted_at IS NOT NULL
+    AND workspace_id IN (SELECT public.get_my_workspace_ids());
+  IF v_workspace_id IS NULL THEN
+    RAISE EXCEPTION 'calendar_not_purgeable' USING ERRCODE = '22023';
+  END IF;
+  DELETE FROM public.presidency_recommendations WHERE calendar_id = p_calendar_id;
+  DELETE FROM public.calendar_entries           WHERE calendar_id = p_calendar_id;
+  DELETE FROM public.calendars                  WHERE id          = p_calendar_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.purge_calendar(uuid) TO authenticated;
+
+CREATE FUNCTION public.empty_calendar_trash()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE
+  v_purged_count int := 0;
+  r record;
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  FOR r IN
+    SELECT id
+    FROM public.calendars
+    WHERE deleted_at IS NOT NULL
+      AND workspace_id IN (SELECT public.get_my_workspace_ids())
+  LOOP
+    DELETE FROM public.presidency_recommendations WHERE calendar_id = r.id;
+    DELETE FROM public.calendar_entries           WHERE calendar_id = r.id;
+    DELETE FROM public.calendars                  WHERE id          = r.id;
+    v_purged_count := v_purged_count + 1;
+  END LOOP;
+  RETURN v_purged_count;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.empty_calendar_trash() TO authenticated;
 
 -- ─── 10. Notification trigger functions ─────────────────────
 CREATE OR REPLACE FUNCTION public.create_notification_from_calendar()

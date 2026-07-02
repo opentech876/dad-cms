@@ -1,8 +1,10 @@
 import { Component, computed, HostListener, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, SlicePipe } from '@angular/common';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { AppRole, ManageUserAction } from '../../models';
+import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 
 interface UserRow {
@@ -38,6 +40,15 @@ const ROLE_LABELS: Record<AppRole, string> = {
 })
 export class UsersComponent implements OnInit {
   private workspaceService = inject(WorkspaceService);
+  private authService      = inject(AuthService);
+
+  /** True when the caller is a platform system_admin — used to unlock the
+   *  "Administrateur" option in the invite-role dropdown when they've
+   *  impersonated into a workspace. The invite-user Edge Function
+   *  authorises owner-role minting for sysadmins server-side; this signal
+   *  only controls whether the option is *visible*. Regular workspace
+   *  owner / chef_equipe never see it — they'd hit a 403 anyway. */
+  readonly isSysadmin = toSignal(this.authService.isSystemAdmin(), { initialValue: false });
 
   /** Active workspace name — used in destructive confirmation modals so the
    *  user can't mistake which tenant they're acting on. Fetched once in

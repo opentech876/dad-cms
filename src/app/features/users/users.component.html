@@ -731,10 +731,24 @@
               [value]="inviteRole()"
               (change)="inviteRole.set($any($event.target).value)"
             >
+              <!-- system_admin is intentionally omitted (platform-level, seeded
+                   via bootstrap or promoted from /admin/utilisateurs).
+                   The "Administrateur" (owner) option is only surfaced for
+                   sysadmins impersonating a workspace — a regular workspace
+                   owner or chef d'équipe would get a 403 from invite-user EF
+                   because minting `owner` is a platform-management concern. -->
+              @if (isSysadmin()) {
+                <option value="owner">Administrateur</option>
+              }
               <option value="chef_equipe">Chef d'équipe</option>
+              <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
               <option value="editeur">Éditeur</option>
               <option value="charge_communication">Chargé de communication</option>
+              <option value="presidence">Présidence</option>
             </select>
+            <span class="field-hint">
+              L'invitation sera envoyée par e-mail. Le rôle sera appliqué dès la première connexion.
+            </span>
           </div>
           @if (inviteStatus() === 'error') {
             <p class="login-error" style="margin-bottom: 12px">{{ inviteError() }}</p>
