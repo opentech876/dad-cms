@@ -1,0 +1,116 @@
+<div class="admin-logs-page">
+
+  <!-- ── Page header ── -->
+  <header class="admin-logs-header">
+    <div>
+      <h1 class="admin-logs-title">Journal d'activité</h1>
+      <p class="admin-logs-sub">
+        Historique horodaté des actions sur les espaces de travail, les rôles plateforme
+        et les membres. Les modifications éditoriales (événements, calendriers, campagnes)
+        ne sont pas incluses ici.
+      </p>
+    </div>
+    <div class="admin-logs-header-actions">
+      <button class="btn btn-flat btn-sm" type="button" (click)="reload()" [disabled]="loading()">
+        <tui-icon icon="@tui.refresh-cw" style="font-size:14px;" />
+        Rafraîchir
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Filter chips ── -->
+  <div class="admin-logs-filters">
+    @for (f of filters; track f.id) {
+      <button class="admin-logs-filter"
+              type="button"
+              [class.admin-logs-filter--active]="activeFilter() === f.id"
+              (click)="setFilter(f.id)">
+        <tui-icon [icon]="f.icon" style="font-size:13px;" />
+        {{ f.label }}
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="admin-logs-state">
+      <span class="spinner"></span>
+      Chargement du journal…
+    </div>
+  } @else if (error(); as err) {
+    <div class="admin-logs-state admin-logs-state--error">
+      <tui-icon icon="@tui.alert-triangle" style="font-size:16px; flex-shrink:0;" />
+      <div style="flex:1;">
+        <div style="font-weight:600; margin-bottom:2px;">Impossible de charger le journal</div>
+        <div style="font-size:12.5px; opacity:0.8;">{{ err }}</div>
+      </div>
+      <button class="btn btn-flat btn-sm" type="button" (click)="reload()">
+        Réessayer
+      </button>
+    </div>
+  } @else if (entries().length === 0) {
+    <div class="admin-logs-empty">
+      <tui-icon icon="@tui.scroll-text" style="font-size:32px; color:var(--fg-3);" />
+      <p class="admin-logs-empty-title">Aucune activité récente</p>
+      <p class="admin-logs-empty-sub">
+        Les actions d'administration apparaîtront ici dès qu'elles seront effectuées.
+      </p>
+    </div>
+  } @else {
+
+    <section class="admin-logs-timeline">
+      @for (group of entriesByDay(); track group.day) {
+        <div class="admin-logs-day">
+          <div class="admin-logs-day-label">
+            {{ group.day | date:'EEEE d MMMM yyyy':'':'fr' }}
+          </div>
+          <ol class="admin-logs-list">
+            @for (entry of group.items; track entry.id) {
+              @let d = describe(entry);
+              <li class="admin-logs-item">
+                <div class="admin-logs-item-icon admin-logs-item-icon--{{ d.tone }}">
+                  <tui-icon [icon]="d.icon" style="font-size:14px;" />
+                </div>
+                <div class="admin-logs-item-body">
+                  <div class="admin-logs-item-main">
+                    <span class="admin-logs-item-actor">
+                      <span class="admin-logs-item-actor-avatar">{{ actorInitial(entry) }}</span>
+                      {{ actorLabel(entry) }}
+                    </span>
+                    <span class="admin-logs-item-verb">{{ d.verb }}</span>
+                    @if (d.target) {
+                      <span class="admin-logs-item-target">{{ d.target }}</span>
+                    }
+                  </div>
+                  <div class="admin-logs-item-meta">
+                    <tui-icon icon="@tui.clock" style="font-size:11px;" />
+                    {{ entry.changed_at | date:'HH:mm':'':'fr' }}
+                    @if (entry.actor_email && entry.actor_name) {
+                      <span class="admin-logs-item-meta-sep">·</span>
+                      <span>{{ entry.actor_email }}</span>
+                    }
+                  </div>
+                </div>
+              </li>
+            }
+          </ol>
+        </div>
+      }
+    </section>
+
+    <div class="admin-logs-footer">
+      @if (hasMore()) {
+        <button class="btn btn-flat btn-sm" type="button"
+                [disabled]="loadingMore()"
+                (click)="loadMore()">
+          @if (loadingMore()) { <span class="spinner"></span> Chargement… }
+          @else {
+            <tui-icon icon="@tui.chevron-down" style="font-size:14px;" />
+            Charger plus
+          }
+        </button>
+      } @else {
+        <span class="admin-logs-footer-end">Fin du journal — {{ entries().length }} entrée(s)</span>
+      }
+    </div>
+  }
+</div>

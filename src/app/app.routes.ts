@@ -143,6 +143,12 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/admin-users.component').then((m) => m.AdminUsersComponent),
       },
+      {
+        path: 'admin/logs',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
+          import('./features/admin/admin-logs.component').then((m) => m.AdminLogsComponent),
+      },
       // /admin/* aliases for the shared user pages, so the sysadmin's Compte
       // sidebar links keep the URL under /admin and inPlatformMode stays
       // true. Same components as the workspace-mode routes below.

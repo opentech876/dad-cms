@@ -44,6 +44,25 @@ export interface AdminUserMembership {
   deleted:        boolean;
 }
 
+/** Tables that the /admin/logs page surfaces. See admin_list_audit_log(). */
+export type AdminAuditTable = 'workspaces' | 'user_roles' | 'workspace_members';
+
+/** A row from admin_list_audit_log() — one admin-scope audit event. */
+export interface AdminAuditEntry {
+  id:             string;
+  table_name:     AdminAuditTable;
+  action:         'INSERT' | 'UPDATE' | 'DELETE';
+  record_id:      string;
+  actor_id:       string | null;
+  actor_email:    string | null;
+  actor_name:     string | null;
+  workspace_id:   string | null;
+  workspace_name: string | null;
+  old_data:       Record<string, any> | null;
+  new_data:       Record<string, any> | null;
+  changed_at:     string;
+}
+
 /** A row in the system_admin global users table view. */
 export interface AdminUser {
   user_id:            string;
@@ -87,6 +106,31 @@ export class AdminService {
       map(({ data, error }: any) => {
         if (error) throw error;
         return (data ?? []) as AdminUser[];
+      }),
+    );
+  }
+
+  /**
+   * List admin-scope audit-log entries. Cursor-paginated on changed_at.
+   * @param limit  How many rows to fetch (server caps at whatever LIMIT accepts).
+   * @param before Cursor: fetch entries strictly older than this timestamp.
+   * @param table  Optional table filter — one of AdminAuditTable, or null for all.
+   */
+  listAuditLog(
+    limit  = 50,
+    before: string | null = null,
+    table:  AdminAuditTable | null = null,
+  ): Observable<AdminAuditEntry[]> {
+    return from(
+      this.supabase.client.rpc('admin_list_audit_log', {
+        p_limit:  limit,
+        p_before: before,
+        p_table:  table,
+      }),
+    ).pipe(
+      map(({ data, error }: any) => {
+        if (error) throw error;
+        return (data ?? []) as AdminAuditEntry[];
       }),
     );
   }

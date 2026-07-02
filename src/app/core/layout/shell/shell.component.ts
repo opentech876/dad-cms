@@ -385,6 +385,7 @@ export class ShellComponent implements OnInit {
       { id: 'admin-dashboard',    label: 'Tableau de bord plateforme', icon: '@tui.layout-dashboard', path: '/admin',              roles: [] },
       { id: 'admin-espaces',      label: 'Espaces de travail',         icon: '@tui.building',         path: '/admin/espaces',      roles: [] },
       { id: 'admin-utilisateurs', label: 'Tous les utilisateurs',      icon: '@tui.users',            path: '/admin/utilisateurs', roles: [] },
+      { id: 'admin-logs',         label: "Journal d'activité",         icon: '@tui.scroll-text',      path: '/admin/logs',         roles: [] },
     ],
   };
 
@@ -448,6 +449,7 @@ export class ShellComponent implements OnInit {
     admin:                   'Administration plateforme · Tableau de bord',
     'admin/espaces':         'Administration plateforme · Espaces',
     'admin/utilisateurs':    'Administration plateforme · Utilisateurs',
+    'admin/logs':            "Administration plateforme · Journal d'activité",
     'admin/notifications':   'Administration plateforme · Notifications',
     'admin/profil':          'Administration plateforme · Mon profil',
     'admin/parametres':      'Administration plateforme · Paramètres',

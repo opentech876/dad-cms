@@ -756,6 +756,59 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_list_all_users() TO authenticated;
 
+-- Cursor-paginated feed of admin-scope audit events. Filters to
+-- workspaces / user_roles / workspace_members so /admin/logs doesn't
+-- drown in editorial noise. Joins actor identity + workspace name.
+CREATE FUNCTION public.admin_list_audit_log(
+  p_limit  int         DEFAULT 50,
+  p_before timestamptz DEFAULT NULL,
+  p_table  text        DEFAULT NULL
+)
+RETURNS TABLE (
+  id             uuid,
+  table_name     text,
+  action         text,
+  record_id      uuid,
+  actor_id       uuid,
+  actor_email    text,
+  actor_name     text,
+  workspace_id   uuid,
+  workspace_name text,
+  old_data       jsonb,
+  new_data       jsonb,
+  changed_at     timestamptz
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  PERFORM public._assert_system_admin();
+  RETURN QUERY
+  WITH any_profile AS (
+    SELECT DISTINCT ON (pf.user_id) pf.user_id, pf.full_name
+    FROM public.profiles pf
+    ORDER BY pf.user_id, pf.created_at ASC
+  )
+  SELECT
+    al.id, al.table_name, al.action, al.record_id, al.actor_id,
+    u.email::text, p.full_name,
+    -- For workspaces-table rows the record IS the workspace; derive ws_id.
+    COALESCE(al.workspace_id,
+             CASE WHEN al.table_name = 'workspaces' THEN al.record_id END),
+    w.name,
+    al.old_data, al.new_data, al.changed_at
+  FROM public.audit_log al
+  LEFT JOIN auth.users u        ON u.id = al.actor_id
+  LEFT JOIN any_profile p       ON p.user_id = al.actor_id
+  LEFT JOIN public.workspaces w ON w.id = COALESCE(al.workspace_id,
+                                          CASE WHEN al.table_name = 'workspaces' THEN al.record_id END)
+  WHERE al.table_name IN ('workspaces', 'user_roles', 'workspace_members')
+    AND (p_before IS NULL OR al.changed_at < p_before)
+    AND (p_table  IS NULL OR al.table_name = p_table)
+  ORDER BY al.changed_at DESC
+  LIMIT p_limit;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_list_audit_log(int, timestamptz, text) TO authenticated;
+
 -- ─── 6. Audit logging ───────────────────────────────────────
 -- Captures workspace_id from the source row when present (every workspace-
 -- scoped table has one). Tables without workspace_id leave it NULL and the
@@ -1453,6 +1506,13 @@ CREATE TRIGGER presidency_recommendations_bump_updated_at
 CREATE TRIGGER companies_audit               AFTER INSERT OR UPDATE OR DELETE ON public.companies FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
 CREATE TRIGGER companies_track_modifications BEFORE UPDATE ON public.companies FOR EACH ROW EXECUTE FUNCTION public.track_modifications();
 CREATE TRIGGER trg_companies_timestamps      BEFORE UPDATE ON public.companies FOR EACH ROW EXECUTE FUNCTION public.update_timestamps();
+
+-- Admin-scope audit triggers (power /admin/logs). No workspace_id on the
+-- rows themselves — log_audit_event falls back to NULL and the admin_list
+-- RPC derives workspace context via record_id when table_name='workspaces'.
+CREATE TRIGGER workspaces_audit        AFTER INSERT OR UPDATE OR DELETE ON public.workspaces        FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
+CREATE TRIGGER user_roles_audit        AFTER INSERT OR UPDATE OR DELETE ON public.user_roles        FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
+CREATE TRIGGER workspace_members_audit AFTER INSERT OR UPDATE OR DELETE ON public.workspace_members FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
 
 -- Hook auth.users → handle_new_user (must be created here as auth schema is created before this migration runs)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
