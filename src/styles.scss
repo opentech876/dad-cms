@@ -41,7 +41,14 @@
 
   --fg-1: #1f1a14;
   --fg-2: #4a4036;
-  --fg-3: #7a6f60;
+  // Was #7a6f60 which passed WCAG AA against --bg-surface (~4.7:1) but
+  // failed against --bg-sunken (~4.1:1) — every chip / hover / muted
+  // meta row on the corbeille + tags + admin-logs read as "washed
+  // out" because those secondary surfaces are the common pairing.
+  // #5c5145 is ~6.4:1 on bg-surface and ~5.7:1 on bg-sunken (AA even
+  // for small text), while staying close enough to the original tone
+  // that the archive palette still feels warm.
+  --fg-3: #5c5145;
   --fg-inverse: #fbf8f1;
 
   --border-1: #d9cfb9;
@@ -65,6 +72,10 @@
   --sidebar-fg-active: #fbf8f1;
   --sidebar-active-bg: rgba(251, 248, 241, 0.08);
   --sidebar-accent: #d8a155;
+  // Soft variant for sidebar chips (role pill under user card, etc.).
+  // Shell.scss referenced this but it was never defined, so the chip
+  // fell back to a hardcoded rgba. Explicit token so themes can override.
+  --sidebar-accent-soft: rgba(216, 161, 85, 0.18);
 }
 
 /* ── Reset ───────────────────────────────────────────────── */
@@ -651,7 +662,10 @@ input, textarea, select { font-family: inherit; }
   /* Foregrounds match the cooler palette. */
   --fg-1: #0f172a;             /* slate-900 */
   --fg-2: #334155;             /* slate-700 */
-  --fg-3: #64748b;             /* slate-500 */
+  /* slate-500 was 4.2:1 on --bg-sunken (slate-200) — fails AA. Bumped
+   * to slate-600 which sits at ~5.9:1 on the same surface. Still lighter
+   * than fg-2 so the muted/primary hierarchy stays intact. */
+  --fg-3: #475569;             /* slate-600 */
   --fg-inverse: #ffffff;
 
   /* Borders — slightly stronger than editorial, less than full slate-300. */

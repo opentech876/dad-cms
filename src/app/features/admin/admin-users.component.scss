@@ -334,9 +334,11 @@
 }
 
 .admin-users-never {
+  // "Jamais" cell in the last-connection column. Uses fg-3 with an
+  // italic tone-down — dropped opacity:0.7 because it stacked on the
+  // muted color and pushed the label below WCAG AA on hover rows.
   color: var(--fg-3);
   font-style: italic;
-  opacity: 0.7;
 }
 
 // ── Responsive ─────────────────────────────────────────────────
