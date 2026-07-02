@@ -208,7 +208,11 @@ input, textarea, select { font-family: inherit; }
 /* ── Tables ──────────────────────────────────────────────── */
 .table-wrap {
   background: var(--bg-surface); border: 1px solid var(--border-1);
-  border-radius: var(--r-lg); overflow: hidden;
+  border-radius: var(--r-lg);
+  // overflow-x:auto so a wide table can scroll instead of clipping at
+  // narrow content widths (e.g. 1024px laptop with sidebar open). Vertical
+  // overflow is still handled by the border-radius clipping.
+  overflow-x: auto;
 }
 .table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 .table thead th {
@@ -408,8 +412,18 @@ input, textarea, select { font-family: inherit; }
 
 /* ── Dashboard layout ────────────────────────────────────── */
 .dashboard-page { display: flex; flex-direction: column; gap: 20px; max-width: 1400px; }
-.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+// KPI grids default to 4-up on wide screens but degrade gracefully via
+// auto-fit: any card that can't hit 200px wraps to the next row. Keeps
+// the layout readable down to ~500px content width (1024px viewport with
+// sidebar open) without a media query.
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 .dashboard-two-col { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+// Collapse the 1.4/1 hero split into a single column when the content
+// area drops below the point where the narrow column stops carrying
+// its own weight (~720px content = ~1024px viewport with sidebar open).
+@media (max-width: 1024px) {
+  .dashboard-two-col { grid-template-columns: 1fr; }
+}
 
 /* ============================================================
  * Theme System — two attributes:

@@ -6,17 +6,9 @@
   flex-direction: column;
 }
 
-// ── KPI grid ──────────────────────────────────────────
-
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-
-  @media (max-width: 900px) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
+// KPI grid uses the global auto-fit definition from styles.scss.
+// See the .kpi-grid rule there — cards wrap automatically once they
+// can't hit 200px, so no local override is needed.
 
 // ── Editor layout ──────────────────────────────────────
 
