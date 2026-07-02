@@ -489,7 +489,11 @@ export class CalendarComponent implements OnInit {
   }
 
   calLabel(cal: Calendar): string {
-    return `${cal.year} — ${cal.name}`;
+    // Show only the user-chosen name. The year used to be prepended
+    // ("2026 — Mon Calendrier"), but that overrides whatever the user
+    // typed. If they want the year in the label they can include it
+    // themselves; the badge next to the selector still shows status.
+    return cal.name;
   }
 
   intensityBg(intensity: 0 | 1 | 2 | 3): string {

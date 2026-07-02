@@ -50,7 +50,10 @@ export class ShellComponent implements OnInit {
   readonly isSystemAdmin = toSignal(this.auth.isSystemAdmin(), { initialValue: false });
 
   readonly toastService = inject(ToastService);
-  readonly notifUnread  = signal(0);
+  // Reactive signal owned by NotificationService. When the user marks
+  // notifications as read (individually or all-at-once) the service
+  // updates this signal and the bell badge disappears automatically.
+  readonly notifUnread = this.notifService.unreadCount;
 
   toastIcon(type: ToastType): string {
     const map: Record<ToastType, string> = {
@@ -547,12 +550,9 @@ export class ShellComponent implements OnInit {
     this.workspaceContext.workspacesChanged$
       .subscribe(() => { void this._reloadWorkspaceSummaries(); });
 
-    try {
-      const count = await firstValueFrom(this.notifService.unreadCount());
-      this.notifUnread.set(count);
-    } catch {
-      // Notifications non disponibles — pas bloquant
-    }
+    // Prime the notification-unread signal from the server. The service
+    // swallows failures internally so this is fire-and-forget.
+    void this.notifService.refreshUnread();
 
     const pwdSet = await this.supabase.hasPasswordSet();
     this.hasPasswordNotSet.set(!pwdSet);

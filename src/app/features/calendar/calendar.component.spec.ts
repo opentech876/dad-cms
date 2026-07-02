@@ -528,9 +528,9 @@ describe('CalendarComponent', () => {
       expect(component.statusLabel('draft')).toBe('Brouillon');
     });
 
-    it('calLabel retourne le format "année — nom"', () => {
+    it("calLabel retourne uniquement le nom saisi par l'utilisateur", () => {
       const cal = component.calendars()[0];
-      expect(component.calLabel(cal)).toBe(`${cal.year} — ${cal.name}`);
+      expect(component.calLabel(cal)).toBe(cal.name);
     });
 
     it('intensityBg retourne une couleur pour chaque intensité', () => {

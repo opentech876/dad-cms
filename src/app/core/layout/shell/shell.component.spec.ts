@@ -1,5 +1,5 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { BehaviorSubject, EMPTY, of, Subject } from 'rxjs';
 import { Router } from '@angular/router';
 import { ShellComponent } from './shell.component';
@@ -92,7 +92,13 @@ describe('ShellComponent — navigation par rôle', () => {
         },
         {
           provide: NotificationService,
-          useValue: { unreadCount: jest.fn().mockReturnValue(of(3)) },
+          // NotificationService now exposes a signal-based unreadCount plus
+          // an async refreshUnread(). The shell reads the signal directly
+          // and calls refresh on init.
+          useValue: {
+            unreadCount: signal(3),
+            refreshUnread: jest.fn().mockResolvedValue(undefined),
+          },
         },
         {
           provide: SupabaseService,

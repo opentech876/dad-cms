@@ -1,11 +1,29 @@
-import { inject, Injectable } from '@angular/core';
-import { from, map, Observable, switchMap } from 'rxjs';
+import { inject, Injectable, signal } from '@angular/core';
+import { firstValueFrom, from, map, Observable, switchMap, tap } from 'rxjs';
 import { Notification } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
 
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
   private supabase = inject(SupabaseService);
+
+  /** Single source of truth for the unread counter. The shell's bell badge
+   *  reads this directly. markAsRead / markAllAsRead update it optimistically
+   *  so the badge reacts without a round-trip. refreshUnread() re-syncs
+   *  with the server (called on shell startup + on relevant navigations). */
+  readonly unreadCount = signal(0);
+
+  /** Fetch the current unread count from the server and push it into the
+   *  signal. Callers should await this on startup. Failures are swallowed
+   *  (the count stays at whatever it was) — notifications aren't blocking. */
+  async refreshUnread(): Promise<void> {
+    try {
+      const list = await firstValueFrom(this.listNotifications());
+      this.unreadCount.set(list.filter(n => !n.read_at).length);
+    } catch {
+      // Non-fatal: leave the previous count in place.
+    }
+  }
 
   listNotifications(): Observable<Notification[]> {
     return from(
@@ -40,6 +58,9 @@ export class NotificationService {
             ),
         ),
       ),
+      // Optimistically decrement the badge — no round-trip needed to keep
+      // the UI honest. Clamped at 0 for safety.
+      tap(() => this.unreadCount.update(n => Math.max(0, n - 1))),
       map(() => undefined),
     );
   }
@@ -60,13 +81,8 @@ export class NotificationService {
             .upsert(rows, { onConflict: 'notification_id,user_id' }),
         );
       }),
+      tap(() => this.unreadCount.set(0)),
       map(() => undefined),
-    );
-  }
-
-  unreadCount(): Observable<number> {
-    return this.listNotifications().pipe(
-      map(notifs => notifs.filter(n => !n.read_at).length),
     );
   }
 }
