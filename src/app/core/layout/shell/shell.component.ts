@@ -235,14 +235,16 @@ export class ShellComponent implements OnInit {
    * Later branches shadow earlier ones.
    */
   private async _refreshDisplayInfo(user: any, isSysadmin: boolean): Promise<void> {
-    // 1. Baseline from email.
-    const email = user?.email ?? '';
+    // 1. Baseline from email. Explicit string annotation because `user` is
+    // `any` (Supabase auth types leak through) — without it, `email` +
+    // `parts` inherit `any` and `.map(p => ...)` fails noImplicitAny.
+    const email: string = user?.email ?? '';
     this.userEmail.set(email);
-    const parts = email.split('@')[0].split('.');
+    const parts: string[] = email.split('@')[0].split('.');
     this.userInitials.set(
       ((parts[0]?.[0] ?? 'A') + (parts[1]?.[0] ?? parts[0]?.[1] ?? '')).toUpperCase(),
     );
-    this.userName.set(parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' '));
+    this.userName.set(parts.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' '));
     this.userAvatarUrl.set(null);
 
     // 2. Sysadmin path — name lives in auth metadata, avatar via storage.
@@ -448,7 +450,7 @@ export class ShellComponent implements OnInit {
       label: 'Administration',
       items: [
         { id: 'workspace',  label: 'Espace de travail', icon: '@tui.building', path: '/espace-de-travail', roles: [] },
-        { id: 'parametres', label: 'Paramètres',         icon: '@tui.settings', path: '/parametres',        roles: [] },
+        { id: 'parametres', label: 'Customisation',      icon: '@tui.settings', path: '/parametres',        roles: [] },
       ],
     },
   ];
@@ -479,7 +481,7 @@ export class ShellComponent implements OnInit {
     items: [
       { id: 'admin-notifications', label: 'Notifications', icon: '@tui.bell',     path: '/admin/notifications', roles: [] },
       { id: 'admin-profil',        label: 'Mon profil',    icon: '@tui.user',     path: '/admin/profil',        roles: [] },
-      { id: 'admin-parametres',    label: 'Paramètres',    icon: '@tui.settings', path: '/admin/parametres',    roles: [] },
+      { id: 'admin-parametres',    label: 'Customisation', icon: '@tui.settings', path: '/admin/parametres',    roles: [] },
     ],
   };
 
@@ -523,7 +525,7 @@ export class ShellComponent implements OnInit {
     metriques:           'Métriques',
     notifications:       'Notifications',
     profil:              'Mon profil',
-    parametres:          'Paramètres',
+    parametres:          'Customisation',
     'espace-de-travail': 'Espace de travail',
     admin:                   'Administration plateforme · Tableau de bord',
     'admin/espaces':         'Administration plateforme · Espaces',
@@ -531,7 +533,7 @@ export class ShellComponent implements OnInit {
     'admin/logs':            "Administration plateforme · Journal d'activité",
     'admin/notifications':   'Administration plateforme · Notifications',
     'admin/profil':          'Administration plateforme · Mon profil',
-    'admin/parametres':      'Administration plateforme · Paramètres',
+    'admin/parametres':      'Administration plateforme · Customisation',
   };
 
   async ngOnInit(): Promise<void> {
