@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
@@ -97,7 +98,7 @@ function isoDate(year: number, month: number, day: number): string {
 @Component({
   selector: 'app-calendar',
   standalone: true,
-  imports: [TuiIcon],
+  imports: [TuiIcon, DatePipe],
   templateUrl: './calendar.component.html',
   styleUrl: './calendar.component.scss',
 })
@@ -122,9 +123,47 @@ export class CalendarComponent implements OnInit {
     { initialValue: false },
   );
 
+  /** Owner + chef_equipe. Gates the "Supprimer" button on the toolbar,
+   *  the Corbeille tab access, and the Restore action inside the tab.
+   *  Mirrors the SECURITY DEFINER role check on soft_delete_calendar()
+   *  and restore_calendar() — hiding the button avoids a 42501 error. */
+  readonly canDeleteCalendars = toSignal(
+    this.authService.hasRoleAtLeast('chef_equipe'),
+    { initialValue: false },
+  );
+
   // Pending Presidence recommendations for the selected calendar (count only).
   readonly pendingRecommendationsCount = signal(0);
   readonly recommendationsApplying = signal(false);
+
+  // ── Delete-calendar modal state ─────────────────────────────────────────
+  readonly deleteModalOpen  = signal(false);
+  readonly deleteConfirmName = signal('');
+  readonly deleting          = signal(false);
+  readonly deleteError       = signal<string | null>(null);
+
+  /** Two levels of gate: an empty draft only needs a click; a calendar
+   *  with entries OR published status forces the user to type the exact
+   *  name (GitHub-style) before the delete button enables. */
+  readonly deleteRequiresNameConfirmation = computed(() => {
+    const cal = this.selectedCalendar();
+    if (!cal) return false;
+    return cal.eventCount > 0 || cal.status === 'published';
+  });
+
+  readonly deleteCanConfirm = computed(() => {
+    const cal = this.selectedCalendar();
+    if (!cal) return false;
+    if (!this.deleteRequiresNameConfirmation()) return true;
+    return this.deleteConfirmName().trim() === cal.name;
+  });
+
+  // ── Corbeille (trash) tab state ─────────────────────────────────────────
+  readonly showTrash    = signal(false);
+  readonly trashLoading = signal(false);
+  readonly trashItems   = signal<import('../../core/calendar/calendar.service').DeletedCalendarSummary[]>([]);
+  readonly trashError   = signal<string | null>(null);
+  readonly restoringId  = signal<string | null>(null);
 
   // Confirm dialog state for the apply flow.
   readonly applyDialogVisible = signal(false);
@@ -574,6 +613,87 @@ export class CalendarComponent implements OnInit {
     if (result.success) {
       await this._reloadCalendars();
     }
+  }
+
+  // ── Delete calendar flow ───────────────────────────────────────────────
+
+  openDeleteModal(): void {
+    if (!this.canDeleteCalendars()) return;
+    if (!this.selectedCalendar()) return;
+    this.deleteConfirmName.set('');
+    this.deleteError.set(null);
+    this.deleteModalOpen.set(true);
+  }
+
+  closeDeleteModal(): void {
+    if (this.deleting()) return;
+    this.deleteModalOpen.set(false);
+    this.deleteConfirmName.set('');
+  }
+
+  async confirmDelete(): Promise<void> {
+    const cal = this.selectedCalendar();
+    if (!cal || this.deleting()) return;
+    if (!this.deleteCanConfirm()) return;
+
+    this.deleting.set(true);
+    this.deleteError.set(null);
+    const result = await firstValueFrom(this.calendarService.deleteCalendar(cal.id));
+    this.deleting.set(false);
+
+    if (!result.success) {
+      this.deleteError.set(result.error ?? 'Échec de la suppression du calendrier.');
+      return;
+    }
+
+    this.toast.success(`Calendrier « ${cal.name} » déplacé dans la corbeille.`);
+    this.deleteModalOpen.set(false);
+    this.selectedCalendarId.set('');
+    await this._reloadCalendars();
+  }
+
+  // ── Corbeille (trash) view ────────────────────────────────────────────
+
+  async openTrash(): Promise<void> {
+    if (!this.canDeleteCalendars()) return;
+    this.showTrash.set(true);
+    await this.refreshTrash();
+  }
+
+  closeTrash(): void {
+    this.showTrash.set(false);
+    this.trashItems.set([]);
+    this.trashError.set(null);
+  }
+
+  async refreshTrash(): Promise<void> {
+    this.trashLoading.set(true);
+    this.trashError.set(null);
+    try {
+      const items = await firstValueFrom(this.calendarService.listDeletedCalendars());
+      this.trashItems.set(items);
+    } catch (e: any) {
+      console.error('[calendar] listDeletedCalendars failed:', e);
+      this.trashError.set(e?.message ?? 'Impossible de charger la corbeille.');
+      this.trashItems.set([]);
+    } finally {
+      this.trashLoading.set(false);
+    }
+  }
+
+  async restoreCalendar(id: string): Promise<void> {
+    if (this.restoringId()) return;
+    if (!this.canDeleteCalendars()) return;
+    this.restoringId.set(id);
+    const result = await firstValueFrom(this.calendarService.restoreCalendar(id));
+    this.restoringId.set(null);
+    if (!result.success) {
+      this.toast.error(result.error ?? 'Échec de la restauration.');
+      return;
+    }
+    this.toast.success('Calendrier restauré.');
+    await this.refreshTrash();
+    await this._reloadCalendars();
   }
 
   // ── Computed views ────────────────────────────────

@@ -1352,6 +1352,87 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.apply_presidency_recommendations(uuid, boolean) TO authenticated;
 
+-- ─── 9b. Calendar soft-delete + restore + trash-list RPCs ────────────────
+-- The calendars table already has deleted_at + deleted_by. Direct writes
+-- would be authorized by the editor+ RLS policy on calendars, but we want
+-- the delete flow restricted to chef_equipe+. These SECURITY DEFINER RPCs
+-- enforce that role gate above the RLS layer.
+
+CREATE FUNCTION public.soft_delete_calendar(p_calendar_id uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.calendars
+     SET deleted_at = now(),
+         deleted_by = auth.uid(),
+         updated_at = now(),
+         updated_by = auth.uid()
+   WHERE id = p_calendar_id
+     AND deleted_at IS NULL;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.soft_delete_calendar(uuid) TO authenticated;
+
+CREATE FUNCTION public.restore_calendar(p_calendar_id uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.calendars
+     SET deleted_at = NULL,
+         deleted_by = NULL,
+         updated_at = now(),
+         updated_by = auth.uid()
+   WHERE id = p_calendar_id
+     AND deleted_at IS NOT NULL;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.restore_calendar(uuid) TO authenticated;
+
+CREATE FUNCTION public.list_deleted_calendars()
+RETURNS TABLE (
+  id            uuid,
+  workspace_id  uuid,
+  year          int,
+  name          text,
+  status        text,
+  deleted_at    timestamptz,
+  deleted_by    uuid,
+  deleter_email text,
+  deleter_name  text,
+  entries_count int
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
+  WITH any_profile AS (
+    SELECT DISTINCT ON (pf.user_id) pf.user_id, pf.full_name
+    FROM public.profiles pf
+    ORDER BY pf.user_id, pf.created_at ASC
+  )
+  SELECT
+    c.id, c.workspace_id, c.year, c.name, c.status,
+    c.deleted_at, c.deleted_by,
+    u.email::text, p.full_name,
+    (SELECT count(*)::int FROM public.calendar_entries WHERE calendar_id = c.id)
+  FROM public.calendars c
+  LEFT JOIN auth.users u  ON u.id = c.deleted_by
+  LEFT JOIN any_profile p ON p.user_id = c.deleted_by
+  WHERE c.deleted_at IS NOT NULL
+    AND c.workspace_id IN (SELECT public.get_my_workspace_ids())
+  ORDER BY c.deleted_at DESC;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.list_deleted_calendars() TO authenticated;
+
 -- ─── 10. Notification trigger functions ─────────────────────
 CREATE OR REPLACE FUNCTION public.create_notification_from_calendar()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$

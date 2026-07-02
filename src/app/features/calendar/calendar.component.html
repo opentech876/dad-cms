@@ -68,6 +68,23 @@
       <tui-icon icon="@tui.copy" style="font-size:14px;" />
       Dupliquer
     </button>
+    @if (canDeleteCalendars() && selectedCalendar()) {
+      <button class="btn btn-flat btn-sm" type="button"
+              style="color:var(--danger);"
+              title="Déplacer ce calendrier dans la corbeille"
+              (click)="openDeleteModal()">
+        <tui-icon icon="@tui.trash-2" style="font-size:14px;" />
+        Supprimer
+      </button>
+    }
+    @if (canDeleteCalendars()) {
+      <button class="btn btn-flat btn-sm" type="button"
+              title="Voir les calendriers supprimés"
+              (click)="openTrash()">
+        <tui-icon icon="@tui.archive" style="font-size:14px;" />
+        Corbeille
+      </button>
+    }
     <button class="btn btn-primary btn-sm" type="button" (click)="openNewCalModal()">
       <tui-icon icon="@tui.plus" style="font-size:14px;" />
       Nouveau calendrier
@@ -740,6 +757,155 @@
           @if (recommendationsApplying()) { <span class="spinner"></span> }
           Appliquer
         </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══ DELETE CALENDAR MODAL ══ -->
+@if (deleteModalOpen() && selectedCalendar(); as cal) {
+  <div class="modal-backdrop" (click)="closeDeleteModal()">
+    <div class="modal" style="max-width:520px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title" style="color:var(--danger);">
+          <tui-icon icon="@tui.trash-2" style="font-size:16px; vertical-align:-3px; margin-right:6px;" />
+          Supprimer le calendrier
+        </span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button"
+                [disabled]="deleting()"
+                (click)="closeDeleteModal()">
+          <tui-icon icon="@tui.x" style="font-size:18px;" />
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p style="margin:0 0 12px; font-size:13.5px; color:var(--fg-2); line-height:1.5;">
+          Vous êtes sur le point de déplacer <strong>{{ cal.name }}</strong> dans la corbeille.
+          Il sera masqué de la liste principale mais restera restaurable.
+        </p>
+
+        <div style="display:flex; gap:16px; margin:14px 0; padding:12px 14px; background:var(--bg-sunken); border-radius:var(--r-sm); font-size:12.5px;">
+          <div style="flex:1;">
+            <div style="color:var(--fg-3); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Année</div>
+            <div style="font-weight:600;">{{ cal.year }}</div>
+          </div>
+          <div style="flex:1;">
+            <div style="color:var(--fg-3); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Statut</div>
+            <div style="font-weight:600;">{{ statusLabel(cal.status) }}</div>
+          </div>
+          <div style="flex:1;">
+            <div style="color:var(--fg-3); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Entrées</div>
+            <div style="font-weight:600;">{{ cal.eventCount }}</div>
+          </div>
+        </div>
+
+        @if (deleteRequiresNameConfirmation()) {
+          <div style="padding:10px 12px; margin-bottom:12px; background:rgba(217,21,21,0.06); border:1px solid rgba(217,21,21,0.2); border-radius:var(--r-sm); font-size:12.5px; color:var(--danger); line-height:1.5;">
+            <strong>Confirmation requise.</strong> Ce calendrier contient des entrées ou est publié.
+            Pour éviter les suppressions accidentelles, saisissez son nom exact ci-dessous pour continuer.
+          </div>
+          <div class="field">
+            <label class="field-label">Nom du calendrier</label>
+            <input class="input" type="text"
+                   [placeholder]="cal.name"
+                   [value]="deleteConfirmName()"
+                   (input)="deleteConfirmName.set($any($event.target).value)" />
+            <span class="field-hint">Saisissez « {{ cal.name }} » pour activer le bouton.</span>
+          </div>
+        }
+
+        @if (deleteError()) {
+          <div style="margin-top:10px; padding:8px 10px; background:rgba(217,21,21,0.08); border-radius:var(--r-sm); color:var(--danger); font-size:12.5px;">
+            {{ deleteError() }}
+          </div>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button"
+                [disabled]="deleting()"
+                (click)="closeDeleteModal()">
+          Annuler
+        </button>
+        <button class="btn btn-sm" type="button"
+                style="background:var(--danger); color:#fff; border-color:var(--danger);"
+                [disabled]="deleting() || !deleteCanConfirm()"
+                (click)="confirmDelete()">
+          @if (deleting()) { <span class="spinner"></span> }
+          <tui-icon icon="@tui.trash-2" style="font-size:13px;" />
+          Déplacer dans la corbeille
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══ CORBEILLE (TRASH) MODAL ══ -->
+@if (showTrash()) {
+  <div class="modal-backdrop" (click)="closeTrash()">
+    <div class="modal modal--wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">
+          <tui-icon icon="@tui.archive" style="font-size:16px; vertical-align:-3px; margin-right:6px;" />
+          Corbeille des calendriers
+        </span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeTrash()">
+          <tui-icon icon="@tui.x" style="font-size:18px;" />
+        </button>
+      </div>
+
+      <div class="modal-body">
+        @if (trashLoading()) {
+          <div style="text-align:center; padding:32px; color:var(--fg-3);">
+            <span class="spinner"></span> Chargement…
+          </div>
+        } @else if (trashError(); as err) {
+          <div style="padding:12px 14px; background:rgba(217,21,21,0.06); border:1px solid rgba(217,21,21,0.2); border-radius:var(--r-sm); color:var(--danger); font-size:13px;">
+            <tui-icon icon="@tui.alert-triangle" style="font-size:14px; vertical-align:-2px; margin-right:6px;" />
+            {{ err }}
+          </div>
+        } @else if (trashItems().length === 0) {
+          <div style="text-align:center; padding:40px 20px; color:var(--fg-3);">
+            <tui-icon icon="@tui.archive" style="font-size:28px; margin-bottom:8px;" />
+            <p style="margin:0; font-size:13.5px;">Aucun calendrier supprimé.</p>
+            <p style="margin:4px 0 0; font-size:12px; opacity:0.7;">
+              Les calendriers déplacés dans la corbeille apparaîtront ici et pourront être restaurés.
+            </p>
+          </div>
+        } @else {
+          <ul style="list-style:none; padding:0; margin:0;">
+            @for (item of trashItems(); track item.id) {
+              <li style="display:flex; align-items:center; gap:14px; padding:14px 12px; border-bottom:1px solid var(--border-1);">
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
+                    <span style="font-weight:600; font-size:14px;">{{ item.name }}</span>
+                    <span class="badge" [class]="statusBadgeClass(item.status)" style="font-size:10px;">
+                      {{ statusLabel(item.status) }}
+                    </span>
+                  </div>
+                  <div style="font-size:11.5px; color:var(--fg-3);">
+                    {{ item.year }} · {{ item.entriesCount }} entrée(s) ·
+                    supprimé le {{ item.deletedAt | date:'d MMM yyyy à HH:mm':'':'fr' }}
+                    @if (item.deleterName || item.deleterEmail) {
+                      par {{ item.deleterName ?? item.deleterEmail }}
+                    }
+                  </div>
+                </div>
+                <button class="btn btn-flat btn-sm" type="button"
+                        [disabled]="restoringId() === item.id"
+                        (click)="restoreCalendar(item.id)">
+                  @if (restoringId() === item.id) { <span class="spinner"></span> }
+                  <tui-icon icon="@tui.rotate-ccw" style="font-size:13px;" />
+                  Restaurer
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeTrash()">Fermer</button>
       </div>
     </div>
   </div>
