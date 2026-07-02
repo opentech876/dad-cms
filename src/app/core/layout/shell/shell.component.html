@@ -193,11 +193,17 @@
 
     <!-- User card -->
     <div class="sidebar-footer">
-      <div class="sidebar-user-avatar" style="cursor:pointer;" (click)="navigateToProfile()" title="Voir mon profil">{{ userInitials }}</div>
+      <div class="sidebar-user-avatar" style="cursor:pointer;" (click)="navigateToProfile()" title="Voir mon profil">
+        @if (userAvatarUrl(); as url) {
+          <img [src]="url" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />
+        } @else {
+          {{ userInitials() }}
+        }
+      </div>
       @if (!collapsed()) {
         <div class="sidebar-user-info" style="cursor:pointer;" (click)="navigateToProfile()">
-          <span class="sidebar-user-name">{{ userName }}</span>
-          <span class="sidebar-user-email">{{ userEmail }}</span>
+          <span class="sidebar-user-name">{{ userName() }}</span>
+          <span class="sidebar-user-email">{{ userEmail() }}</span>
           @if (currentRoleLabel()) {
             <span class="sidebar-user-role" [title]="currentRoleLabel()">{{ currentRoleLabel() }}</span>
           }

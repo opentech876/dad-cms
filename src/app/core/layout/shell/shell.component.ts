@@ -85,9 +85,14 @@ export class ShellComponent implements OnInit {
 
   private userId = '';
 
-  userEmail = '';
-  userInitials = 'AA';
-  userName = 'Utilisateur';
+  // Sidebar user card + avatar signals — reactive so a save on /profil
+  // (which pings workspaceContext.profileChanged$) makes the sidebar
+  // re-render without a page refresh. Templates read these as function
+  // calls: {{ userName() }} etc.
+  readonly userEmail    = signal('');
+  readonly userInitials = signal('AA');
+  readonly userName     = signal('Utilisateur');
+  readonly userAvatarUrl = signal<string | null>(null);
 
   readonly workspaces = signal<WorkspaceSummary[]>([]);
   /** Active workspace is the one stored in WorkspaceContextService (localStorage-backed). */
@@ -216,6 +221,59 @@ export class ShellComponent implements OnInit {
       }
     } catch {
       // Non-blocking — leave whatever we had cached.
+    }
+  }
+
+  /**
+   * Populate the sidebar identity block (email, name, initials, avatar).
+   * Split out of ngOnInit so it can be re-run after /profil saves a new
+   * name via workspaceContext.profileChanged$ — keeps the sidebar in sync
+   * without a page refresh. Handles all three sources of truth:
+   *   1. email prefix (fallback if nothing else is set),
+   *   2. auth.users.raw_user_meta_data.full_name (sysadmin path),
+   *   3. profiles.full_name + avatar_url (workspace-scoped path).
+   * Later branches shadow earlier ones.
+   */
+  private async _refreshDisplayInfo(user: any, isSysadmin: boolean): Promise<void> {
+    // 1. Baseline from email.
+    const email = user?.email ?? '';
+    this.userEmail.set(email);
+    const parts = email.split('@')[0].split('.');
+    this.userInitials.set(
+      ((parts[0]?.[0] ?? 'A') + (parts[1]?.[0] ?? parts[0]?.[1] ?? '')).toUpperCase(),
+    );
+    this.userName.set(parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' '));
+    this.userAvatarUrl.set(null);
+
+    // 2. Sysadmin path — name lives in auth metadata, avatar via storage.
+    if (isSysadmin) {
+      const metaFullName = (user?.user_metadata?.full_name as string | undefined) ?? '';
+      if (metaFullName.trim()) {
+        this.userName.set(metaFullName.trim());
+        const np = metaFullName.trim().split(/\s+/);
+        this.userInitials.set(((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA');
+      } else {
+        this.showSysadminSetup.set(true);
+      }
+      return;
+    }
+
+    // 3. Workspace-scoped profile path.
+    try {
+      const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
+      if (profile) {
+        if (profile.full_name) {
+          this.userName.set(profile.full_name);
+          const np = profile.full_name.trim().split(/\s+/);
+          this.userInitials.set(((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA');
+        } else {
+          this.profilePhone.set(profile.phone ?? '');
+          this.showProfileSetup.set(true);
+        }
+        if (profile.avatar_url) this.userAvatarUrl.set(profile.avatar_url);
+      }
+    } catch {
+      // Profile check failed — leave email-derived defaults in place.
     }
   }
 
@@ -514,29 +572,8 @@ export class ShellComponent implements OnInit {
 
     const user = await firstValueFrom(this.auth.getCurrentUser().pipe(filter(Boolean)));
     this.userId = user.id ?? '';
-    this.userEmail = user.email ?? '';
-    const parts = this.userEmail.split('@')[0].split('.');
-    this.userInitials = ((parts[0]?.[0] ?? 'A') + (parts[1]?.[0] ?? parts[0]?.[1] ?? '')).toUpperCase();
-    this.userName = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
-
-    // Resolve the platform-level role early. system_admin is workspace-
-    // agnostic: it bypasses the workspace summary + per-workspace profile
-    // loading paths (which would either return empty or fail), reads its
-    // display name from auth.users.raw_user_meta_data.full_name instead.
     const isSysadmin = await firstValueFrom(this.auth.isSystemAdmin());
-
-    if (isSysadmin) {
-      const metaFullName = ((user as any).user_metadata?.full_name as string | undefined) ?? '';
-      if (metaFullName.trim()) {
-        this.userName = metaFullName.trim();
-        const np = metaFullName.trim().split(/\s+/);
-        this.userInitials = ((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA';
-      } else {
-        // First sysadmin sign-in: name not yet set. Surface the sysadmin
-        // setup modal — the workspace-scoped one would just fail.
-        this.showSysadminSetup.set(true);
-      }
-    }
+    await this._refreshDisplayInfo(user, isSysadmin);
 
     // Load workspace summaries for BOTH branches. A sysadmin can also be a
     // member of one or more workspaces (either invited as manager, or
@@ -545,23 +582,17 @@ export class ShellComponent implements OnInit {
     // fetch just returns [] and nothing changes.
     await this._reloadWorkspaceSummaries();
 
-    if (!isSysadmin) {
-      try {
-        const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
-        if (profile !== null) {
-          if (profile.full_name) {
-            this.userName = profile.full_name;
-            const np = profile.full_name.trim().split(/\s+/);
-            this.userInitials = ((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA';
-          } else {
-            this.profilePhone.set(profile.phone ?? '');
-            this.showProfileSetup.set(true);
-          }
-        }
-      } catch {
-        // Profile check failed — skip setup modal
-      }
-    }
+    // When /profil saves a new name / avatar / phone, it fires
+    // workspaceContext.profileChanged$. Re-run the loader so the
+    // sidebar identity block reflects the change immediately.
+    this.workspaceContext.profileChanged$.subscribe(() => {
+      void (async () => {
+        const u = await firstValueFrom(this.auth.getCurrentUser());
+        if (!u) return;
+        const isAdmin = await firstValueFrom(this.auth.isSystemAdmin());
+        await this._refreshDisplayInfo(u, isAdmin);
+      })();
+    });
 
     // Live-reload the switcher whenever a workspace is created / renamed /
     // soft-deleted from anywhere in the app (currently /admin/espaces).
@@ -608,9 +639,9 @@ export class ShellComponent implements OnInit {
 
     this.supabase.markPasswordSet();
     this.hasPasswordNotSet.set(false);
-    this.userName = fullName;
+    this.userName.set(fullName);
     const np = fullName.split(/\s+/);
-    this.userInitials = ((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA';
+    this.userInitials.set(((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA');
     this.sysadminSaveLoading.set(false);
     this.showSysadminSetup.set(false);
   }

@@ -25,6 +25,8 @@ describe('ShellComponent — navigation par rôle', () => {
     setActiveWorkspace: jest.Mock;
     workspacesChanged$: Subject<void>;
     notifyWorkspacesChanged: jest.Mock;
+    profileChanged$: Subject<void>;
+    notifyProfileChanged: jest.Mock;
   };
 
   const MOCK_WORKSPACES: WorkspaceSummary[] = [
@@ -53,11 +55,14 @@ describe('ShellComponent — navigation par rôle', () => {
       getWorkspaceSummaries: jest.fn().mockReturnValue(of(workspacesOverride ?? MOCK_WORKSPACES)),
     };
     const workspacesChanged$ = new Subject<void>();
+    const profileChanged$    = new Subject<void>();
     mockWorkspaceContext = {
       activeWorkspaceId: jest.fn().mockReturnValue('ws-1'),
       setActiveWorkspace: jest.fn(),
       workspacesChanged$,
       notifyWorkspacesChanged: jest.fn(() => workspacesChanged$.next()),
+      profileChanged$,
+      notifyProfileChanged: jest.fn(() => profileChanged$.next()),
     };
     const updateUserSpy = jest.fn().mockResolvedValue(opts?.updateUserResult ?? { data: { user: {} }, error: null });
 
@@ -296,7 +301,7 @@ describe('ShellComponent — navigation par rôle', () => {
   it('userName est défini à partir de profile.full_name quand disponible', async () => {
     createComponent('owner'); // default mock returns { full_name: 'Test User', ... }
     await component.ngOnInit();
-    expect(component.userName).toBe('Test User');
+    expect(component.userName()).toBe('Test User');
   });
 
   // ── profile setup modal ────────────────────────────────────────────────────
@@ -443,7 +448,7 @@ describe('ShellComponent — navigation par rôle', () => {
       await component.ngOnInit();
       expect(component.showSysadminSetup()).toBe(false);
       // Le nom doit être hydraté depuis user_metadata
-      expect(component.userName).toBe('Elvis Destin OLEMBE');
+      expect(component.userName()).toBe('Elvis Destin OLEMBE');
     });
 
     it("saveSysadminSetup appelle auth.updateUser avec full_name et password", async () => {
@@ -461,7 +466,7 @@ describe('ShellComponent — navigation par rôle', () => {
       });
       expect(supabase.markPasswordSet).toHaveBeenCalled();
       expect(component.showSysadminSetup()).toBe(false);
-      expect(component.userName).toBe('Elvis Destin OLEMBE');
+      expect(component.userName()).toBe('Elvis Destin OLEMBE');
     });
 
     it("saveSysadminSetup refuse un mot de passe trop court et garde le modal ouvert", async () => {

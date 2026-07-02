@@ -6,6 +6,7 @@ import { filter, firstValueFrom } from 'rxjs';
 import { AppRole } from '../../models';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -29,6 +30,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 export class ProfileComponent implements OnInit {
   private readonly auth             = inject(AuthService);
   private readonly workspaceService = inject(WorkspaceService);
+  private readonly workspaceContext = inject(WorkspaceContextService);
   private readonly supabase         = inject(SupabaseService);
   private readonly route            = inject(ActivatedRoute);
   private readonly toast            = inject(ToastService);
@@ -130,6 +132,9 @@ export class ProfileComponent implements OnInit {
           this.toast.error('Impossible de mettre à jour le profil : ' + error.message);
         } else {
           this.toast.success('Profil mis à jour avec succès.');
+          // Ping the shell so the sidebar name + initials refresh from the
+          // updated auth metadata without a full page reload.
+          this.workspaceContext.notifyProfileChanged();
         }
       } else {
         const result = await firstValueFrom(
@@ -141,6 +146,7 @@ export class ProfileComponent implements OnInit {
         );
         if (result.success) {
           this.toast.success('Profil mis à jour avec succès.');
+          this.workspaceContext.notifyProfileChanged();
         } else {
           this.toast.error(result.error ?? 'Impossible de mettre à jour le profil. Veuillez réessayer.');
         }
@@ -177,6 +183,9 @@ export class ProfileComponent implements OnInit {
         if (prev) URL.revokeObjectURL(prev);
         this.avatarPreview.set(null);
         this.toast.success('Photo de profil mise à jour.');
+        // Refresh the sidebar avatar/initials — reads the new avatar_url
+        // from profiles on the next getMyProfile round-trip.
+        this.workspaceContext.notifyProfileChanged();
       }
     } finally {
       this.avatarUploading.set(false);

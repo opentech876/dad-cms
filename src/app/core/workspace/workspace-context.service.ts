@@ -29,6 +29,18 @@ export class WorkspaceContextService {
   }
 
   /**
+   * Ping this after the caller's own profile changes (full_name, avatar_url,
+   * phone). The shell listens and reloads the sidebar user card + avatar
+   * so the identity block stays in sync after a save on /profil without
+   * a page refresh.
+   */
+  readonly profileChanged$ = new Subject<void>();
+
+  notifyProfileChanged(): void {
+    this.profileChanged$.next();
+  }
+
+  /**
    * Set the active workspace and stamp `workspace_members.last_accessed_at`
    * for the caller. The stamp is fire-and-forget — failure here shouldn't
    * block the switch, and the value is purely used to order the switcher
