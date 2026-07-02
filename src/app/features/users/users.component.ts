@@ -26,7 +26,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
   chef_equipe: "Chef d'équipe",
   editeur: 'Éditeur',
   charge_communication: 'Commercial',
-  presidence: 'Présidence',
+  presidence: 'Curateur',
   chef_equipe_commerciale: 'Chef d\'équipe comm.',
   system_admin: 'Admin plateforme',
 };
@@ -140,7 +140,7 @@ export class UsersComponent implements OnInit {
     this.users().find(u => u.userId === this.confirmModalUserId()) ?? null
   );
 
-  // Columns (after the label): Administrateur | Chef d'équipe | Éditeur | Commercial | Présidence | Chef d'équipe comm.
+  // Columns (after the label): Administrateur | Chef d'équipe | Éditeur | Commercial | Curateur | Chef d'équipe comm.
   readonly permissionsMatrix: (string | number)[][] = [
     ["Créer / configurer l'espace",                       1, 0, 0, 0, 0, 0],
     ['Inviter / bloquer un membre',                       1, 0, 0, 0, 0, 0],
@@ -149,8 +149,8 @@ export class UsersComponent implements OnInit {
     ['Dupliquer un calendrier',                           1, 1, 0, 0, 0, 0],
     ['CRUD entrées de la bibliothèque historique',        1, 1, 1, 0, 0, 0],
     ['Assigner un événement à un jour (calendrier)',      1, 1, 0, 0, 0, 0],
-    ['Recommander un événement à un jour (Présidence)',   1, 0, 0, 0, 1, 0],
-    ['Appliquer une recommandation Présidence',           1, 1, 1, 0, 0, 0],
+    ['Recommander un événement à un jour (Curateur)',     1, 0, 0, 0, 1, 0],
+    ['Appliquer une recommandation du Curateur',          1, 1, 1, 0, 0, 0],
     ['CRUD compagnies (annonceurs)',                      1, 0, 0, 0, 0, 1],
     ['CRUD encarts publicitaires',                        1, 1, 0, 1, 0, 1],
     ['Tableaux de bord (lecture seule)',                  1, 1, 1, 1, 1, 1],

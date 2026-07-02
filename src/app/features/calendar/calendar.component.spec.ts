@@ -685,7 +685,7 @@ describe('CalendarComponent', () => {
   });
 
   // ── Presidency apply flow ──────────────────────────────────────────────
-  describe('flux d\'application des recommandations Présidence', () => {
+  describe('flux d\'application des recommandations du Curateur', () => {
     it('canApplyRecommendations est true pour un rôle éditorial', () => {
       expect(component.canApplyRecommendations()).toBe(true);
     });

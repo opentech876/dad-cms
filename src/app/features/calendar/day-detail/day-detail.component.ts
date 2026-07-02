@@ -98,7 +98,7 @@ export class DayDetailComponent implements OnInit {
   async save(): Promise<void> {
     if (this.saveLoading()) return;
     if (!this.canEditAssignments()) {
-      this.toast.error('Les affectations sont gérées par la Présidence et appliquées par l\'équipe éditoriale.');
+      this.toast.error('Les affectations sont gérées par le Curateur et appliquées par l\'équipe éditoriale.');
       return;
     }
     this.saveLoading.set(true);

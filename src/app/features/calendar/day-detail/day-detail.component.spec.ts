@@ -352,7 +352,7 @@ describe('DayDetailComponent', () => {
       expect(mockCalendarEntryService.assignEvent).not.toHaveBeenCalled();
       expect(mockCalendarEntryService.unassignSlot).not.toHaveBeenCalled();
       expect(mockToast.error).toHaveBeenCalledWith(
-        expect.stringContaining('Présidence'),
+        expect.stringContaining('Curateur'),
       );
     });
   });

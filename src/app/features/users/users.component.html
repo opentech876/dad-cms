@@ -121,7 +121,7 @@
           font-weight: 600;
         "
       >
-        Présidence
+        Curateur
       </div>
       <div
         style="
@@ -196,7 +196,7 @@
       <option>Éditeur</option>
       <option>Commercial</option>
       <option>Chef d'équipe comm.</option>
-      <option>Présidence</option>
+      <option>Curateur</option>
     </select>
     <div style="flex: 1"></div>
     <button class="btn btn-primary btn-sm" type="button" (click)="openInviteModal()">
@@ -278,7 +278,7 @@
                     <span class="badge badge-warning">Commercial</span>
                   }
                   @if (user.role === 'presidence') {
-                    <span class="badge badge-accent">Présidence</span>
+                    <span class="badge badge-accent">Curateur</span>
                   }
                   @if (user.role === 'chef_equipe_commerciale') {
                     <span class="badge badge-warning">Chef d'équipe comm.</span>
@@ -463,7 +463,7 @@
             <th style="text-align: center">Chef d'équipe</th>
             <th style="text-align: center">Éditeur</th>
             <th style="text-align: center">Commercial</th>
-            <th style="text-align: center">Présidence</th>
+            <th style="text-align: center">Curateur</th>
             <th style="text-align: center">Chef d'éq. comm.</th>
           </tr>
         </thead>
@@ -513,7 +513,7 @@
             <option value="editeur">Éditeur</option>
             <option value="charge_communication">Commercial</option>
             <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
-            <option value="presidence">Présidence</option>
+            <option value="presidence">Curateur</option>
           </select>
           <span class="field-hint">
             @if (roleModalTargetRole() === 'chef_equipe') {
@@ -526,7 +526,7 @@
               Campagnes publicitaires et tableaux de bord.
             }
             @if (roleModalTargetRole() === 'presidence') {
-              Recommandations éditoriales (Présidence) — décide les événements à proposer chaque jour.
+              Recommandations éditoriales (Curateur) — décide les événements à proposer chaque jour.
             }
             @if (roleModalTargetRole() === 'chef_equipe_commerciale') {
               Gestion des compagnies (annonceurs) et supervision des campagnes publicitaires.
@@ -744,7 +744,7 @@
               <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
               <option value="editeur">Éditeur</option>
               <option value="charge_communication">Commercial</option>
-              <option value="presidence">Présidence</option>
+              <option value="presidence">Curateur</option>
             </select>
             <span class="field-hint">
               L'invitation sera envoyée par e-mail. Le rôle sera appliqué dès la première connexion.

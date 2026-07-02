@@ -88,12 +88,14 @@ export class DashboardComponent implements OnInit {
     return Math.round((this.stats().yearEvents / maxSlots) * 100);
   });
 
+  // Placeholder feed until the real audit_log stream lands on the dashboard.
+  // Names + targets are deliberately generic — no real persons or brands.
   readonly activityFeed = [
-    { id: 1, initials: 'AB', who: 'Aïcha Bemba',     action: 'a publié',    target: 'Indépendance de la République du Congo', meta: 'Calendrier 2025 · 15 août',     time: 'Il y a 8 min'  },
-    { id: 2, initials: 'SM', who: 'Sylvie Mbembé',    action: 'a assigné',   target: 'MTN Forfait étudiant',                  meta: '91 dates · Avril → Juin 2026',  time: 'Il y a 32 min' },
-    { id: 3, initials: 'TM', who: 'Théodore Makosso', action: 'a modifié',   target: 'Conférence nationale souveraine',       meta: 'Calendrier 2025 · 10 mars',     time: 'Il y a 1 h'   },
-    { id: 4, initials: 'EO', who: 'Elvis Olembe',     action: 'a dupliqué',  target: 'Calendrier 2025 → 2026',                meta: '243 événements · 12 campagnes', time: 'Il y a 3 h'   },
-    { id: 5, initials: 'AB', who: 'Aïcha Bemba',      action: 'a réordonné', target: 'Événements du 28 novembre',             meta: '2 événements',                  time: 'Hier · 18:42' },
+    { id: 1, initials: 'MA', who: 'Membre A', action: 'a publié',    target: 'un événement historique',              meta: 'Calendrier en cours · exemple',         time: 'Il y a 8 min'  },
+    { id: 2, initials: 'MB', who: 'Membre B', action: 'a assigné',   target: 'une campagne publicitaire',           meta: '91 dates · trimestre en cours',         time: 'Il y a 32 min' },
+    { id: 3, initials: 'MC', who: 'Membre C', action: 'a modifié',   target: 'un événement historique',              meta: 'Calendrier en cours · exemple',         time: 'Il y a 1 h'   },
+    { id: 4, initials: 'MD', who: 'Membre D', action: 'a dupliqué',  target: 'un calendrier annuel',                 meta: 'événements et campagnes copiés',        time: 'Il y a 3 h'   },
+    { id: 5, initials: 'MA', who: 'Membre A', action: 'a réordonné', target: 'les événements d\'une journée',        meta: '2 événements',                          time: 'Hier · 18:42' },
   ];
 
   readonly coverageBars = [78,72,85,68,90,82,75,88,70,65,72,55].map((pct, i) => ({
@@ -105,7 +107,7 @@ export class DashboardComponent implements OnInit {
   readonly publicationTodos = [
     { icon: '⚠️', text: '4 dates sans événement',  meta: '14 fév · 22 mars · 3 mai · 18 sept', bg: 'var(--warning-soft)', fg: 'var(--warning)' },
     { icon: '🖼️', text: '12 images en attente',    meta: 'Compresser à 800×600 / ≤150 Ko',      bg: 'var(--info-soft)',    fg: 'var(--info)'    },
-    { icon: '📢', text: '3 campagnes à approuver', meta: 'Demande de Sylvie Mbembé',             bg: 'var(--accent-soft)', fg: 'var(--accent)'  },
+    { icon: '📢', text: '3 campagnes à approuver', meta: 'Demandes en attente de validation',    bg: 'var(--accent-soft)', fg: 'var(--accent)'  },
   ];
 
   async ngOnInit(): Promise<void> {

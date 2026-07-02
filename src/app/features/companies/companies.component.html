@@ -148,7 +148,7 @@
           <input class="input"
                  [value]="editorName()"
                  (input)="editorName.set($any($event.target).value)"
-                 placeholder="MTN Congo" />
+                 placeholder="Raison sociale de l'entreprise" />
         </div>
         <div class="field required">
           <label class="field-label">Type *</label>
@@ -172,7 +172,7 @@
           <input class="input" type="url"
                  [value]="editorWebsite()"
                  (input)="editorWebsite.set($any($event.target).value)"
-                 placeholder="https://mtn.cg" />
+                 placeholder="https://exemple.cg" />
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div class="field">
@@ -180,7 +180,7 @@
             <input class="input" type="email"
                    [value]="editorEmail()"
                    (input)="editorEmail.set($any($event.target).value)"
-                   placeholder="contact@mtn.cg" />
+                   placeholder="contact@exemple.cg" />
           </div>
           <div class="field">
             <label class="field-label">Téléphone</label>

@@ -66,7 +66,7 @@ export class ShellComponent implements OnInit {
       chef_equipe:             "Chef d'équipe",
       editeur:                 'Éditeur',
       charge_communication:    'Commercial',
-      presidence:              'Présidence',
+      presidence:              'Curateur',
       chef_equipe_commerciale: "Chef d'équipe commerciale",
       system_admin:            'Administrateur plateforme',
     };
@@ -517,7 +517,7 @@ export class ShellComponent implements OnInit {
   private readonly routeTitles: Record<string, string> = {
     dashboard:           'Tableau de bord',
     calendrier:          'Calendrier éditorial',
-    recommandations:     'Recommandations Présidence',
+    recommandations:     'Recommandations du Curateur',
     evenements:          'Bibliothèque d\'événements historiques',
     campagnes:           'Encarts publicitaires',
     compagnies:          'Annonceurs',

@@ -721,7 +721,7 @@
   <div class="modal-backdrop" (click)="cancelApply()">
     <div class="modal" style="max-width:560px;" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h3 style="margin:0; font-size:16px;">Appliquer la recommandation Présidence</h3>
+        <h3 style="margin:0; font-size:16px;">Appliquer la recommandation du Curateur</h3>
         <button class="btn btn-flat btn-sm" type="button" (click)="cancelApply()" aria-label="Fermer">
           <tui-icon icon="@tui.x" style="font-size:14px;" />
         </button>
@@ -734,7 +734,7 @@
           </p>
         } @else {
           <p style="margin:0 0 12px 0; font-size:13.5px; color:var(--fg-2);">
-            {{ applyConflicts().length }} jour(s) déjà affecté(s) seront <strong>remplacé(s)</strong> par la recommandation Présidence&nbsp;:
+            {{ applyConflicts().length }} jour(s) déjà affecté(s) seront <strong>remplacé(s)</strong> par la recommandation du Curateur&nbsp;:
           </p>
           <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--fg-2); max-height:240px; overflow:auto;">
             @for (c of applyConflicts(); track c.mmdd + '-' + c.position) {
@@ -953,7 +953,7 @@
         <div style="padding:12px 14px; margin-bottom:14px; background:rgba(217,21,21,0.06); border:1px solid rgba(217,21,21,0.2); border-radius:var(--r-sm); font-size:13px; color:var(--danger); line-height:1.55;">
           <strong>Action irréversible.</strong>
           Vous êtes sur le point de supprimer définitivement <strong>{{ trashItems().length }}</strong>
-          calendrier(s) de la corbeille, ainsi que toutes leurs entrées et recommandations Présidence.
+          calendrier(s) de la corbeille, ainsi que toutes leurs entrées et recommandations du Curateur.
           Aucune restauration ne sera possible.
         </div>
 
