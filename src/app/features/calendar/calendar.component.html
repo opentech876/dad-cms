@@ -849,9 +849,20 @@
           <tui-icon icon="@tui.archive" style="font-size:16px; vertical-align:-3px; margin-right:6px;" />
           Corbeille des calendriers
         </span>
-        <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeTrash()">
-          <tui-icon icon="@tui.x" style="font-size:18px;" />
-        </button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          @if (trashItems().length > 0 && !trashLoading() && !trashError()) {
+            <button class="btn btn-flat btn-sm" type="button"
+                    style="color:var(--danger);"
+                    title="Supprimer définitivement TOUS les calendriers de la corbeille"
+                    (click)="openEmptyTrashModal()">
+              <tui-icon icon="@tui.trash-x" style="font-size:14px;" />
+              Vider la corbeille
+            </button>
+          }
+          <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="closeTrash()">
+            <tui-icon icon="@tui.x" style="font-size:18px;" />
+          </button>
+        </div>
       </div>
 
       <div class="modal-body">
@@ -891,13 +902,24 @@
                     }
                   </div>
                 </div>
-                <button class="btn btn-flat btn-sm" type="button"
-                        [disabled]="restoringId() === item.id"
-                        (click)="restoreCalendar(item.id)">
-                  @if (restoringId() === item.id) { <span class="spinner"></span> }
-                  <tui-icon icon="@tui.rotate-ccw" style="font-size:13px;" />
-                  Restaurer
-                </button>
+                <div style="display:flex; gap:6px; flex-shrink:0;">
+                  <button class="btn btn-flat btn-sm" type="button"
+                          [disabled]="restoringId() === item.id || purgingId() === item.id"
+                          (click)="restoreCalendar(item.id)">
+                    @if (restoringId() === item.id) { <span class="spinner"></span> }
+                    <tui-icon icon="@tui.rotate-ccw" style="font-size:13px;" />
+                    Restaurer
+                  </button>
+                  <button class="btn btn-flat btn-sm" type="button"
+                          style="color:var(--danger);"
+                          [disabled]="purgingId() === item.id || restoringId() === item.id"
+                          [attr.title]="'Supprimer définitivement — irréversible'"
+                          (click)="purgeCalendar(item.id, item.name)">
+                    @if (purgingId() === item.id) { <span class="spinner"></span> }
+                    <tui-icon icon="@tui.trash-x" style="font-size:13px;" />
+                    Supprimer
+                  </button>
+                </div>
               </li>
             }
           </ul>
@@ -906,6 +928,68 @@
 
       <div class="modal-footer">
         <button class="btn btn-secondary btn-sm" type="button" (click)="closeTrash()">Fermer</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══ VIDER LA CORBEILLE CONFIRM MODAL ══ -->
+@if (emptyTrashModalOpen()) {
+  <div class="modal-backdrop" (click)="closeEmptyTrashModal()">
+    <div class="modal" style="max-width:520px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title" style="color:var(--danger);">
+          <tui-icon icon="@tui.trash-x" style="font-size:16px; vertical-align:-3px; margin-right:6px;" />
+          Vider la corbeille
+        </span>
+        <button class="btn btn-flat btn-icon btn-sm" type="button"
+                [disabled]="emptyingTrash()"
+                (click)="closeEmptyTrashModal()">
+          <tui-icon icon="@tui.x" style="font-size:18px;" />
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div style="padding:12px 14px; margin-bottom:14px; background:rgba(217,21,21,0.06); border:1px solid rgba(217,21,21,0.2); border-radius:var(--r-sm); font-size:13px; color:var(--danger); line-height:1.55;">
+          <strong>Action irréversible.</strong>
+          Vous êtes sur le point de supprimer définitivement <strong>{{ trashItems().length }}</strong>
+          calendrier(s) de la corbeille, ainsi que toutes leurs entrées et recommandations Présidence.
+          Aucune restauration ne sera possible.
+        </div>
+
+        <div class="field">
+          <label class="field-label">Saisissez « SUPPRIMER » pour confirmer</label>
+          <input class="input" type="text"
+                 placeholder="SUPPRIMER"
+                 autocomplete="off"
+                 [value]="emptyTrashConfirm()"
+                 (input)="emptyTrashConfirm.set($any($event.target).value)" />
+          <span class="field-hint">
+            En majuscules exactement, pour éviter les suppressions accidentelles.
+          </span>
+        </div>
+
+        @if (emptyTrashError()) {
+          <div style="margin-top:10px; padding:8px 10px; background:rgba(217,21,21,0.08); border-radius:var(--r-sm); color:var(--danger); font-size:12.5px;">
+            {{ emptyTrashError() }}
+          </div>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button"
+                [disabled]="emptyingTrash()"
+                (click)="closeEmptyTrashModal()">
+          Annuler
+        </button>
+        <button class="btn btn-sm" type="button"
+                style="background:var(--danger); color:#fff; border-color:var(--danger);"
+                [disabled]="emptyingTrash() || !emptyTrashCanConfirm()"
+                (click)="confirmEmptyTrash()">
+          @if (emptyingTrash()) { <span class="spinner"></span> }
+          <tui-icon icon="@tui.trash-x" style="font-size:13px;" />
+          Vider définitivement
+        </button>
       </div>
     </div>
   </div>

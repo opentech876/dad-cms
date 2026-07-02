@@ -312,4 +312,54 @@ describe('CalendarService', () => {
       expect(result).toEqual([]);
     });
   });
+
+  // ── purgeCalendar() ────────────────────────────────────────────────────────
+
+  describe('purgeCalendar()', () => {
+    it('délègue à la RPC purge_calendar avec p_calendar_id', async () => {
+      mockSupabase.client = buildClient();
+      await firstValueFrom(service.purgeCalendar('cal-1'));
+      expect(rpcSpy).toHaveBeenCalledWith('purge_calendar', { p_calendar_id: 'cal-1' });
+    });
+
+    it('retourne success: true quand la RPC réussit', async () => {
+      mockSupabase.client = buildClient();
+      const result = await firstValueFrom(service.purgeCalendar('cal-1'));
+      expect(result.success).toBe(true);
+    });
+
+    it("retourne success: false avec un message en cas d'erreur", async () => {
+      mockSupabase.client = buildClient({ simulateError: 'Not purgeable' });
+      const result = await firstValueFrom(service.purgeCalendar('cal-1'));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Not purgeable');
+    });
+  });
+
+  // ── emptyCalendarTrash() ───────────────────────────────────────────────────
+
+  describe('emptyCalendarTrash()', () => {
+    it('délègue à la RPC empty_calendar_trash sans argument', async () => {
+      mockSupabase.client = buildClient();
+      await firstValueFrom(service.emptyCalendarTrash());
+      expect(rpcSpy).toHaveBeenCalledWith('empty_calendar_trash');
+    });
+
+    it('renvoie le compteur "purged" quand la RPC réussit', async () => {
+      mockSupabase.client = {
+        auth: { getUser: jest.fn() },
+        from: jest.fn(),
+        rpc: jest.fn().mockResolvedValue({ data: 3, error: null }),
+      };
+      const result = await firstValueFrom(service.emptyCalendarTrash());
+      expect(result).toEqual({ success: true, purged: 3 });
+    });
+
+    it("retourne success: false avec un message en cas d'erreur", async () => {
+      mockSupabase.client = buildClient({ simulateError: 'Access denied' });
+      const result = await firstValueFrom(service.emptyCalendarTrash());
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Access denied');
+    });
+  });
 });

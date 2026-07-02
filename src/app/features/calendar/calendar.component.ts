@@ -164,6 +164,17 @@ export class CalendarComponent implements OnInit {
   readonly trashItems   = signal<import('../../core/calendar/calendar.service').DeletedCalendarSummary[]>([]);
   readonly trashError   = signal<string | null>(null);
   readonly restoringId  = signal<string | null>(null);
+  readonly purgingId    = signal<string | null>(null);
+
+  // Empty-trash confirmation modal state. Requires typing "SUPPRIMER" to
+  // enable the button since this is unrecoverable.
+  readonly emptyTrashModalOpen = signal(false);
+  readonly emptyTrashConfirm   = signal('');
+  readonly emptyingTrash       = signal(false);
+  readonly emptyTrashError     = signal<string | null>(null);
+  readonly emptyTrashCanConfirm = computed(() =>
+    this.emptyTrashConfirm().trim() === 'SUPPRIMER',
+  );
 
   // Confirm dialog state for the apply flow.
   readonly applyDialogVisible = signal(false);
@@ -694,6 +705,53 @@ export class CalendarComponent implements OnInit {
     this.toast.success('Calendrier restauré.');
     await this.refreshTrash();
     await this._reloadCalendars();
+  }
+
+  /** Per-row hard delete. No modal — the corbeille is already the danger
+   *  zone; user has already reviewed the row and chose to click purge. */
+  async purgeCalendar(id: string, name: string): Promise<void> {
+    if (this.purgingId() || this.restoringId()) return;
+    if (!this.canDeleteCalendars()) return;
+    this.purgingId.set(id);
+    const result = await firstValueFrom(this.calendarService.purgeCalendar(id));
+    this.purgingId.set(null);
+    if (!result.success) {
+      this.toast.error(result.error ?? 'Échec de la suppression définitive.');
+      return;
+    }
+    this.toast.success(`« ${name} » supprimé définitivement.`);
+    await this.refreshTrash();
+  }
+
+  openEmptyTrashModal(): void {
+    if (!this.canDeleteCalendars()) return;
+    if (this.trashItems().length === 0) return;
+    this.emptyTrashConfirm.set('');
+    this.emptyTrashError.set(null);
+    this.emptyTrashModalOpen.set(true);
+  }
+
+  closeEmptyTrashModal(): void {
+    if (this.emptyingTrash()) return;
+    this.emptyTrashModalOpen.set(false);
+    this.emptyTrashConfirm.set('');
+    this.emptyTrashError.set(null);
+  }
+
+  async confirmEmptyTrash(): Promise<void> {
+    if (!this.emptyTrashCanConfirm() || this.emptyingTrash()) return;
+    if (!this.canDeleteCalendars()) return;
+    this.emptyingTrash.set(true);
+    this.emptyTrashError.set(null);
+    const result = await firstValueFrom(this.calendarService.emptyCalendarTrash());
+    this.emptyingTrash.set(false);
+    if (!result.success) {
+      this.emptyTrashError.set(result.error ?? 'Échec du vidage de la corbeille.');
+      return;
+    }
+    this.toast.success(`${result.purged ?? 0} calendrier(s) supprimé(s) définitivement.`);
+    this.emptyTrashModalOpen.set(false);
+    await this.refreshTrash();
   }
 
   // ── Computed views ────────────────────────────────

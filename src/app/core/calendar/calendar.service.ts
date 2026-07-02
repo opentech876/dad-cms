@@ -127,6 +127,33 @@ export class CalendarService {
     );
   }
 
+  /** Hard-delete a single soft-deleted calendar. Also removes its
+   *  calendar_entries + presidency_recommendations. Only rows already in
+   *  the trash are eligible; the RPC returns 22023 on an active calendar. */
+  purgeCalendar(id: string): Observable<{ success: boolean; error?: string }> {
+    return from(
+      this.supabaseService.client.rpc('purge_calendar', { p_calendar_id: id }),
+    ).pipe(
+      map(({ error }: any) =>
+        error ? { success: false, error: error.message } : { success: true },
+      ),
+    );
+  }
+
+  /** Bulk purge: hard-delete every soft-deleted calendar in the caller's
+   *  workspaces. Returns the count on success. */
+  emptyCalendarTrash(): Observable<{ success: boolean; purged?: number; error?: string }> {
+    return from(
+      this.supabaseService.client.rpc('empty_calendar_trash'),
+    ).pipe(
+      map(({ data, error }: any) =>
+        error
+          ? { success: false, error: error.message }
+          : { success: true, purged: data ?? 0 },
+      ),
+    );
+  }
+
   /** Deleted-calendar list, workspace-scoped, sorted by deleted_at DESC.
    *  Powers the Corbeille view. Empty array on any error — the caller
    *  surfaces the error via a banner if it wants to. */
