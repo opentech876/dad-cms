@@ -483,7 +483,13 @@ input, textarea, select { font-family: inherit; }
   --bg-surface:   #f5efe1;
   --bg-surface-2: #ebe3cf;
   --bg-sunken:    #ddd3bb;
-  --bg-elev:      #f5efe1;
+  // Elevated surface for cards / modals / dropdowns. Was #f5efe1, i.e.
+  // the SAME value as --bg-surface — cards using it disappeared into
+  // the page background (no perceptible edge, only the border-1 outline
+  // hinted at their presence). Lifted to a slightly warmer, brighter
+  // kraft so modals and admin-logs / admin-users cards stand out. Still
+  // firmly kraft (fits Field's earth palette), not white.
+  --bg-elev:      #fbf6ea;
   --fg-1:        #18221f;
   --fg-2:        #3a4641;
   --fg-3:        #4e5850;

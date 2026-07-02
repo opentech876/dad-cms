@@ -25,7 +25,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
   owner: 'Administrateur',
   chef_equipe: "Chef d'équipe",
   editeur: 'Éditeur',
-  charge_communication: 'Chargé comm.',
+  charge_communication: 'Commercial',
   presidence: 'Présidence',
   chef_equipe_commerciale: 'Chef d\'équipe comm.',
   system_admin: 'Admin plateforme',
@@ -140,7 +140,7 @@ export class UsersComponent implements OnInit {
     this.users().find(u => u.userId === this.confirmModalUserId()) ?? null
   );
 
-  // Columns (after the label): Administrateur | Chef d'équipe | Éditeur | Chargé comm. | Présidence | Chef d'équipe comm.
+  // Columns (after the label): Administrateur | Chef d'équipe | Éditeur | Commercial | Présidence | Chef d'équipe comm.
   readonly permissionsMatrix: (string | number)[][] = [
     ["Créer / configurer l'espace",                       1, 0, 0, 0, 0, 0],
     ['Inviter / bloquer un membre',                       1, 0, 0, 0, 0, 0],

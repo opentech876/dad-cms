@@ -14,7 +14,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
   owner:                   'Administrateur',
   chef_equipe:             "Chef d'équipe",
   editeur:                 'Éditeur',
-  charge_communication:    'Chargé de communication',
+  charge_communication:    'Commercial',
   presidence:              'Présidence',
   chef_equipe_commerciale: "Chef d'équipe commerciale",
   system_admin:            "Administrateur plateforme",
