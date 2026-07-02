@@ -1,7 +1,9 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../../core/auth/auth.service';
 import { CalendarService, CalendarSummary } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
 import { EventService } from '../../core/events/event.service';
@@ -31,11 +33,22 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
   styleUrl: './recommandations.component.scss',
 })
 export class RecommandationsComponent implements OnInit {
+  private readonly authService = inject(AuthService);
   private readonly calendarService = inject(CalendarService);
   private readonly calendarEntryService = inject(CalendarEntryService);
   private readonly eventService = inject(EventService);
   private readonly recommendationService = inject(RecommendationService);
   private readonly toast = inject(ToastService);
+
+  /** True when the user can create / edit / delete recommendations. Only
+   *  owner + presidence pass here — chef_equipe and editeur reach this
+   *  page in read-only mode to review pending recommendations before
+   *  applying them from /calendrier. Mirrors the RLS WITH CHECK on
+   *  presidency_recommendations (has_role_at_least('presidence')). */
+  readonly canManageRecommendations = toSignal(
+    this.authService.hasRoleAtLeast('presidence'),
+    { initialValue: false },
+  );
 
   readonly calendars = signal<CalendarSummary[]>([]);
   readonly selectedCalendarId = signal<string>('');
@@ -154,6 +167,9 @@ export class RecommandationsComponent implements OnInit {
   }
 
   async openDayEditor(mmdd: string): Promise<void> {
+    // Both presidence (edit) and editorial (read-only) roles open this
+    // modal — the template swaps between select dropdowns and plain text
+    // based on canManageRecommendations().
     this.editorMmdd.set(mmdd);
     this.editorOpen.set(true);
     this.editorLoading.set(true);

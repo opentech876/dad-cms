@@ -224,9 +224,14 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(paths).not.toContain('/utilisateurs');
   });
 
-  it("editeur ne voit pas 'recommandations'", () => {
+  it("editeur voit 'recommandations' en lecture seule (elle doit pouvoir consulter avant d'appliquer)", () => {
     createComponent('editeur');
-    expect(component.visibleNavItems().map(i => i.path)).not.toContain('/recommandations');
+    expect(component.visibleNavItems().map(i => i.path)).toContain('/recommandations');
+  });
+
+  it("chef_equipe voit 'recommandations' en lecture seule", () => {
+    createComponent('chef_equipe');
+    expect(component.visibleNavItems().map(i => i.path)).toContain('/recommandations');
   });
 
   // ── chef_equipe_commerciale ───────────────────────────────────────────────

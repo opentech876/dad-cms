@@ -198,6 +198,9 @@
         <div class="sidebar-user-info" style="cursor:pointer;" (click)="navigateToProfile()">
           <span class="sidebar-user-name">{{ userName }}</span>
           <span class="sidebar-user-email">{{ userEmail }}</span>
+          @if (currentRoleLabel()) {
+            <span class="sidebar-user-role" [title]="currentRoleLabel()">{{ currentRoleLabel() }}</span>
+          }
         </div>
         <button class="sidebar-toggle-btn" (click)="toggleCollapsed()" title="Réduire la barre">
           <tui-icon icon="@tui.panel-left" style="font-size: 16px" />

@@ -111,7 +111,11 @@ export const routes: Routes = [
       {
         path: 'recommandations',
         canActivate: [roleGuard],
-        data: { requiredRoles: ['owner', 'presidence'] },
+        // Editorial roles get read-only access so they can review pending
+        // recommendations before applying them from /calendrier. Write
+        // access (create/edit/delete) is enforced inside the component +
+        // by RLS on presidency_recommendations (presidence + owner only).
+        data: { requiredRoles: ['owner', 'presidence', 'chef_equipe', 'editeur'] },
         loadComponent: () =>
           import('./features/presidence/recommandations.component').then((m) => m.RecommandationsComponent),
       },

@@ -55,6 +55,24 @@ export class ShellComponent implements OnInit {
   // updates this signal and the bell badge disappears automatically.
   readonly notifUnread = this.notifService.unreadCount;
 
+  /** Human-readable French label for the current role, shown as a chip
+   *  under the user email in the sidebar footer. Empty string when the
+   *  role isn't loaded yet — the template hides the chip in that case. */
+  readonly currentRoleLabel = computed(() => {
+    const role = this.currentRole();
+    if (!role) return '';
+    const labels: Record<string, string> = {
+      owner:                   'Administrateur',
+      chef_equipe:             "Chef d'équipe",
+      editeur:                 'Éditeur',
+      charge_communication:    'Chargé de communication',
+      presidence:              'Présidence',
+      chef_equipe_commerciale: "Chef d'équipe commerciale",
+      system_admin:            'Administrateur plateforme',
+    };
+    return labels[role] ?? role;
+  });
+
   toastIcon(type: ToastType): string {
     const map: Record<ToastType, string> = {
       success: '@tui.check-circle',
@@ -347,7 +365,7 @@ export class ShellComponent implements OnInit {
       label: 'Éditorial',
       items: [
         { id: 'calendrier',      label: 'Calendrier éditorial',       icon: '@tui.calendar',    path: '/calendrier',      roles: [] },
-        { id: 'recommandations', label: 'Recommandations',            icon: '@tui.list-checks', path: '/recommandations', roles: ['owner', 'presidence'] },
+        { id: 'recommandations', label: 'Recommandations',            icon: '@tui.list-checks', path: '/recommandations', roles: ['owner', 'presidence', 'chef_equipe', 'editeur'] },
         { id: 'evenements',      label: "Bibliothèque d'événements",  icon: '@tui.book-open',   path: '/evenements',      roles: ['owner', 'chef_equipe', 'editeur'] },
       ],
     },

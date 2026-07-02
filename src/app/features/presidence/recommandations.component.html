@@ -8,7 +8,11 @@
           Recommandations Présidence
         </h1>
         <p style="margin:6px 0 0 0; font-size:13px; color:var(--fg-3);">
-          Choisissez l'événement à proposer pour chaque jour du calendrier sélectionné. L'équipe éditoriale appliquera ces choix.
+          @if (canManageRecommendations()) {
+            Choisissez l'événement à proposer pour chaque jour du calendrier sélectionné. L'équipe éditoriale appliquera ces choix.
+          } @else {
+            Consultez les recommandations préparées par la Présidence. Pour les appliquer au calendrier, ouvrez « Calendrier » et cliquez sur « Appliquer la recommandation ».
+          }
         </p>
       </div>
 
@@ -96,7 +100,7 @@
           <p style="font-style:italic; color:var(--fg-3);">
             Aucun événement enregistré pour ce jour dans la bibliothèque.
           </p>
-        } @else {
+        } @else if (canManageRecommendations()) {
           <!-- Position 1 — Événement National -->
           <div class="field">
             <label class="field-label">Événement National</label>
@@ -122,22 +126,54 @@
               }
             </select>
           </div>
+        } @else {
+          <!-- Read-only view: editorial roles land here. Show the current
+               recommendations as plain text so they can review what was
+               proposed for this day before triggering apply on /calendrier. -->
+          <div class="field">
+            <label class="field-label">Événement National</label>
+            <div style="padding:10px 12px; background:var(--bg-sunken); border-radius:var(--r-sm); font-size:13px;">
+              @let ev1 = editorLibrary().find(e => e.id === editorPos1());
+              @if (ev1) {
+                {{ ev1.title }} <span style="color:var(--fg-3);">({{ ev1.event_date | slice:0:4 }})</span>
+              } @else {
+                <span style="color:var(--fg-3); font-style:italic;">Aucune recommandation</span>
+              }
+            </div>
+          </div>
+          <div class="field" style="margin-top:14px;">
+            <label class="field-label">Date Internationale</label>
+            <div style="padding:10px 12px; background:var(--bg-sunken); border-radius:var(--r-sm); font-size:13px;">
+              @let ev2 = editorLibrary().find(e => e.id === editorPos2());
+              @if (ev2) {
+                {{ ev2.title }} <span style="color:var(--fg-3);">({{ ev2.event_date | slice:0:4 }})</span>
+              } @else {
+                <span style="color:var(--fg-3); font-style:italic;">Aucune recommandation</span>
+              }
+            </div>
+          </div>
         }
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary btn-sm" type="button" (click)="closeDayEditor()">
-          Annuler
-        </button>
-        <button class="btn btn-primary btn-sm"
-                type="button"
-                [disabled]="editorSaving()"
-                (click)="saveDayEditor()">
-          @if (editorSaving()) {
-            <span class="spinner"></span>
-          }
-          Enregistrer la recommandation
-        </button>
+        @if (canManageRecommendations()) {
+          <button class="btn btn-secondary btn-sm" type="button" (click)="closeDayEditor()">
+            Annuler
+          </button>
+          <button class="btn btn-primary btn-sm"
+                  type="button"
+                  [disabled]="editorSaving()"
+                  (click)="saveDayEditor()">
+            @if (editorSaving()) {
+              <span class="spinner"></span>
+            }
+            Enregistrer la recommandation
+          </button>
+        } @else {
+          <button class="btn btn-primary btn-sm" type="button" (click)="closeDayEditor()">
+            Fermer
+          </button>
+        }
       </div>
     </div>
   </div>
