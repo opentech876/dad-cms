@@ -1652,11 +1652,22 @@ CREATE POLICY "Allow anonymous update on devices"     ON public.devices FOR UPDA
 CREATE POLICY "devices_logs_insert_anon"          ON public.devices_logs FOR INSERT TO anon          WITH CHECK (true);
 CREATE POLICY "devices_logs_insert_authenticated" ON public.devices_logs FOR INSERT TO authenticated WITH CHECK (true);
 
--- notifications
+-- notifications — scoped to the reader's join date so newly-invited members
+-- don't inherit the workspace's entire notification history on first login.
+-- The workspaces.created_by branch is a safety net for the creator.
 CREATE POLICY "Members read workspace notifications" ON public.notifications FOR SELECT TO authenticated
   USING (
-    workspace_id IN (SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid())
-    OR workspace_id IN (SELECT id FROM public.workspaces WHERE created_by = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.workspace_members wm
+      WHERE wm.user_id      = auth.uid()
+        AND wm.workspace_id = notifications.workspace_id
+        AND notifications.created_at >= wm.joined_at
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.workspaces w
+      WHERE w.created_by = auth.uid()
+        AND w.id         = notifications.workspace_id
+    )
   );
 CREATE POLICY "System inserts notifications" ON public.notifications FOR INSERT TO authenticated WITH CHECK (true);
 
