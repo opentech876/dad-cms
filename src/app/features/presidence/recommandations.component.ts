@@ -10,7 +10,8 @@ import { EventService } from '../../core/events/event.service';
 import { RecommendationService, PresidencyRecommendationWithEvent } from '../../core/presidency/recommendation.service';
 import { ToastService } from '../../core/services/toast.service';
 import { Event as HistoricalEvent } from '../../models';
-import { MONTHS_FR_LONG_CAP, formatDayMonthLong } from '../../core/utils/date.utils';
+import { MONTHS_FR_LONG_CAP, formatDayMonthLong, normalizeSearchable } from '../../core/utils/date.utils';
+import { compressImage } from '../../core/utils/image.utils';
 
 interface DayCell {
   day: number;        // 1..31
@@ -22,6 +23,9 @@ interface MonthSection {
   name: string;
   days: DayCell[];
 }
+
+type CuratorTab = 'proposer' | 'bibliotheque';
+type LibraryFilter = 'tous' | 'curateur' | 'non-assignes';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -40,13 +44,17 @@ export class RecommandationsComponent implements OnInit {
   private readonly recommendationService = inject(RecommendationService);
   private readonly toast = inject(ToastService);
 
-  /** True when the user can create / edit / delete recommendations. Only
-   *  owner + presidence pass here — chef_equipe and editeur reach this
-   *  page in read-only mode to review pending recommendations before
-   *  applying them from /calendrier. Mirrors the RLS WITH CHECK on
-   *  presidency_recommendations (has_role_at_least('presidence')). */
+  /** Curateur + owner: full management (tabs, create events, edit slots).
+   *  Mirrors the RLS WITH CHECK on presidency_recommendations. */
   readonly canManageRecommendations = toSignal(
     this.authService.hasRoleAtLeast('presidence'),
+    { initialValue: false },
+  );
+
+  /** Chef d'équipe + owner: can apply recommendations (per-item or all).
+   *  Mirrors the SECURITY DEFINER gate on both apply RPCs. */
+  readonly canApply = toSignal(
+    this.authService.hasRoleAtLeast('chef_equipe'),
     { initialValue: false },
   );
 
@@ -57,7 +65,10 @@ export class RecommandationsComponent implements OnInit {
   readonly recommendations = signal<PresidencyRecommendationWithEvent[]>([]);
   readonly existingEntries = signal<CalendarEntryWithEvent[]>([]);
 
-  // Per-day editor (inline modal).
+  // ── Curator tabs ─────────────────────────────────────────────────────
+  readonly activeTab = signal<CuratorTab>('proposer');
+
+  // ── Per-day editor (Proposer tab modal) ──────────────────────────────
   readonly editorOpen = signal(false);
   readonly editorMmdd = signal('');
   readonly editorLibrary = signal<HistoricalEvent[]>([]);
@@ -68,6 +79,56 @@ export class RecommandationsComponent implements OnInit {
 
   // Expanded months in the accordion. Default: current month + Jan.
   readonly expandedMonths = signal<Set<number>>(new Set([0, new Date().getMonth()]));
+
+  // ── Bibliothèque tab ─────────────────────────────────────────────────
+  readonly libraryEvents  = signal<HistoricalEvent[]>([]);
+  readonly libraryLoading = signal(false);
+  readonly librarySearch  = signal('');
+  readonly libraryFilter  = signal<LibraryFilter>('tous');
+
+  /** Event ids currently assigned in the selected calendar. */
+  readonly assignedEventIds = computed<Set<string>>(() =>
+    new Set(this.existingEntries().map(e => e.event_id)),
+  );
+
+  /** Event ids referenced by a recommendation (pending or applied). */
+  readonly recommendedEventIds = computed<Set<string>>(() =>
+    new Set(this.recommendations().map(r => r.event_id)),
+  );
+
+  readonly filteredLibrary = computed<HistoricalEvent[]>(() => {
+    const search = normalizeSearchable(this.librarySearch());
+    const filter = this.libraryFilter();
+    const assigned = this.assignedEventIds();
+    return this.libraryEvents().filter(e => {
+      if (filter === 'curateur' && e.origin !== 'curateur') return false;
+      if (filter === 'non-assignes' && assigned.has(e.id)) return false;
+      if (!search) return true;
+      return normalizeSearchable(`${e.title} ${e.event_date}`).includes(search);
+    });
+  });
+
+  // ── Create-event modal (Bibliothèque tab) ────────────────────────────
+  readonly createOpen         = signal(false);
+  readonly createTitle        = signal('');
+  readonly createDate         = signal('');
+  readonly createDescription  = signal('');
+  readonly createImageFile    = signal<File | null>(null);
+  readonly createImagePreview = signal<string | null>(null);
+  readonly createSaving       = signal(false);
+  readonly createError        = signal<string | null>(null);
+
+  // ── Pending list (main view for non-curators) ────────────────────────
+  readonly pendingRecs = computed(() =>
+    this.recommendations().filter(r => r.status === 'pending'),
+  );
+  readonly appliedRecs = computed(() =>
+    this.recommendations().filter(r => r.status === 'applied'),
+  );
+  readonly showApplied = signal(false);
+  /** id of the recommendation whose apply is in flight (locks its button). */
+  readonly applyingId  = signal<string | null>(null);
+  readonly applyingAll = signal(false);
 
   readonly selectedCalendar = computed(() =>
     this.calendars().find(c => c.id === this.selectedCalendarId()),
@@ -133,6 +194,28 @@ export class RecommandationsComponent implements OnInit {
     this.loading.set(false);
   }
 
+  // ── Tabs ──────────────────────────────────────────────────────────────
+
+  async setTab(tab: CuratorTab): Promise<void> {
+    this.activeTab.set(tab);
+    // Lazy-load the full library the first time the Bibliothèque opens.
+    if (tab === 'bibliotheque' && this.libraryEvents().length === 0) {
+      await this.reloadLibrary();
+    }
+  }
+
+  async reloadLibrary(): Promise<void> {
+    this.libraryLoading.set(true);
+    try {
+      const events = await firstValueFrom(this.eventService.listEvents());
+      this.libraryEvents.set(events);
+    } finally {
+      this.libraryLoading.set(false);
+    }
+  }
+
+  // ── Proposer tab (month grid + day editor) ────────────────────────────
+
   toggleMonth(idx: number): void {
     this.expandedMonths.update(s => {
       const next = new Set(s);
@@ -167,9 +250,7 @@ export class RecommandationsComponent implements OnInit {
   }
 
   async openDayEditor(mmdd: string): Promise<void> {
-    // Both presidence (edit) and editorial (read-only) roles open this
-    // modal — the template swaps between select dropdowns and plain text
-    // based on canManageRecommendations().
+    if (!this.canManageRecommendations()) return;
     this.editorMmdd.set(mmdd);
     this.editorOpen.set(true);
     this.editorLoading.set(true);
@@ -234,5 +315,134 @@ export class RecommandationsComponent implements OnInit {
   editorDayLabel(): string {
     const year = this.selectedCalendar()?.year ?? new Date().getFullYear();
     return formatDayMonthLong(`${year}-${this.editorMmdd()}`) || this.editorMmdd();
+  }
+
+  /** "15 août" style label for a recommendation row in the pending list. */
+  recDayLabel(rec: PresidencyRecommendationWithEvent): string {
+    const year = this.selectedCalendar()?.year ?? new Date().getFullYear();
+    return formatDayMonthLong(`${year}-${rec.mmdd}`) || rec.mmdd;
+  }
+
+  positionLabel(position: 1 | 2): string {
+    return position === 1 ? 'Événement National' : 'Date Internationale';
+  }
+
+  /** Title of the event currently occupying the recommendation's slot, when
+   *  it differs — the apply will REPLACE it, so the row warns about it. */
+  conflictTitle(rec: PresidencyRecommendationWithEvent): string | null {
+    const existing = this.existingEntries().find(
+      e => e.mmdd === rec.mmdd && e.position === rec.position,
+    );
+    if (!existing || existing.event_id === rec.event_id) return null;
+    return existing.event?.title ?? '—';
+  }
+
+  imageUrl(event: HistoricalEvent | null): string | null {
+    if (!event?.image_path) return null;
+    return this.eventService.getImageUrl(event.image_path);
+  }
+
+  // ── Apply (chef_equipe + owner) ───────────────────────────────────────
+
+  async applySingle(rec: PresidencyRecommendationWithEvent): Promise<void> {
+    if (!this.canApply() || this.applyingId() || this.applyingAll()) return;
+    this.applyingId.set(rec.id);
+    const result = await firstValueFrom(this.recommendationService.applySingle(rec.id));
+    this.applyingId.set(null);
+    if (!result.success) {
+      this.toast.error(result.error ?? "Échec de l'application de la recommandation.");
+      return;
+    }
+    this.toast.success(`Recommandation du ${this.recDayLabel(rec)} appliquée.`);
+    await this.selectCalendar(this.selectedCalendarId());
+  }
+
+  async applyAllPending(): Promise<void> {
+    if (!this.canApply() || this.applyingAll() || this.pendingRecs().length === 0) return;
+    this.applyingAll.set(true);
+    const result = await firstValueFrom(
+      this.recommendationService.applyAll(this.selectedCalendarId(), true),
+    );
+    this.applyingAll.set(false);
+    if (!result.success) {
+      this.toast.error(result.error ?? "Échec de l'application des recommandations.");
+      return;
+    }
+    this.toast.success(`${result.applied ?? 0} recommandation(s) appliquée(s).`);
+    await this.selectCalendar(this.selectedCalendarId());
+  }
+
+  // ── Create event (Curateur, Bibliothèque tab) ─────────────────────────
+
+  openCreateModal(): void {
+    if (!this.canManageRecommendations()) return;
+    this.createTitle.set('');
+    this.createDate.set('');
+    this.createDescription.set('');
+    this.createImageFile.set(null);
+    const prev = this.createImagePreview();
+    if (prev) URL.revokeObjectURL(prev);
+    this.createImagePreview.set(null);
+    this.createError.set(null);
+    this.createOpen.set(true);
+  }
+
+  closeCreateModal(): void {
+    if (this.createSaving()) return;
+    this.createOpen.set(false);
+  }
+
+  onCreateImageChange(ev: globalThis.Event): void {
+    const file = (ev.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    this.createImageFile.set(file);
+    const prev = this.createImagePreview();
+    if (prev) URL.revokeObjectURL(prev);
+    this.createImagePreview.set(URL.createObjectURL(file));
+  }
+
+  async submitCreate(): Promise<void> {
+    if (this.createSaving()) return;
+    const title = this.createTitle().trim();
+    const date  = this.createDate();
+    if (!title || !date) {
+      this.createError.set('Le titre et la date historique sont obligatoires.');
+      return;
+    }
+
+    this.createSaving.set(true);
+    this.createError.set(null);
+    try {
+      const created = await firstValueFrom(this.eventService.createEvent({
+        event_date: date,
+        title,
+        description: this.createDescription().trim() || undefined,
+        origin: 'curateur',
+      }));
+      if (!created.success || !created.id) {
+        this.createError.set(created.error ?? "Impossible de créer l'événement.");
+        return;
+      }
+
+      // Image is optional; a failed upload doesn't undo the event —
+      // the row is the source of truth, the image can be retried from
+      // the library list later.
+      const file = this.createImageFile();
+      if (file) {
+        const compressed = await compressImage(file);
+        const upload = await firstValueFrom(this.eventService.uploadImage(created.id, compressed));
+        if (upload.path) {
+          await firstValueFrom(this.eventService.updateEvent(created.id, { image_path: upload.path }));
+        } else {
+          this.toast.warning('Événement créé, mais le téléversement de l\'image a échoué. Réessayez depuis la bibliothèque.');
+        }
+      }
+
+      this.toast.success(`« ${title} » ajouté à la bibliothèque (Réserve).`);
+      this.createOpen.set(false);
+      await this.reloadLibrary();
+    } finally {
+      this.createSaving.set(false);
+    }
   }
 }

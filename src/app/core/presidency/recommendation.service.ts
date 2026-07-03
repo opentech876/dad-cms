@@ -166,4 +166,19 @@ export class RecommendationService {
       }),
     );
   }
+
+  /** Apply exactly one pending recommendation (per-item « Appliquer » in the
+   *  recommendations list). Same chef_equipe gate + overwrite semantics as
+   *  applyAll, enforced server-side. */
+  applySingle(recommendationId: string): Observable<{ success: boolean; error?: string }> {
+    return from(
+      this.supabase.client.rpc('apply_single_recommendation', {
+        p_recommendation_id: recommendationId,
+      }),
+    ).pipe(
+      map(({ error }: any) =>
+        error ? { success: false, error: error.message } : { success: true },
+      ),
+    );
+  }
 }

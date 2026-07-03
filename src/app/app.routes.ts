@@ -110,12 +110,11 @@ export const routes: Routes = [
       },
       {
         path: 'recommandations',
-        canActivate: [roleGuard],
-        // Editorial roles get read-only access so they can review pending
-        // recommendations before applying them from /calendrier. Write
-        // access (create/edit/delete) is enforced inside the component +
-        // by RLS on presidency_recommendations (presidence + owner only).
-        data: { requiredRoles: ['owner', 'presidence', 'chef_equipe', 'editeur'] },
+        // Viewing is open to every authenticated role (product decision
+        // 2026-07-03): all members can see what the Curateur proposes.
+        // Writes stay curateur-only (RLS) and applying stays chef_equipe+
+        // (SECURITY DEFINER gate on both apply RPCs) — the component only
+        // renders the corresponding controls per role.
         loadComponent: () =>
           import('./features/presidence/recommandations.component').then((m) => m.RecommandationsComponent),
       },

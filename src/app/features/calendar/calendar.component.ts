@@ -113,13 +113,13 @@ export class CalendarComponent implements OnInit {
   private readonly toast = inject(ToastService);
 
   /**
-   * Editorial-tier visibility for the "Appliquer la recommandation" button.
-   * Mirrors the RPC's `has_role_at_least('editeur')` check so we don't show
-   * a button that would return `42501 insufficient_privilege` for
-   * `charge_communication` or `presidence` users who also reach /calendrier.
+   * Visibility for the "Appliquer la recommandation" button. Apply rights
+   * were tightened to chef_equipe (product decision 2026-07-03): the team
+   * lead decides what lands on the calendar; editors review on
+   * /recommandations. Mirrors the RPC's has_role_at_least('chef_equipe').
    */
   readonly canApplyRecommendations = toSignal(
-    this.authService.hasRoleAtLeast('editeur'),
+    this.authService.hasRoleAtLeast('chef_equipe'),
     { initialValue: false },
   );
 

@@ -248,7 +248,8 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(paths).toContain('/compagnies');
     expect(paths).not.toContain('/evenements');
     expect(paths).not.toContain('/utilisateurs');
-    expect(paths).not.toContain('/recommandations');
+    // Viewing recommendations is open to every role since 2026-07-03.
+    expect(paths).toContain('/recommandations');
   });
 
   it("editeur ne voit pas 'compagnies'", () => {

@@ -695,9 +695,9 @@ describe('CalendarComponent', () => {
       expect(component.canApplyRecommendations()).toBe(false);
     });
 
-    it('hasRoleAtLeast est appelé avec "editeur" (le tier minimal accepté par la RPC)', () => {
+    it('hasRoleAtLeast est appelé avec "chef_equipe" (le tier minimal accepté par la RPC)', () => {
       const auth = TestBed.inject(AuthService) as unknown as { hasRoleAtLeast: jest.Mock };
-      expect(auth.hasRoleAtLeast).toHaveBeenCalledWith('editeur');
+      expect(auth.hasRoleAtLeast).toHaveBeenCalledWith('chef_equipe');
     });
 
     it('refreshPendingCount met à jour pendingRecommendationsCount depuis le service', async () => {

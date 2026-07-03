@@ -7,6 +7,7 @@ export type EventPosition = 1 | 2;
 export type AdPosition = 'header' | 'footer';
 export type CalendarStatus = 'draft' | 'published' | 'archived';
 export type EventStatus = 'draft' | 'published';
+export type EventOrigin = 'editorial' | 'curateur';
 export type ManageUserAction = 'update_role' | 'block' | 'unblock' | 'remove' | 'set_password' | 'resend_invitation' | 'revoke_invitation';
 
 export interface UserListEntry {
@@ -89,6 +90,9 @@ export interface Event {
   /** Name of the curator who entered this row (preserved across Excel imports). */
   historian: string | null;
   status: EventStatus;
+  /** Authoring channel: 'editorial' (default) or 'curateur' — Curateur-created
+   *  events live in the same library but stay tag-separable. */
+  origin: EventOrigin;
   workspace_id: string;
   created_by: string | null;
   created_at: string;
@@ -210,6 +214,8 @@ export interface CreateEventDto {
   image_path?: string;
   source?: string | null;
   historian?: string | null;
+  /** Defaults to 'editorial' server-side; the Curateur flow passes 'curateur'. */
+  origin?: EventOrigin;
 }
 
 export interface AuditLogEntry {

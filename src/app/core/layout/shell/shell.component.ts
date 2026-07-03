@@ -425,7 +425,7 @@ export class ShellComponent implements OnInit {
       label: 'Éditorial',
       items: [
         { id: 'calendrier',      label: 'Calendrier éditorial',       icon: '@tui.calendar',    path: '/calendrier',      roles: [] },
-        { id: 'recommandations', label: 'Recommandations',            icon: '@tui.list-checks', path: '/recommandations', roles: ['owner', 'presidence', 'chef_equipe', 'editeur'] },
+        { id: 'recommandations', label: 'Recommandations',            icon: '@tui.list-checks', path: '/recommandations', roles: [] },
         { id: 'evenements',      label: "Bibliothèque d'événements",  icon: '@tui.book-open',   path: '/evenements',      roles: ['owner', 'chef_equipe', 'editeur'] },
       ],
     },

@@ -121,9 +121,15 @@ CREATE TABLE IF NOT EXISTS public.events (
   updated_by    uuid REFERENCES auth.users(id),
   deleted_by    uuid REFERENCES auth.users(id),
   status        text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
-  workspace_id  uuid NOT NULL REFERENCES public.workspaces(id)
+  workspace_id  uuid NOT NULL REFERENCES public.workspaces(id),
+  -- Who authored the entry: 'editorial' (default) or 'curateur' — Curateur-
+  -- created events live in the same library but stay tag-separable for
+  -- listing / indexing purposes.
+  origin        text NOT NULL DEFAULT 'editorial' CHECK (origin IN ('editorial','curateur'))
 );
 CREATE INDEX IF NOT EXISTS idx_events_event_date ON public.events (event_date);
+CREATE INDEX IF NOT EXISTS idx_events_origin_curateur
+  ON public.events (workspace_id) WHERE origin = 'curateur';
 
 -- 3.7 calendar_entries
 CREATE TABLE IF NOT EXISTS public.calendar_entries (
@@ -1307,9 +1313,10 @@ RETURNS numeric LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
 $$;
 
 -- ─── 9b. Presidency apply RPC ───────────────────────────────
--- Editors (and chef_equipe/owner) call this to copy Presidence drafts into
--- calendar_entries. SECURITY DEFINER lets it bypass the chef_equipe-only RLS
--- on calendar_entries so plain editeurs can still apply.
+-- Chef d'équipe (and owner) call this to copy Curateur drafts into
+-- calendar_entries. Apply rights were tightened from editeur to
+-- chef_equipe (product decision 2026-07-03) — plain editeurs review
+-- the recommendations but the team lead decides what lands.
 CREATE OR REPLACE FUNCTION public.apply_presidency_recommendations(
   p_calendar_id uuid,
   p_overwrite   boolean DEFAULT true
@@ -1320,7 +1327,7 @@ DECLARE
   v_skipped_count int := 0;
   r record;
 BEGIN
-  IF NOT public.has_role_at_least('editeur'::public.app_role) THEN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
     RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
   END IF;
 
@@ -1354,6 +1361,42 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.apply_presidency_recommendations(uuid, boolean) TO authenticated;
+
+-- Per-item variant for the recommendations list UI: apply exactly one
+-- pending recommendation. Same chef_equipe gate + overwrite semantics
+-- as the bulk RPC. 22023 when the row is missing, already applied, or
+-- belongs to a workspace the caller isn't a member of.
+CREATE FUNCTION public.apply_single_recommendation(p_recommendation_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE
+  r record;
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT id, calendar_id, mmdd, position, event_id, workspace_id
+    INTO r
+  FROM public.presidency_recommendations
+  WHERE id = p_recommendation_id
+    AND status = 'pending'
+    AND workspace_id IN (SELECT public.get_my_workspace_ids());
+
+  IF r.id IS NULL THEN
+    RAISE EXCEPTION 'recommendation_not_applicable' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.calendar_entries (calendar_id, mmdd, position, event_id, workspace_id, created_by)
+  VALUES (r.calendar_id, r.mmdd, r.position, r.event_id, r.workspace_id, auth.uid())
+  ON CONFLICT (calendar_id, mmdd, position) DO UPDATE
+    SET event_id = EXCLUDED.event_id, updated_at = now();
+
+  UPDATE public.presidency_recommendations
+    SET status = 'applied', applied_at = now(), applied_by = auth.uid()
+    WHERE id = r.id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.apply_single_recommendation(uuid) TO authenticated;
 
 -- ─── 9b. Calendar soft-delete + restore + trash-list RPCs ────────────────
 -- The calendars table already has deleted_at + deleted_by. Direct writes
@@ -1726,6 +1769,12 @@ CREATE POLICY "Events - Read all"             ON public.events FOR SELECT TO aut
 CREATE POLICY "Events - Write editorial roles" ON public.events TO authenticated
   USING (public.has_role_at_least('editeur'::public.app_role))
   WITH CHECK (public.has_role_at_least('editeur'::public.app_role));
+-- The Curateur can create / edit / soft-delete HIS slice of the library
+-- (origin='curateur' rows only) — never editorial rows, and he can't
+-- re-tag his rows as editorial (both USING and WITH CHECK pin origin).
+CREATE POLICY "Events - Curateur writes own curated" ON public.events
+  USING (public.has_role_at_least('presidence'::public.app_role) AND origin = 'curateur')
+  WITH CHECK (public.has_role_at_least('presidence'::public.app_role) AND origin = 'curateur');
 
 -- calendar_entries (note: policies live without explicit role list — applies to public)
 CREATE POLICY "Calendar Entries - Read authenticated" ON public.calendar_entries FOR SELECT USING (auth.uid() IS NOT NULL);

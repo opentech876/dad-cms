@@ -72,6 +72,7 @@ export class EventService {
             source: dto.source ?? null,
             historian: dto.historian ?? null,
             status: 'draft',
+            origin: dto.origin ?? 'editorial',
             workspace_id: wsId,
             created_by: user?.id ?? null,
           })
