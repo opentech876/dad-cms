@@ -238,6 +238,23 @@ export interface Notification {
   category: NotificationCategory;
   created_at: string;
   read_at: string | null;
+  // Detail-modal fields (surfaced when the user opens a notification).
+  // workspace_id is needed to look up the actor's profile in the right
+  // tenant. actor_id may be null for system-generated notifications.
+  workspace_id: string | null;
+  actor_id: string | null;
+  action: string | null;      // 'INSERT' | 'UPDATE' | 'DELETE' (raw pg trigger op)
+  table_name: string | null;  // 'events' | 'calendars' | 'ad_campaigns' | ...
+  record_id: string | null;
+  link_path: string | null;   // route to open when the user clicks "Voir"
+}
+
+/** Actor profile fetched on-demand for the notification detail modal.
+ *  Kept small — the notifications list stays lean, full profile only
+ *  loads when the user opens a specific row. */
+export interface NotificationActor {
+  full_name:  string | null;
+  avatar_url: string | null;
 }
 
 export interface Device {

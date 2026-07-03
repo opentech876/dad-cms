@@ -58,7 +58,7 @@
           class="notif-item"
           [class.notif-item--unread]="!notif.read_at"
           [class.notif-item--first]="first"
-          (click)="!notif.read_at && markAsRead(notif.id)">
+          (click)="openDetail(notif)">
 
           <!-- Icon -->
           <div class="notif-item-icon notif-item-icon--{{ notif.category }}">
@@ -88,6 +88,117 @@
       }
     }
   </div>
+
+  <!-- ── Detail modal ── -->
+  @if (selectedNotif(); as notif) {
+    <div class="modal-backdrop" (click)="closeDetail()">
+      <div class="modal" style="max-width:560px;" (click)="$event.stopPropagation()">
+        <div class="modal-header" style="align-items:flex-start;">
+          <div style="display:flex; gap:12px; align-items:flex-start; flex:1;">
+            <div class="notif-item-icon notif-item-icon--{{ notif.category }}"
+                 style="flex-shrink:0;">
+              <tui-icon [icon]="categoryIcon(notif.category)" style="font-size:18px;" />
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
+                <span class="modal-title" style="font-size:16px;">{{ notif.title }}</span>
+              </div>
+              <span class="notif-item-tag notif-item-tag--{{ notif.category }}">
+                {{ categoryLabel(notif.category) }}
+              </span>
+            </div>
+          </div>
+          <button class="btn btn-flat btn-icon btn-sm" type="button"
+                  (click)="closeDetail()" aria-label="Fermer">
+            <tui-icon icon="@tui.x" style="font-size:18px;" />
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <p style="margin:0 0 18px; font-size:13.5px; color:var(--fg-2); line-height:1.55;">
+            {{ notif.body }}
+          </p>
+
+          <!-- Actor block -->
+          <div class="notif-detail-row">
+            <div class="notif-detail-label">Auteur</div>
+            <div class="notif-detail-value">
+              @if (loadingActor()) {
+                <span class="spinner" style="width:12px; height:12px;"></span>
+                <span style="color:var(--fg-3);">Chargement…</span>
+              } @else if (selectedActor(); as actor) {
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div class="notif-detail-avatar">
+                    @if (actor.avatar_url) {
+                      <img [src]="actor.avatar_url" alt="Avatar" />
+                    } @else {
+                      {{ actorInitials(actor.full_name) }}
+                    }
+                  </div>
+                  <span>{{ actor.full_name ?? 'Utilisateur inconnu' }}</span>
+                </div>
+              } @else if (notif.actor_id) {
+                <span style="color:var(--fg-3); font-style:italic;">
+                  Utilisateur introuvable dans cet espace
+                </span>
+              } @else {
+                <span style="color:var(--fg-3); font-style:italic;">Système</span>
+              }
+            </div>
+          </div>
+
+          <!-- Action + target row -->
+          @if (notif.action || notif.table_name) {
+            <div class="notif-detail-row">
+              <div class="notif-detail-label">Action</div>
+              <div class="notif-detail-value">
+                @if (notif.action) {
+                  <span class="notif-detail-chip notif-detail-chip--{{ notif.action }}">
+                    {{ actionLabel(notif.action) }}
+                  </span>
+                }
+                @if (notif.table_name) {
+                  <span style="margin-left:6px; color:var(--fg-2);">
+                    {{ tableLabel(notif.table_name) }}
+                  </span>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Timestamp -->
+          <div class="notif-detail-row">
+            <div class="notif-detail-label">Horodatage</div>
+            <div class="notif-detail-value">
+              {{ notif.created_at | date:'EEEE d MMMM yyyy, HH:mm':'':'fr' }}
+            </div>
+          </div>
+
+          <!-- Read status -->
+          @if (notif.read_at) {
+            <div class="notif-detail-row">
+              <div class="notif-detail-label">Lu</div>
+              <div class="notif-detail-value" style="color:var(--fg-3);">
+                {{ notif.read_at | date:'d MMM yyyy, HH:mm':'':'fr' }}
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary btn-sm" type="button" (click)="closeDetail()">
+            Fermer
+          </button>
+          @if (notif.link_path) {
+            <button class="btn btn-primary btn-sm" type="button" (click)="openLink()">
+              <tui-icon icon="@tui.external-link" style="font-size:13px;" />
+              Voir
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  }
 
   <!-- ── Pagination ── -->
   @if (!loading() && totalPages() > 1) {

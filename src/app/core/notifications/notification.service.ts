@@ -1,6 +1,6 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom, from, map, Observable, switchMap, tap } from 'rxjs';
-import { Notification } from '../../models';
+import { Notification, NotificationActor } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
 
 @Injectable({ providedIn: 'root' })
@@ -35,13 +35,40 @@ export class NotificationService {
       map(({ data, error }) => {
         if (error) throw error;
         return (data ?? []).map((row: any) => ({
-          id:         row.id,
-          title:      row.title,
-          body:       row.body,
-          category:   row.category,
-          created_at: row.created_at,
-          read_at:    row.notification_reads?.[0]?.read_at ?? null,
+          id:           row.id,
+          title:        row.title,
+          body:         row.body,
+          category:     row.category,
+          created_at:   row.created_at,
+          read_at:      row.notification_reads?.[0]?.read_at ?? null,
+          workspace_id: row.workspace_id ?? null,
+          actor_id:     row.actor_id ?? null,
+          action:       row.action ?? null,
+          table_name:   row.table_name ?? null,
+          record_id:    row.record_id ?? null,
+          link_path:    row.link_path ?? null,
         }));
+      }),
+    );
+  }
+
+  /** Fetch the display info of a notification's actor: full name +
+   *  avatar_url from the workspace-scoped profiles row. Returns null
+   *  when there is no actor (system-generated notification) or when
+   *  the profile isn't accessible (RLS / missing row). */
+  getActorProfile(actorId: string | null, workspaceId: string | null): Observable<NotificationActor | null> {
+    if (!actorId || !workspaceId) return from(Promise.resolve(null));
+    return from(
+      this.supabase.client
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('user_id', actorId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle(),
+    ).pipe(
+      map(({ data, error }: any) => {
+        if (error || !data) return null;
+        return { full_name: data.full_name, avatar_url: data.avatar_url } as NotificationActor;
       }),
     );
   }

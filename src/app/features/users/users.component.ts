@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { AppRole, ManageUserAction } from '../../models';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { ToastService } from '../../core/services/toast.service';
 
 interface UserRow {
   userId: string;
@@ -41,6 +42,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 export class UsersComponent implements OnInit {
   private workspaceService = inject(WorkspaceService);
   private authService      = inject(AuthService);
+  private toast            = inject(ToastService);
 
   /** True when the caller is a platform system_admin — used to unlock the
    *  "Administrateur" option in the invite-role dropdown when they've
@@ -214,7 +216,23 @@ export class UsersComponent implements OnInit {
   async handleAction(userId: string, action: ManageUserAction, role?: AppRole): Promise<void> {
     const result = await firstValueFrom(this.workspaceService.manageUser(userId, action, role));
     if (result.success) {
+      const messages: Record<ManageUserAction, string> = {
+        update_role:        'Rôle mis à jour.',
+        block:              'Utilisateur bloqué.',
+        unblock:            'Utilisateur débloqué.',
+        remove:             'Utilisateur retiré de cet espace.',
+        set_password:       'Mot de passe mis à jour.',
+        resend_invitation:  'Invitation renvoyée.',
+        revoke_invitation:  'Invitation révoquée.',
+      };
+      this.toast.success(messages[action] ?? 'Action effectuée.');
       await this.loadUsers();
+    } else {
+      // Previously the failure was silently swallowed — the modal just closed
+      // and the user saw no feedback (which is why "I cannot change a user's
+      // role" felt like a missing feature rather than a permission error).
+      // Surface the real EF message.
+      this.toast.error(result.error ?? "L'action n'a pas pu être exécutée.");
     }
   }
 

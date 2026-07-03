@@ -1,8 +1,9 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
-import { Notification, NotificationCategory } from '../../models';
+import { Notification, NotificationActor, NotificationCategory } from '../../models';
 import { NotificationService } from '../../core/notifications/notification.service';
 
 type NotifFilter = 'all' | 'unread' | NotificationCategory;
@@ -18,12 +19,18 @@ const PAGE_SIZE = 20;
 })
 export class NotificationsComponent implements OnInit {
   private notifService = inject(NotificationService);
+  private router       = inject(Router);
 
   readonly notifications = signal<Notification[]>([]);
   readonly activeFilter  = signal<NotifFilter>('all');
   readonly loading       = signal(true);
   readonly currentPage   = signal(1);
   readonly pageSize      = PAGE_SIZE;
+
+  // ── Detail modal state ─────────────────────────────────────────────
+  readonly selectedNotif  = signal<Notification | null>(null);
+  readonly selectedActor  = signal<NotificationActor | null>(null);
+  readonly loadingActor   = signal(false);
 
   readonly unreadCount = computed(() =>
     this.notifications().filter(n => !n.read_at).length,
@@ -123,5 +130,78 @@ export class NotificationsComponent implements OnInit {
       system:    '@tui.settings',
     };
     return map[cat] ?? '@tui.bell';
+  }
+
+  // ── Detail modal handlers ────────────────────────────────────────────
+
+  /** Row click → open detail modal + mark read if it wasn't already. */
+  async openDetail(notif: Notification): Promise<void> {
+    this.selectedNotif.set(notif);
+    this.selectedActor.set(null);
+    // Mark read only on first open (visual + badge accuracy).
+    if (!notif.read_at) {
+      await this.markAsRead(notif.id);
+    }
+    // Fetch actor lazily. Failures leave the modal without an author
+    // block — non-blocking, the timestamp + action still tell the story.
+    if (notif.actor_id && notif.workspace_id) {
+      this.loadingActor.set(true);
+      try {
+        const actor = await firstValueFrom(
+          this.notifService.getActorProfile(notif.actor_id, notif.workspace_id),
+        );
+        this.selectedActor.set(actor);
+      } finally {
+        this.loadingActor.set(false);
+      }
+    }
+  }
+
+  closeDetail(): void {
+    this.selectedNotif.set(null);
+    this.selectedActor.set(null);
+  }
+
+  async openLink(): Promise<void> {
+    const notif = this.selectedNotif();
+    if (!notif?.link_path) return;
+    this.closeDetail();
+    await this.router.navigateByUrl(notif.link_path);
+  }
+
+  /** Human-readable action label. Falls back to the raw op if unknown. */
+  actionLabel(action: string | null): string {
+    if (!action) return '';
+    const map: Record<string, string> = {
+      INSERT: 'Créé',
+      UPDATE: 'Modifié',
+      DELETE: 'Supprimé',
+    };
+    return map[action] ?? action;
+  }
+
+  /** Human-readable target label. Uses the singular form. */
+  tableLabel(tableName: string | null): string {
+    if (!tableName) return '';
+    const map: Record<string, string> = {
+      events:                     'Événement',
+      calendars:                  'Calendrier',
+      calendar_entries:           'Affectation de calendrier',
+      ad_campaigns:               'Campagne publicitaire',
+      companies:                  'Entreprise',
+      presidency_recommendations: 'Recommandation du Curateur',
+      workspaces:                 'Espace de travail',
+      workspace_members:          'Membre',
+      user_roles:                 'Rôle plateforme',
+      profiles:                   'Profil',
+    };
+    return map[tableName] ?? tableName;
+  }
+
+  /** Initials for the actor avatar fallback (when avatar_url is null). */
+  actorInitials(fullName: string | null): string {
+    if (!fullName) return '?';
+    const parts = fullName.trim().split(/\s+/);
+    return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
   }
 }
