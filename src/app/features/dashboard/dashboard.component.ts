@@ -1,13 +1,13 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { DecimalPipe, PercentPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { SupabaseService } from '../../core/supabase/supabase.service';
-import { CampaignService } from '../../core/campaigns/campaign.service';
 import { CompanyService } from '../../core/companies/company.service';
 import { MetriquesService } from '../../core/metriques/metriques.service';
-import { MONTHS_FR_LONG_CAP, formatDateShort } from '../../core/utils/date.utils';
-import { CampaignTap } from '../../models';
+import { DashboardOperationalStats, InsightsService } from '../../core/insights/insights.service';
+import { MONTHS_FR_LONG, MONTHS_FR_LONG_CAP, formatRelativeFr } from '../../core/utils/date.utils';
+import { MonthCoverage } from '../../models';
 
 interface KpiStats {
   totalEvents: number;
@@ -16,16 +16,6 @@ interface KpiStats {
   yearEvents: number;
   pendingValidations: number;
   activeCompanies: number;
-}
-
-interface AdPerformanceRow {
-  campaignId: string;
-  name: string;
-  advertiser: string;
-  impressions: number;
-  clicks: number;
-  ctr: number | null;
-  period: string;
 }
 
 interface FeaturedEvent {
@@ -38,18 +28,53 @@ interface FeaturedEvent {
   also: string;
 }
 
+/** One row of the real activity feed, ready for display. */
+interface FeedRow {
+  initials: string;
+  who: string;
+  action: string;
+  target: string;
+  meta: string;
+  time: string;
+}
+
+/** One actionable item of the "Avant publication" checklist. */
+interface TodoRow {
+  icon: string;
+  text: string;
+  meta: string;
+  bg: string;
+  fg: string;
+  link: string;
+}
+
+const TABLE_LABELS: Record<string, string> = {
+  events:                     'Événement',
+  calendars:                  'Calendrier',
+  calendar_entries:           'Affectation de calendrier',
+  ad_campaigns:               'Campagne publicitaire',
+  companies:                  'Entreprise',
+  presidency_recommendations: 'Recommandation du Curateur',
+};
+
+const ACTION_VERBS: Record<string, string> = {
+  INSERT: 'a créé',
+  UPDATE: 'a modifié',
+  DELETE: 'a supprimé',
+};
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, DecimalPipe, PercentPipe],
+  imports: [RouterLink, DecimalPipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit {
   private supabase         = inject(SupabaseService);
-  private campaignService  = inject(CampaignService);
   private companyService   = inject(CompanyService);
   private metriquesService = inject(MetriquesService);
+  private insightsService  = inject(InsightsService);
 
   readonly loading = signal(true);
   readonly stats = signal<KpiStats>({
@@ -61,8 +86,9 @@ export class DashboardComponent implements OnInit {
     activeCompanies: 0,
   });
 
-  /** Real top-5 ad performers by impressions, joined with campaign + company data. */
-  readonly topAdPerformers = signal<AdPerformanceRow[]>([]);
+  /** One-round-trip operational snapshot (activity, checklist inputs,
+   *  30-day ad inventory). Null until loaded or when no workspace. */
+  readonly opStats = signal<DashboardOperationalStats | null>(null);
 
   readonly currentYear = new Date().getFullYear();
   readonly todayLabel = new Date().toLocaleDateString('fr-FR', {
@@ -88,27 +114,99 @@ export class DashboardComponent implements OnInit {
     return Math.round((this.stats().yearEvents / maxSlots) * 100);
   });
 
-  // Placeholder feed until the real audit_log stream lands on the dashboard.
-  // Names + targets are deliberately generic — no real persons or brands.
-  readonly activityFeed = [
-    { id: 1, initials: 'MA', who: 'Membre A', action: 'a publié',    target: 'un événement historique',              meta: 'Calendrier en cours · exemple',         time: 'Il y a 8 min'  },
-    { id: 2, initials: 'MB', who: 'Membre B', action: 'a assigné',   target: 'une campagne publicitaire',           meta: '91 dates · trimestre en cours',         time: 'Il y a 32 min' },
-    { id: 3, initials: 'MC', who: 'Membre C', action: 'a modifié',   target: 'un événement historique',              meta: 'Calendrier en cours · exemple',         time: 'Il y a 1 h'   },
-    { id: 4, initials: 'MD', who: 'Membre D', action: 'a dupliqué',  target: 'un calendrier annuel',                 meta: 'événements et campagnes copiés',        time: 'Il y a 3 h'   },
-    { id: 5, initials: 'MA', who: 'Membre A', action: 'a réordonné', target: 'les événements d\'une journée',        meta: '2 événements',                          time: 'Hier · 18:42' },
-  ];
+  /** Real activity feed derived from the audit_log slice in opStats. */
+  readonly activityFeed = computed<FeedRow[]>(() => {
+    const entries = this.opStats()?.activity ?? [];
+    return entries.map(e => {
+      const name = e.actor_name || 'Système';
+      const np = name.trim().split(/\s+/);
+      return {
+        initials: ((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'S',
+        who:      name,
+        action:   ACTION_VERBS[e.action] ?? e.action.toLowerCase(),
+        target:   e.record_label ?? (TABLE_LABELS[e.table_name] ?? e.table_name),
+        meta:     TABLE_LABELS[e.table_name] ?? e.table_name,
+        time:     formatRelativeFr(e.changed_at),
+      };
+    });
+  });
 
-  readonly coverageBars = [78,72,85,68,90,82,75,88,70,65,72,55].map((pct, i) => ({
-    pct,
-    label: ['J','F','M','A','M','J','J','A','S','O','N','D'][i],
-    current: i === new Date().getMonth(),
-  }));
+  /** Real per-month fill bars (same RPC the metrics page uses). */
+  readonly coverage = signal<MonthCoverage[]>([]);
+  readonly coverageBars = computed(() =>
+    this.coverage().map(c => ({
+      pct:     Number(c.percent),
+      label:   ['J','F','M','A','M','J','J','A','S','O','N','D'][c.month - 1],
+      current: c.month - 1 === new Date().getMonth(),
+    })),
+  );
 
-  readonly publicationTodos = [
-    { icon: '⚠️', text: '4 dates sans événement',  meta: '14 fév · 22 mars · 3 mai · 18 sept', bg: 'var(--warning-soft)', fg: 'var(--warning)' },
-    { icon: '🖼️', text: '12 images en attente',    meta: 'Compresser à 800×600 / ≤150 Ko',      bg: 'var(--info-soft)',    fg: 'var(--info)'    },
-    { icon: '📢', text: '3 campagnes à approuver', meta: 'Demandes en attente de validation',    bg: 'var(--accent-soft)', fg: 'var(--accent)'  },
-  ];
+  /** "Avant publication" checklist — computed live from opStats. Only
+   *  items with something to do appear; a fully green workspace shows
+   *  the all-clear row instead. */
+  readonly publicationTodos = computed<TodoRow[]>(() => {
+    const s = this.opStats();
+    if (!s) return [];
+    const todos: TodoRow[] = [];
+
+    if (s.empty_days === null) {
+      todos.push({
+        icon: '📅', text: `Aucun calendrier ${this.currentYear}`,
+        meta: 'Créez le calendrier de l\'année pour commencer',
+        bg: 'var(--danger-soft)', fg: 'var(--danger)', link: '/calendrier',
+      });
+    } else if (s.empty_days.count > 0) {
+      todos.push({
+        icon: '⚠️', text: `${s.empty_days.count} date${s.empty_days.count > 1 ? 's' : ''} sans événement`,
+        meta: s.empty_days.next.map(m => this.mmddLabel(m)).join(' · ') || 'toutes déjà passées',
+        bg: 'var(--warning-soft)', fg: 'var(--warning)', link: '/calendrier',
+      });
+    }
+
+    if (s.events_no_image > 0) {
+      todos.push({
+        icon: '🖼️', text: `${s.events_no_image} événement${s.events_no_image > 1 ? 's' : ''} sans illustration`,
+        meta: 'Compresser à 800×600 / ≤150 Ko avant téléversement',
+        bg: 'var(--info-soft)', fg: 'var(--info)', link: '/evenements',
+      });
+    }
+
+    if (s.validations_soon.length > 0) {
+      todos.push({
+        icon: '📢', text: `${s.validations_soon.length} campagne${s.validations_soon.length > 1 ? 's' : ''} à valider avant diffusion`,
+        meta: s.validations_soon.map(v => v.name).slice(0, 3).join(' · '),
+        bg: 'var(--accent-soft)', fg: 'var(--accent)', link: '/campagnes',
+      });
+    }
+
+    if (s.pending_recommendations > 0) {
+      todos.push({
+        icon: '✅', text: `${s.pending_recommendations} recommandation${s.pending_recommendations > 1 ? 's' : ''} du Curateur à appliquer`,
+        meta: 'Ouvrir le calendrier puis « Appliquer la recommandation »',
+        bg: 'var(--success-soft)', fg: 'var(--success)', link: '/calendrier',
+      });
+    }
+
+    return todos;
+  });
+
+  /** 30-day sold/unsold outlook per ad position + unsold-day counters. */
+  readonly inventory = computed(() => this.opStats()?.inventory ?? []);
+  readonly unsoldHeaderDays = computed(() => this.inventory().filter(d => !d.h).length);
+  readonly unsoldFooterDays = computed(() => this.inventory().filter(d => !d.f).length);
+
+  /** '08-07' → '7 août' */
+  private mmddLabel(mmdd: string): string {
+    const [mm, dd] = mmdd.split('-').map(Number);
+    return `${dd} ${MONTHS_FR_LONG[mm - 1] ?? ''}`;
+  }
+
+  /** Tooltip for one inventory cell. */
+  inventoryTitle(day: { d: string; h: boolean; f: boolean }, position: 'h' | 'f'): string {
+    const sold = position === 'h' ? day.h : day.f;
+    const label = position === 'h' ? 'Header' : 'Footer';
+    return `${day.d} — ${label} : ${sold ? 'vendu' : 'disponible'}`;
+  }
 
   async ngOnInit(): Promise<void> {
     const db = this.supabase.client;
@@ -139,10 +237,13 @@ export class DashboardComponent implements OnInit {
         .is('validated_at', null),
     ]);
 
-    // Companies + top ad performers in parallel.
-    const [companies, taps] = await Promise.all([
-      firstValueFrom(this.companyService.listCompanies()),
-      firstValueFrom(this.metriquesService.getCampaignTaps()),
+    // Companies + operational snapshot + real coverage in parallel.
+    // Each falls back to an empty/neutral value on failure so a single
+    // slow or broken source never blanks the whole dashboard.
+    const [companies, opStats, coverage] = await Promise.all([
+      firstValueFrom(this.companyService.listCompanies()).catch(() => []),
+      firstValueFrom(this.insightsService.getDashboardStats()).catch(() => null),
+      firstValueFrom(this.metriquesService.getCalendarCoverage()).catch(() => []),
     ]);
 
     this.stats.set({
@@ -153,42 +254,11 @@ export class DashboardComponent implements OnInit {
       pendingValidations: pendingValRes.count ?? 0,
       activeCompanies: companies.length,
     });
-
-    await this._loadTopAdPerformers(taps);
+    this.opStats.set(opStats);
+    this.coverage.set(coverage);
 
     this.loading.set(false);
     await this._loadFeaturedEvent(db, year);
-  }
-
-  private async _loadTopAdPerformers(taps: CampaignTap[]): Promise<void> {
-    const top5 = taps.slice(0, 5);
-    if (top5.length === 0) {
-      this.topAdPerformers.set([]);
-      return;
-    }
-    const ids = top5.map(t => t.campaign_id);
-    const { data } = await this.supabase.client
-      .from('ad_campaigns')
-      .select('id, start_date, end_date')
-      .in('id', ids);
-    const dateMap = new Map<string, { start_date: string; end_date: string }>();
-    for (const r of (data ?? []) as any[]) dateMap.set(r.id, { start_date: r.start_date, end_date: r.end_date });
-
-    this.topAdPerformers.set(top5.map(t => {
-      const dates = dateMap.get(t.campaign_id);
-      const period = dates
-        ? `${formatDateShort(dates.start_date)} → ${formatDateShort(dates.end_date)}`
-        : '—';
-      return {
-        campaignId: t.campaign_id,
-        name: t.campaign_name,
-        advertiser: t.advertiser,
-        impressions: t.tap_count,
-        clicks: t.click_count,
-        ctr: t.ctr,
-        period,
-      };
-    }));
   }
 
   private async _loadFeaturedEvent(db: any, year: number): Promise<void> {

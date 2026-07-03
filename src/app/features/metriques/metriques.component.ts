@@ -4,6 +4,7 @@ import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { CampaignTap, DailyActivity, DeviceLog, MonthCoverage } from '../../models';
 import { MetriquesService, DeviceStats } from '../../core/metriques/metriques.service';
+import { InsightsService, MetricsExtraStats } from '../../core/insights/insights.service';
 
 const MONTH_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
@@ -16,13 +17,16 @@ const MONTH_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 
 })
 export class MetriquesComponent implements OnInit {
   private metriquesService = inject(MetriquesService);
+  private insightsService  = inject(InsightsService);
 
+  readonly currentYear   = new Date().getFullYear();
   readonly loading       = signal(true);
   readonly deviceStats   = signal<DeviceStats>({ total: 0, android: 0, ios: 0 });
   readonly deviceLogs    = signal<DeviceLog[]>([]);
   readonly campaignTaps  = signal<CampaignTap[]>([]);
   readonly cmsActivity   = signal<DailyActivity[]>([]);
   readonly coverage      = signal<MonthCoverage[]>([]);
+  readonly extras        = signal<MetricsExtraStats | null>(null);
 
   readonly notifOpenRate = computed(() => {
     const logs = this.deviceLogs();
@@ -100,12 +104,28 @@ export class MetriquesComponent implements OnInit {
     return { polyline: line, area, max, points: pts };
   });
 
-  readonly coverageBarData = computed(() => {
-    const months = this.coverage();
+  /** Per-month ad-inventory fill rate, per position. The commercial
+   *  "sold vs sellable" evidence — % of days covered by a validated +
+   *  active campaign. */
+  readonly fillRateBarData = computed(() => {
+    const rows = this.extras()?.fill_rate ?? [];
     return MONTH_LABELS.map((label, i) => {
-      const m = months.find(c => c.month === i + 1);
-      return { label, percent: m?.percent ?? 0 };
+      const m = rows.find(r => r.month === i + 1);
+      const days = m?.days ?? 30;
+      return {
+        label,
+        headerPct: m ? Math.round((m.header_days / days) * 100) : 0,
+        footerPct: m ? Math.round((m.footer_days / days) * 100) : 0,
+      };
     });
+  });
+
+  /** Curateur → editorial application speed. Null until any
+   *  recommendation has been applied. */
+  readonly applyLatency = computed(() => {
+    const l = this.extras()?.apply_latency;
+    if (!l || l.applied_count === 0) return null;
+    return l;
   });
 
   async ngOnInit(): Promise<void> {
@@ -116,6 +136,7 @@ export class MetriquesComponent implements OnInit {
       firstValueFrom(this.metriquesService.getCampaignTaps()).then(v => this.campaignTaps.set(v)),
       firstValueFrom(this.metriquesService.getCmsActivity()).then(v => this.cmsActivity.set(v)),
       firstValueFrom(this.metriquesService.getCalendarCoverage()).then(v => this.coverage.set(v)),
+      firstValueFrom(this.insightsService.getMetricsExtras(new Date().getFullYear())).then(v => this.extras.set(v)),
     ]);
     this.loading.set(false);
   }

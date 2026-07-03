@@ -72,8 +72,28 @@
         </div>
         <div class="kpi-card__body">
           <div class="kpi-card__value">{{ coveragePercent() }}%</div>
-          <div class="kpi-card__label">Couverture calendrier 2026</div>
+          <div class="kpi-card__label">Couverture calendrier {{ currentYear }}</div>
           <div class="kpi-card__sub">mois entièrement remplis</div>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-card__icon kpi-card__icon--coverage">
+          <tui-icon icon="@tui.list-checks" style="font-size:18px;" />
+        </div>
+        <div class="kpi-card__body">
+          @if (applyLatency(); as lat) {
+            <div class="kpi-card__value">{{ lat.median_hours | number:'1.0-1' }}&nbsp;h</div>
+            <div class="kpi-card__label">Délai d'application des recommandations</div>
+            <div class="kpi-card__sub">
+              médiane · {{ lat.applied_count }} appliquée{{ lat.applied_count > 1 ? 's' : '' }}
+              · moy. {{ lat.avg_hours | number:'1.0-1' }} h
+            </div>
+          } @else {
+            <div class="kpi-card__value" style="color:var(--fg-3);">—</div>
+            <div class="kpi-card__label">Délai d'application des recommandations</div>
+            <div class="kpi-card__sub">aucune recommandation appliquée pour l'instant</div>
+          }
         </div>
       </div>
 
@@ -131,26 +151,45 @@
       }
     </div>
 
-    <!-- ══ Row: Calendar coverage bar chart ══ -->
+    <!-- ══ Row: Ad-inventory fill rate per month (sold days per position) ══
+         The editorial coverage chart now lives on the dashboard (operational
+         view); this one answers the commercial question "how much of our ad
+         inventory is actually sold, month by month". -->
     <div class="card metriques-chart-card">
       <div class="metriques-chart-header">
         <div>
-          <div class="metriques-chart-title">Couverture calendrier 2026 par mois</div>
-          <div class="metriques-chart-sub">Pourcentage de jours avec au moins un événement</div>
+          <div class="metriques-chart-title">Inventaire publicitaire vendu — {{ currentYear }}</div>
+          <div class="metriques-chart-sub">
+            % de jours du mois couverts par une campagne validée et active, par position
+          </div>
+        </div>
+        <div style="display:flex; gap:14px; font-size:11.5px; color:var(--fg-3);">
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent); display:inline-block;"></span>
+            Header
+          </span>
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent-2); display:inline-block;"></span>
+            Footer
+          </span>
         </div>
       </div>
       <div class="metriques-bar-chart">
-        @for (bar of coverageBarData(); track bar.label) {
+        @for (bar of fillRateBarData(); track bar.label) {
           <div class="metriques-bar-col">
-            <div class="metriques-bar-track">
-              <div
-                class="metriques-bar-fill"
-                [class.metriques-bar-fill--full]="bar.percent >= 100"
-                [class.metriques-bar-fill--empty]="bar.percent === 0"
-                [style.height.%]="bar.percent">
+            <div class="metriques-bar-track" style="display:flex; gap:2px; align-items:flex-end;">
+              <div style="flex:1; height:100%; display:flex; align-items:flex-end;"
+                   [title]="'Header : ' + bar.headerPct + '%'">
+                <div style="width:100%; border-radius:2px 2px 0 0; background:var(--accent);"
+                     [style.height.%]="bar.headerPct"></div>
+              </div>
+              <div style="flex:1; height:100%; display:flex; align-items:flex-end;"
+                   [title]="'Footer : ' + bar.footerPct + '%'">
+                <div style="width:100%; border-radius:2px 2px 0 0; background:var(--accent-2);"
+                     [style.height.%]="bar.footerPct"></div>
               </div>
             </div>
-            <span class="metriques-bar-pct">{{ bar.percent }}%</span>
+            <span class="metriques-bar-pct">{{ bar.headerPct }} / {{ bar.footerPct }}</span>
             <span class="metriques-bar-label">{{ bar.label }}</span>
           </div>
         }
