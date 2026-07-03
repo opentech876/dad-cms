@@ -4,7 +4,7 @@ import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { CampaignTap, DailyActivity, DeviceLog, MonthCoverage } from '../../models';
 import { MetriquesService, DeviceStats } from '../../core/metriques/metriques.service';
-import { InsightsService, MetricsExtraStats } from '../../core/insights/insights.service';
+import { AdvertiserExposure, InsightsService, MetricsExtraStats } from '../../core/insights/insights.service';
 
 const MONTH_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
@@ -127,6 +127,84 @@ export class MetriquesComponent implements OnInit {
     if (!l || l.applied_count === 0) return null;
     return l;
   });
+
+  // ── Advertiser exposure (proof-of-performance) ─────────────────
+
+  readonly advertiserExposure = computed<AdvertiserExposure[]>(() =>
+    this.extras()?.advertiser_exposure ?? [],
+  );
+
+  exposureCtr(row: AdvertiserExposure): number | null {
+    return row.impressions > 0 ? row.clicks / row.impressions : null;
+  }
+
+  /**
+   * Build the CSV for the exposure table. Pure so the spec can assert the
+   * exact output. Conventions chosen for French Excel:
+   *   - ';' separator (',' is the decimal separator in fr locales)
+   *   - UTF-8 BOM prefix so Excel decodes accents without an import wizard
+   *   - CRLF line endings
+   *   - CTR rendered with a decimal comma
+   */
+  buildExposureCsv(rows: AdvertiserExposure[]): string {
+    const esc = (v: string | number): string => {
+      const s = String(v);
+      return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = ['Annonceur', 'Campagnes', 'Jours diffusés', 'Jours réservés', 'Impressions', 'Clics', 'CTR'];
+    const lines = rows.map(r => {
+      const ctr = r.impressions > 0
+        ? (r.clicks / r.impressions * 100).toFixed(2).replace('.', ',') + ' %'
+        : '—';
+      return [esc(r.company_name), r.campaigns, r.days_aired, r.days_booked, r.impressions, r.clicks, ctr].join(';');
+    });
+    return '\ufeff' + [header.join(';'), ...lines].join('\r\n');
+  }
+
+  exportExposureCsv(): void {
+    const rows = this.advertiserExposure();
+    if (rows.length === 0) return;
+    const blob = new Blob([this.buildExposureCsv(rows)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `exposition-annonceurs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Team velocity (last 8 ISO weeks) ───────────────────────────
+
+  readonly teamVelocity = computed(() => {
+    const weeks = this.extras()?.team_velocity ?? [];
+    return weeks.map(w => ({ ...w, total: w.events + w.entries + w.campaigns }));
+  });
+
+  readonly velocityMax = computed(() =>
+    Math.max(1, ...this.teamVelocity().map(w => w.total)),
+  );
+
+  /** Current-week total vs previous week. Null when there's nothing to
+   *  compare (fewer than 2 weeks, or both weeks at zero). deltaPct is
+   *  null when the previous week was 0 (division impossible) — the
+   *  template then shows "nouveau" instead of a percentage. */
+  readonly velocityTrend = computed(() => {
+    const rows = this.teamVelocity();
+    if (rows.length < 2) return null;
+    const current  = rows[rows.length - 1].total;
+    const previous = rows[rows.length - 2].total;
+    if (current === 0 && previous === 0) return null;
+    const deltaPct = previous > 0 ? Math.round(((current - previous) / previous) * 100) : null;
+    const direction: 'up' | 'down' | 'flat' =
+      current > previous ? 'up' : current < previous ? 'down' : 'flat';
+    return { current, previous, deltaPct, direction };
+  });
+
+  /** '2026-06-29' → '29/06' */
+  weekLabel(iso: string): string {
+    const [, mm, dd] = iso.split('-');
+    return `${dd}/${mm}`;
+  }
 
   async ngOnInit(): Promise<void> {
     this.loading.set(true);

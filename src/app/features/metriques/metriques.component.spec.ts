@@ -3,7 +3,18 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { of } from 'rxjs';
 import { MetriquesComponent } from './metriques.component';
 import { MetriquesService } from '../../core/metriques/metriques.service';
-import { InsightsService } from '../../core/insights/insights.service';
+import { InsightsService, MetricsExtraStats } from '../../core/insights/insights.service';
+
+/** Complete-but-empty extras payload; tests override the slice under test. */
+function makeExtras(overrides: Partial<MetricsExtraStats> = {}): MetricsExtraStats {
+  return {
+    fill_rate: [],
+    apply_latency: { applied_count: 0, avg_hours: 0, median_hours: 0 },
+    advertiser_exposure: [],
+    team_velocity: [],
+    ...overrides,
+  };
+}
 
 describe('MetriquesComponent', () => {
   let component: MetriquesComponent;
@@ -44,13 +55,12 @@ describe('MetriquesComponent', () => {
 
   describe('fillRateBarData', () => {
     it('convertit les jours vendus en pourcentages par position', () => {
-      component.extras.set({
+      component.extras.set(makeExtras({
         fill_rate: [
           { month: 1, days: 31, header_days: 0,  footer_days: 23 },
           { month: 2, days: 28, header_days: 14, footer_days: 0  },
         ],
-        apply_latency: { applied_count: 0, avg_hours: 0, median_hours: 0 },
-      });
+      }));
       const bars = component.fillRateBarData();
       expect(bars[0]).toMatchObject({ label: 'Jan', headerPct: 0,  footerPct: 74 });
       expect(bars[1]).toMatchObject({ label: 'Fév', headerPct: 50, footerPct: 0  });
@@ -61,19 +71,93 @@ describe('MetriquesComponent', () => {
 
   describe('applyLatency', () => {
     it('renvoie null quand aucune recommandation appliquée', () => {
-      component.extras.set({
-        fill_rate: [],
-        apply_latency: { applied_count: 0, avg_hours: 0, median_hours: 0 },
-      });
+      component.extras.set(makeExtras());
       expect(component.applyLatency()).toBeNull();
     });
 
     it('renvoie les latences quand il y a des applications', () => {
-      component.extras.set({
-        fill_rate: [],
+      component.extras.set(makeExtras({
         apply_latency: { applied_count: 5, avg_hours: 12.4, median_hours: 8.1 },
-      });
+      }));
       expect(component.applyLatency()).toEqual({ applied_count: 5, avg_hours: 12.4, median_hours: 8.1 });
+    });
+  });
+
+  describe('exposition annonceurs + export CSV', () => {
+    const EXPO = [
+      { company_id: 'c1', company_name: 'Entreprise "Alpha"; Congo', campaigns: 2,
+        days_aired: 10, days_booked: 4, impressions: 200, clicks: 5 },
+      { company_id: 'c2', company_name: 'Beta', campaigns: 1,
+        days_aired: 0, days_booked: 8, impressions: 0, clicks: 0 },
+    ];
+
+    it('exposureCtr calcule clics/impressions et null sans impression', () => {
+      expect(component.exposureCtr(EXPO[0])).toBeCloseTo(0.025);
+      expect(component.exposureCtr(EXPO[1])).toBeNull();
+    });
+
+    it('buildExposureCsv produit un CSV français (BOM, ; , CRLF, virgule décimale)', () => {
+      const csv = component.buildExposureCsv(EXPO);
+      expect(csv.charCodeAt(0)).toBe(0xFEFF);                      // BOM pour Excel
+      const lines = csv.slice(1).split('\r\n');
+      expect(lines[0]).toBe('Annonceur;Campagnes;Jours diffusés;Jours réservés;Impressions;Clics;CTR');
+      // Nom contenant ; et " → encadré de guillemets, guillemets doublés.
+      expect(lines[1]).toBe('"Entreprise ""Alpha""; Congo";2;10;4;200;5;2,50 %');
+      // Zéro impression → CTR affiché en tiret.
+      expect(lines[2]).toBe('Beta;1;0;8;0;0;—');
+    });
+  });
+
+  describe('vélocité hebdomadaire', () => {
+    it('calcule le total par semaine et le max', () => {
+      component.extras.set(makeExtras({
+        team_velocity: [
+          { week_start: '2026-06-22', events: 2, entries: 3, campaigns: 1 },
+          { week_start: '2026-06-29', events: 10, entries: 20, campaigns: 0 },
+        ],
+      }));
+      expect(component.teamVelocity()[0].total).toBe(6);
+      expect(component.teamVelocity()[1].total).toBe(30);
+      expect(component.velocityMax()).toBe(30);
+    });
+
+    it('velocityTrend: hausse avec pourcentage', () => {
+      component.extras.set(makeExtras({
+        team_velocity: [
+          { week_start: '2026-06-22', events: 10, entries: 0, campaigns: 0 },
+          { week_start: '2026-06-29', events: 15, entries: 0, campaigns: 0 },
+        ],
+      }));
+      expect(component.velocityTrend()).toEqual({ current: 15, previous: 10, deltaPct: 50, direction: 'up' });
+    });
+
+    it('velocityTrend: deltaPct null quand la semaine précédente est à zéro', () => {
+      component.extras.set(makeExtras({
+        team_velocity: [
+          { week_start: '2026-06-22', events: 0, entries: 0, campaigns: 0 },
+          { week_start: '2026-06-29', events: 5, entries: 0, campaigns: 0 },
+        ],
+      }));
+      expect(component.velocityTrend()).toEqual({ current: 5, previous: 0, deltaPct: null, direction: 'up' });
+    });
+
+    it('velocityTrend: null quand les deux semaines sont à zéro ou données insuffisantes', () => {
+      component.extras.set(makeExtras({
+        team_velocity: [
+          { week_start: '2026-06-22', events: 0, entries: 0, campaigns: 0 },
+          { week_start: '2026-06-29', events: 0, entries: 0, campaigns: 0 },
+        ],
+      }));
+      expect(component.velocityTrend()).toBeNull();
+
+      component.extras.set(makeExtras({
+        team_velocity: [{ week_start: '2026-06-29', events: 5, entries: 0, campaigns: 0 }],
+      }));
+      expect(component.velocityTrend()).toBeNull();
+    });
+
+    it('weekLabel formate en jj/mm', () => {
+      expect(component.weekLabel('2026-06-29')).toBe('29/06');
     });
   });
 

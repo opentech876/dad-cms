@@ -16,6 +16,7 @@ function makeOpStats(overrides: Partial<DashboardOperationalStats> = {}): Dashbo
     validations_soon: [],
     pending_recommendations: 0,
     inventory: [],
+    risky_days: [],
     ...overrides,
   };
 }
@@ -403,6 +404,38 @@ describe('DashboardComponent', () => {
       mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats()));
       await component.ngOnInit();
       expect(component.publicationTodos()).toEqual([]);
+    });
+  });
+
+  describe('jours à risque', () => {
+    it('expose les risky_days du snapshot', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats({
+        risky_days: [{ date: '2026-07-04', mmdd: '07-04', entries: 1, days_until: 1 }],
+      })));
+      await component.ngOnInit();
+      expect(component.riskyDays().length).toBe(1);
+    });
+
+    it('sévérité: vide + ≤7 jours → critical', () => {
+      expect(component.riskySeverity({ date: '', mmdd: '07-04', entries: 0, days_until: 3 })).toBe('critical');
+    });
+
+    it('sévérité: vide + >7 jours → warning', () => {
+      expect(component.riskySeverity({ date: '', mmdd: '07-20', entries: 0, days_until: 17 })).toBe('warning');
+    });
+
+    it('sévérité: partiel (1/2) → info quelle que soit l\'échéance', () => {
+      expect(component.riskySeverity({ date: '', mmdd: '07-04', entries: 1, days_until: 1 })).toBe('info');
+    });
+
+    it('riskyCountdown: aujourd\'hui / demain / dans N j', () => {
+      expect(component.riskyCountdown({ date: '', mmdd: '', entries: 0, days_until: 0 })).toBe("aujourd'hui");
+      expect(component.riskyCountdown({ date: '', mmdd: '', entries: 0, days_until: 1 })).toBe('demain');
+      expect(component.riskyCountdown({ date: '', mmdd: '', entries: 0, days_until: 12 })).toBe('dans 12 j');
+    });
+
+    it('riskyDateLabel: MM-DD → jour + mois en français', () => {
+      expect(component.riskyDateLabel({ date: '', mmdd: '08-07', entries: 0, days_until: 30 })).toBe('7 août');
     });
   });
 

@@ -78,6 +78,7 @@ DECLARE
   v_val_soon  jsonb;
   v_pending   int;
   v_inventory jsonb;
+  v_risky     jsonb;
 BEGIN
   IF p_workspace_id IS NULL
      OR p_workspace_id NOT IN (SELECT public.get_my_workspace_ids()) THEN
@@ -110,6 +111,7 @@ BEGIN
 
   IF v_cal_id IS NULL THEN
     v_empty := NULL;
+    v_risky := '[]'::jsonb;
   ELSE
     WITH days AS (
       SELECT to_char(d, 'MM-DD') AS mmdd
@@ -128,6 +130,27 @@ BEGIN
       'next',  coalesce((SELECT jsonb_agg(mmdd) FROM (SELECT mmdd FROM empty
                           WHERE mmdd >= to_char(now(), 'MM-DD') LIMIT 6) n), '[]'::jsonb)
     ) INTO v_empty;
+
+    -- Risky days: next 30 days that mobile will show with missing content.
+    -- entries = 0 → the day is blank on mobile (critical as it approaches);
+    -- entries = 1 → only one of the two positions is filled (partial).
+    SELECT coalesce(jsonb_agg(x ORDER BY x->>'date'), '[]'::jsonb) INTO v_risky FROM (
+      SELECT jsonb_build_object(
+        'date',       to_char(d, 'YYYY-MM-DD'),
+        'mmdd',       to_char(d, 'MM-DD'),
+        'entries',    cnt,
+        'days_until', (d::date - current_date)
+      ) AS x
+      FROM (
+        SELECT d, (SELECT count(*)::int FROM public.calendar_entries ce
+                   WHERE ce.calendar_id = v_cal_id
+                     AND ce.mmdd = to_char(d, 'MM-DD')) AS cnt
+        FROM generate_series(current_date, current_date + 29, interval '1 day') d
+      ) counted
+      WHERE cnt < 2
+      ORDER BY d
+      LIMIT 10
+    ) sub;
   END IF;
 
   SELECT count(*)::int INTO v_no_image
@@ -169,7 +192,8 @@ BEGIN
     'events_no_image',         v_no_image,
     'validations_soon',        v_val_soon,
     'pending_recommendations', v_pending,
-    'inventory',               v_inventory
+    'inventory',               v_inventory,
+    'risky_days',              v_risky
   );
 END;
 $$;
@@ -183,8 +207,10 @@ CREATE FUNCTION public.metrics_extra_stats(p_workspace_id uuid, p_year int)
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
 DECLARE
-  v_fill    jsonb;
-  v_latency jsonb;
+  v_fill     jsonb;
+  v_latency  jsonb;
+  v_expo     jsonb;
+  v_velocity jsonb;
 BEGIN
   IF p_workspace_id IS NULL
      OR p_workspace_id NOT IN (SELECT public.get_my_workspace_ids()) THEN
@@ -232,9 +258,72 @@ BEGIN
   WHERE pr.workspace_id = p_workspace_id
     AND pr.status = 'applied' AND pr.applied_at IS NOT NULL;
 
+  -- Per-advertiser exposure — the proof-of-performance summary the
+  -- commercial team can export and send to each client.
+  --   days_aired  : distinct PAST days a validated campaign was on air
+  --   days_booked : distinct FUTURE days already reserved (validated+active)
+  SELECT coalesce(jsonb_agg(x ORDER BY (x->>'impressions')::int DESC, x->>'company_name'), '[]'::jsonb)
+  INTO v_expo FROM (
+    SELECT jsonb_build_object(
+      'company_id',   c.id,
+      'company_name', c.name,
+      'campaigns',    (SELECT count(*)::int FROM public.ad_campaigns ac
+                       WHERE ac.company_id = c.id AND ac.deleted_at IS NULL),
+      'days_aired',   coalesce((SELECT count(DISTINCT d)::int
+                       FROM public.ad_campaigns ac
+                       CROSS JOIN LATERAL generate_series(
+                         ac.start_date, LEAST(ac.end_date, current_date), interval '1 day') d
+                       WHERE ac.company_id = c.id AND ac.deleted_at IS NULL
+                         AND ac.validated_at IS NOT NULL
+                         AND ac.start_date <= current_date), 0),
+      'days_booked',  coalesce((SELECT count(DISTINCT d)::int
+                       FROM public.ad_campaigns ac
+                       CROSS JOIN LATERAL generate_series(
+                         GREATEST(ac.start_date, current_date + 1), ac.end_date, interval '1 day') d
+                       WHERE ac.company_id = c.id AND ac.deleted_at IS NULL
+                         AND ac.validated_at IS NOT NULL AND ac.active = true
+                         AND ac.end_date > current_date), 0),
+      'impressions',  (SELECT count(*)::int FROM public.ad_campaign_device_views v
+                       JOIN public.ad_campaigns ac ON ac.id = v.campaign_id
+                       WHERE ac.company_id = c.id),
+      'clicks',       (SELECT count(*)::int FROM public.ad_campaign_device_clicks ck
+                       JOIN public.ad_campaigns ac ON ac.id = ck.campaign_id
+                       WHERE ac.company_id = c.id)
+    ) AS x
+    FROM public.companies c
+    WHERE c.workspace_id = p_workspace_id AND c.deleted_at IS NULL
+      AND EXISTS (SELECT 1 FROM public.ad_campaigns ac
+                  WHERE ac.company_id = c.id AND ac.deleted_at IS NULL)
+  ) sub;
+
+  -- Team velocity — creations per ISO week over the last 8 weeks,
+  -- counted from the source tables' created_at (more complete than
+  -- audit_log, whose triggers were installed later and don't cover
+  -- calendar_entries).
+  SELECT coalesce(jsonb_agg(x ORDER BY x->>'week_start'), '[]'::jsonb) INTO v_velocity FROM (
+    SELECT jsonb_build_object(
+      'week_start', to_char(w, 'YYYY-MM-DD'),
+      'events',    (SELECT count(*)::int FROM public.events e
+                    WHERE e.workspace_id = p_workspace_id
+                      AND e.created_at >= w AND e.created_at < w + interval '7 days'),
+      'entries',   (SELECT count(*)::int FROM public.calendar_entries ce
+                    WHERE ce.workspace_id = p_workspace_id
+                      AND ce.created_at >= w AND ce.created_at < w + interval '7 days'),
+      'campaigns', (SELECT count(*)::int FROM public.ad_campaigns ac
+                    WHERE ac.workspace_id = p_workspace_id
+                      AND ac.created_at >= w AND ac.created_at < w + interval '7 days')
+    ) AS x
+    FROM generate_series(
+      date_trunc('week', current_date)::date - interval '7 weeks',
+      date_trunc('week', current_date)::date,
+      interval '1 week') w
+  ) sub;
+
   RETURN jsonb_build_object(
-    'fill_rate',     v_fill,
-    'apply_latency', v_latency
+    'fill_rate',           v_fill,
+    'apply_latency',       v_latency,
+    'advertiser_exposure', v_expo,
+    'team_velocity',       v_velocity
   );
 END;
 $$;

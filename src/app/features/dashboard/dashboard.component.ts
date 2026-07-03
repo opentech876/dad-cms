@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { CompanyService } from '../../core/companies/company.service';
 import { MetriquesService } from '../../core/metriques/metriques.service';
-import { DashboardOperationalStats, InsightsService } from '../../core/insights/insights.service';
+import { DashboardOperationalStats, InsightsService, RiskyDay } from '../../core/insights/insights.service';
 import { MONTHS_FR_LONG, MONTHS_FR_LONG_CAP, formatRelativeFr } from '../../core/utils/date.utils';
 import { MonthCoverage } from '../../models';
 
@@ -194,6 +194,29 @@ export class DashboardComponent implements OnInit {
   readonly inventory = computed(() => this.opStats()?.inventory ?? []);
   readonly unsoldHeaderDays = computed(() => this.inventory().filter(d => !d.h).length);
   readonly unsoldFooterDays = computed(() => this.inventory().filter(d => !d.f).length);
+
+  /** Days in the next 30 that mobile would show incomplete (0 or 1 of
+   *  2 positions filled). Sorted by date, max 10 (RPC-limited). */
+  readonly riskyDays = computed<RiskyDay[]>(() => this.opStats()?.risky_days ?? []);
+
+  /** Severity drives the card's row color:
+   *  - blank day within a week → critical (mobile shows NOTHING, imminent)
+   *  - blank day further out   → warning
+   *  - partial day (1 of 2)    → info */
+  riskySeverity(day: RiskyDay): 'critical' | 'warning' | 'info' {
+    if (day.entries === 0) return day.days_until <= 7 ? 'critical' : 'warning';
+    return 'info';
+  }
+
+  riskyDateLabel(day: RiskyDay): string {
+    return this.mmddLabel(day.mmdd);
+  }
+
+  riskyCountdown(day: RiskyDay): string {
+    if (day.days_until === 0) return "aujourd'hui";
+    if (day.days_until === 1) return 'demain';
+    return `dans ${day.days_until} j`;
+  }
 
   /** '08-07' → '7 août' */
   private mmddLabel(mmdd: string): string {

@@ -32,6 +32,15 @@ export interface InventoryDay {
   f: boolean;      // footer position sold
 }
 
+/** A day within the next 30 that mobile would show with missing content.
+ *  entries = 0 → completely blank; entries = 1 → one of two positions. */
+export interface RiskyDay {
+  date:       string;   // 'YYYY-MM-DD'
+  mmdd:       string;   // 'MM-DD'
+  entries:    number;   // 0 | 1
+  days_until: number;   // 0 = today
+}
+
 export interface DashboardOperationalStats {
   activity:                ActivityEntry[];
   empty_days:              EmptyDaysSummary | null;
@@ -39,6 +48,7 @@ export interface DashboardOperationalStats {
   validations_soon:        ValidationSoon[];
   pending_recommendations: number;
   inventory:               InventoryDay[];
+  risky_days:              RiskyDay[];
 }
 
 export interface MonthFillRate {
@@ -54,9 +64,31 @@ export interface ApplyLatency {
   median_hours:  number;
 }
 
+/** Proof-of-performance summary per advertiser — exportable as CSV so the
+ *  commercial team can send it to each client. */
+export interface AdvertiserExposure {
+  company_id:   string;
+  company_name: string;
+  campaigns:    number;
+  days_aired:   number;   // distinct PAST days a validated campaign was on air
+  days_booked:  number;   // distinct FUTURE days reserved (validated + active)
+  impressions:  number;
+  clicks:       number;
+}
+
+/** Editorial creations for one ISO week (Monday start). */
+export interface VelocityWeek {
+  week_start: string;   // 'YYYY-MM-DD'
+  events:     number;
+  entries:    number;
+  campaigns:  number;
+}
+
 export interface MetricsExtraStats {
-  fill_rate:     MonthFillRate[];
-  apply_latency: ApplyLatency;
+  fill_rate:           MonthFillRate[];
+  apply_latency:       ApplyLatency;
+  advertiser_exposure: AdvertiserExposure[];
+  team_velocity:       VelocityWeek[];
 }
 
 /**

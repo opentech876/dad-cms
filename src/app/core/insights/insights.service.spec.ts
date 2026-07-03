@@ -16,11 +16,17 @@ describe('InsightsService', () => {
     validations_soon: [],
     pending_recommendations: 2,
     inventory: [],
+    risky_days: [{ date: '2026-07-04', mmdd: '07-04', entries: 1, days_until: 1 }],
   };
 
   const FAKE_METRICS = {
     fill_rate: [{ month: 1, days: 31, header_days: 0, footer_days: 5 }],
     apply_latency: { applied_count: 4, avg_hours: 12.5, median_hours: 8.0 },
+    advertiser_exposure: [{
+      company_id: 'co-1', company_name: 'Entreprise A', campaigns: 2,
+      days_aired: 10, days_booked: 4, impressions: 120, clicks: 3,
+    }],
+    team_velocity: [{ week_start: '2026-06-29', events: 12, entries: 30, campaigns: 1 }],
   };
 
   beforeEach(() => {
