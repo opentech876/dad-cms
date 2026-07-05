@@ -11,6 +11,7 @@ import { EventService } from '../../core/events/event.service';
 import { ToastService } from '../../core/services/toast.service';
 import { CalendarService, CalendarSummary } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntrySlim } from '../../core/calendar/calendar-entry.service';
+import { compressImage } from '../../core/utils/image.utils';
 import {
   formatDateShort,
   formatDayMonthLong,
@@ -519,7 +520,8 @@ export class EventsComponent implements OnInit {
 
     const file = this.editorImageFile();
     if (file && eventId) {
-      const upload = await firstValueFrom(this.eventService.uploadImage(eventId, file));
+      const compressed = await compressImage(file);
+      const upload = await firstValueFrom(this.eventService.uploadImage(eventId, compressed));
       if (upload.path) {
         await firstValueFrom(this.eventService.updateEvent(eventId, { image_path: upload.path }));
         this.editorImageFile.set(null);

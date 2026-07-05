@@ -10,6 +10,7 @@ import { CampaignService } from '../../core/campaigns/campaign.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { formatDateShort } from '../../core/utils/date.utils';
+import { compressImage } from '../../core/utils/image.utils';
 
 type CampaignStatus = 'active' | 'planifiee' | 'terminee';
 
@@ -543,7 +544,8 @@ export class AdCampaignsComponent implements OnInit {
 
     const file = this.editorImageFile();
     if (file && campaignId) {
-      const upload = await firstValueFrom(this.campaignService.uploadBanner(campaignId, file));
+      const compressed = await compressImage(file);
+      const upload = await firstValueFrom(this.campaignService.uploadBanner(campaignId, compressed));
       if (upload.path) {
         await firstValueFrom(this.campaignService.updateCampaign(campaignId, { image_path: upload.path }));
         this.editorImageFile.set(null);

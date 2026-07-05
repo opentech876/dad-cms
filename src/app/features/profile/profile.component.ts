@@ -9,6 +9,7 @@ import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
+import { compressImage } from '../../core/utils/image.utils';
 
 const ROLE_LABELS: Record<AppRole, string> = {
   owner:                   'Administrateur',
@@ -173,7 +174,8 @@ export class ProfileComponent implements OnInit {
     if (!file || !this.userId) return;
     this.avatarUploading.set(true);
     try {
-      const res = await firstValueFrom(this.workspaceService.uploadAvatar(this.userId, file));
+      const compressed = await compressImage(file);
+      const res = await firstValueFrom(this.workspaceService.uploadAvatar(this.userId, compressed));
       if (!res.success) {
         this.toast.error(res.error ?? 'Erreur lors du téléversement.');
       } else {

@@ -37,7 +37,16 @@ export async function compressImage(file: File): Promise<File> {
   // Already small enough AND not oversized? Skip the whole pipeline.
   // We still need the dimensions to decide, so only short-circuit on size.
   try {
-    const bitmap = await createImageBitmap(file);
+    // 'from-image' applies the EXIF orientation while decoding — without it
+    // a portrait phone JPEG lands rotated 90° after the canvas re-encode
+    // (canvas strips EXIF, so the metadata-based rotation is lost).
+    // Older engines that reject the options dict fall back to a plain call.
+    let bitmap: ImageBitmap;
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
+    } catch {
+      bitmap = await createImageBitmap(file);
+    }
     const { width, height } = fitWithin(bitmap.width, bitmap.height);
     const alreadyFits = file.size <= MAX_BYTES
       && bitmap.width <= MAX_WIDTH && bitmap.height <= MAX_HEIGHT;

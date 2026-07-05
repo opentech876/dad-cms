@@ -134,6 +134,9 @@ BEGIN
     -- Risky days: next 30 days that mobile will show with missing content.
     -- entries = 0 → the day is blank on mobile (critical as it approaches);
     -- entries = 1 → only one of the two positions is filled (partial).
+    -- Each day is checked against the calendar of ITS OWN year so the
+    -- window survives the December→January boundary; a year without a
+    -- calendar counts as 0 entries (nothing to display on mobile).
     SELECT coalesce(jsonb_agg(x ORDER BY x->>'date'), '[]'::jsonb) INTO v_risky FROM (
       SELECT jsonb_build_object(
         'date',       to_char(d, 'YYYY-MM-DD'),
@@ -142,9 +145,14 @@ BEGIN
         'days_until', (d::date - current_date)
       ) AS x
       FROM (
-        SELECT d, (SELECT count(*)::int FROM public.calendar_entries ce
-                   WHERE ce.calendar_id = v_cal_id
-                     AND ce.mmdd = to_char(d, 'MM-DD')) AS cnt
+        SELECT d,
+          coalesce((SELECT count(*)::int
+                    FROM public.calendar_entries ce
+                    JOIN public.calendars c2 ON c2.id = ce.calendar_id
+                    WHERE c2.workspace_id = p_workspace_id
+                      AND c2.year = extract(year FROM d)::int
+                      AND c2.deleted_at IS NULL
+                      AND ce.mmdd = to_char(d, 'MM-DD')), 0) AS cnt
         FROM generate_series(current_date, current_date + 29, interval '1 day') d
       ) counted
       WHERE cnt < 2
