@@ -13,6 +13,7 @@ import { RecommendationService } from '../../core/presidency/recommendation.serv
 import { AuthService } from '../../core/auth/auth.service';
 import { AdCampaign, Event as HistoricalEvent, EventPosition } from '../../models';
 import { MONTHS_FR_LONG as MONTHS_FR, MONTHS_FR_LONG_CAP as MONTHS_FR_CAP } from '../../core/utils/date.utils';
+import { APPLY_TIER } from '../../core/utils/labels.utils';
 
 type CalendarView = 'year' | 'month' | 'list';
 export type CalendarFilter = 'all' | 'full' | 'partial' | 'empty' | 'has_campaign';
@@ -119,7 +120,7 @@ export class CalendarComponent implements OnInit {
    * /recommandations. Mirrors the RPC's has_role_at_least('chef_equipe').
    */
   readonly canApplyRecommendations = toSignal(
-    this.authService.hasRoleAtLeast('chef_equipe'),
+    this.authService.hasRoleAtLeast(APPLY_TIER),
     { initialValue: false },
   );
 
@@ -128,7 +129,7 @@ export class CalendarComponent implements OnInit {
    *  Mirrors the SECURITY DEFINER role check on soft_delete_calendar()
    *  and restore_calendar() — hiding the button avoids a 42501 error. */
   readonly canDeleteCalendars = toSignal(
-    this.authService.hasRoleAtLeast('chef_equipe'),
+    this.authService.hasRoleAtLeast(APPLY_TIER),
     { initialValue: false },
   );
 

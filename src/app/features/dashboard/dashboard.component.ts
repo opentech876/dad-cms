@@ -2,31 +2,13 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { SupabaseService } from '../../core/supabase/supabase.service';
 import { CompanyService } from '../../core/companies/company.service';
 import { MetriquesService } from '../../core/metriques/metriques.service';
 import { DashboardOperationalStats, InsightsService, RiskyDay } from '../../core/insights/insights.service';
+import { DashboardService, FeaturedEvent, KpiStats } from '../../core/dashboard/dashboard.service';
+import { getInitials } from '../../core/utils/labels.utils';
 import { MONTHS_FR_LONG, MONTHS_FR_LONG_CAP, formatRelativeFr } from '../../core/utils/date.utils';
 import { MonthCoverage } from '../../models';
-
-interface KpiStats {
-  totalEvents: number;
-  publishedCalendars: number;
-  activeCampaigns: number;
-  yearEvents: number;
-  pendingValidations: number;
-  activeCompanies: number;
-}
-
-interface FeaturedEvent {
-  title: string;
-  dropLetter: string;
-  excerpt: string;
-  day: string;
-  month: string;
-  year: string;
-  also: string;
-}
 
 /** One row of the real activity feed, ready for display. */
 interface FeedRow {
@@ -71,10 +53,10 @@ const ACTION_VERBS: Record<string, string> = {
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit {
-  private supabase         = inject(SupabaseService);
-  private companyService   = inject(CompanyService);
-  private metriquesService = inject(MetriquesService);
-  private insightsService  = inject(InsightsService);
+  private companyService    = inject(CompanyService);
+  private metriquesService  = inject(MetriquesService);
+  private insightsService   = inject(InsightsService);
+  private dashboardService  = inject(DashboardService);
 
   readonly loading = signal(true);
   readonly stats = signal<KpiStats>({
@@ -119,9 +101,8 @@ export class DashboardComponent implements OnInit {
     const entries = this.opStats()?.activity ?? [];
     return entries.map(e => {
       const name = e.actor_name || 'Système';
-      const np = name.trim().split(/\s+/);
       return {
-        initials: ((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'S',
+        initials: getInitials(name, 'S'),
         who:      name,
         action:   ACTION_VERBS[e.action] ?? e.action.toLowerCase(),
         target:   e.record_label ?? (TABLE_LABELS[e.table_name] ?? e.table_name),
@@ -232,100 +213,32 @@ export class DashboardComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    const db = this.supabase.client;
     const year = this.currentYear;
 
-    const [eventsRes, calendarsRes, campaignsRes, yearEventsRes, pendingValRes] = await Promise.all([
-      db.from('events').select('*', { count: 'exact', head: true }).is('deleted_at', null),
-      db
-        .from('calendars')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'published')
-        .is('deleted_at', null),
-      db
-        .from('ad_campaigns')
-        .select('*', { count: 'exact', head: true })
-        .eq('active', true)
-        .is('deleted_at', null),
-      db
-        .from('events')
-        .select('*', { count: 'exact', head: true })
-        .gte('event_date', `${year}-01-01`)
-        .lte('event_date', `${year}-12-31`)
-        .is('deleted_at', null),
-      db
-        .from('ad_campaigns')
-        .select('*', { count: 'exact', head: true })
-        .is('deleted_at', null)
-        .is('validated_at', null),
-    ]);
-
-    // Companies + operational snapshot + real coverage in parallel.
-    // Each falls back to an empty/neutral value on failure so a single
-    // slow or broken source never blanks the whole dashboard.
+    // Companies + operational snapshot + coverage in parallel; each falls
+    // back silently so a single broken source never blanks the whole page.
     const [companies, opStats, coverage] = await Promise.all([
       firstValueFrom(this.companyService.listCompanies()).catch(() => []),
       firstValueFrom(this.insightsService.getDashboardStats()).catch(() => null),
       firstValueFrom(this.metriquesService.getCalendarCoverage()).catch(() => []),
     ]);
 
-    this.stats.set({
-      totalEvents: eventsRes.count ?? 0,
-      publishedCalendars: calendarsRes.count ?? 0,
-      activeCampaigns: campaignsRes.count ?? 0,
-      yearEvents: yearEventsRes.count ?? 0,
-      pendingValidations: pendingValRes.count ?? 0,
-      activeCompanies: companies.length,
-    });
+    const stats = await firstValueFrom(
+      this.dashboardService.getKpiStats(year, companies.length),
+    ).catch(() => ({
+      totalEvents: 0, publishedCalendars: 0, activeCampaigns: 0,
+      yearEvents: 0, pendingValidations: 0, activeCompanies: 0,
+    }));
+
+    this.stats.set(stats);
     this.opStats.set(opStats);
     this.coverage.set(coverage);
-
     this.loading.set(false);
-    await this._loadFeaturedEvent(db, year);
-  }
 
-  private async _loadFeaturedEvent(db: any, year: number): Promise<void> {
-    const now = new Date();
-    const mmdd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    const { data: cal } = await db
-      .from('calendars')
-      .select('id')
-      .eq('year', year)
-      .eq('status', 'published')
-      .is('deleted_at', null)
-      .maybeSingle();
-
-    if (!cal) { this.featuredEventLoading.set(false); return; }
-
-    // Same source as mobile's get_today_content RPC — calendar_entries joined to events.
-    // Soft-deleted events are filtered client-side to mirror the RPC's `e.deleted_at IS NULL`.
-    const { data: entries } = await db
-      .from('calendar_entries')
-      .select('position, event:events(title, description, event_date, deleted_at)')
-      .eq('calendar_id', cal.id)
-      .eq('mmdd', mmdd)
-      .order('position', { ascending: true });
-
-    const rows = ((entries as any[] | null) ?? []).filter(r => r.event && r.event.deleted_at === null);
-    const primary = rows.find(r => r.position === 1);
-    if (!primary?.event) { this.featuredEventLoading.set(false); return; }
-
-    const secondary = rows.find(r => r.position === 2);
-    const ev = primary.event;
-    const desc: string = ev.description ?? '';
-
-    // Right-side preview shows TODAY's date (the day this event is published on mobile),
-    // not the event's historical event_date — those are intentionally different fields.
-    this.featuredEvent.set({
-      title: ev.title,
-      dropLetter: desc.charAt(0),
-      excerpt: desc.slice(1),
-      day: this.todayDayNum,
-      month: this.todayMonthCap,
-      year: String(year),
-      also: secondary?.event?.title ?? '',
-    });
+    const featured = await firstValueFrom(
+      this.dashboardService.getFeaturedEvent(year),
+    ).catch(() => null);
+    if (featured) this.featuredEvent.set(featured);
     this.featuredEventLoading.set(false);
   }
 }

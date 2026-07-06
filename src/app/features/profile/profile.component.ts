@@ -10,16 +10,7 @@ import { WorkspaceContextService } from '../../core/workspace/workspace-context.
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
 import { compressImage } from '../../core/utils/image.utils';
-
-const ROLE_LABELS: Record<AppRole, string> = {
-  owner:                   'Administrateur',
-  chef_equipe:             "Chef d'équipe",
-  editeur:                 'Éditeur',
-  charge_communication:    'Commercial',
-  presidence:              'Curateur',
-  chef_equipe_commerciale: "Chef d'équipe commerciale",
-  system_admin:            "Administrateur plateforme",
-};
+import { ROLE_LABELS, getInitials } from '../../core/utils/labels.utils';
 
 @Component({
   selector: 'app-profile',
@@ -58,10 +49,7 @@ export class ProfileComponent implements OnInit {
 
   readonly initials = computed(() => {
     const name = this.fullName().trim();
-    if (name) {
-      const parts = name.split(/\s+/);
-      return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || name[0].toUpperCase();
-    }
+    if (name) return getInitials(name);
     return (this.userEmail()[0] ?? '?').toUpperCase();
   });
 

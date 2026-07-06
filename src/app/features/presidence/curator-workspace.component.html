@@ -1,0 +1,307 @@
+<!-- ── Curator tabs ── -->
+<div class="card" style="padding:0 24px; margin-bottom:18px;">
+  <div class="reco-tabs">
+    <button type="button" class="reco-tab"
+            [class.reco-tab--active]="activeTab() === 'proposer'"
+            (click)="setTab('proposer')">
+      <tui-icon icon="@tui.calendar-check" style="font-size:14px;" />
+      Proposer
+    </button>
+    <button type="button" class="reco-tab"
+            [class.reco-tab--active]="activeTab() === 'bibliotheque'"
+            (click)="setTab('bibliotheque')">
+      <tui-icon icon="@tui.library" style="font-size:14px;" />
+      Bibliothèque
+    </button>
+  </div>
+</div>
+
+<!-- ══ Proposer tab — month accordion ══ -->
+@if (activeTab() === 'proposer') {
+  @for (m of months; track m.index) {
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; cursor:pointer; user-select:none;"
+           (click)="toggleMonth(m.index)">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <tui-icon [icon]="isExpanded(m.index) ? '@tui.chevron-down' : '@tui.chevron-right'"
+                    style="font-size:16px; color:var(--fg-3);" />
+          <span style="font-family:var(--font-serif); font-size:17px; font-weight:600;">
+            {{ m.name }} {{ calendarYear() }}
+          </span>
+        </div>
+      </div>
+
+      @if (isExpanded(m.index)) {
+        <div style="padding:6px 16px 16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(70px, 1fr)); gap:6px;">
+          @for (d of m.days; track d.mmdd) {
+            <button
+              type="button"
+              class="day-cell"
+              [class.day-cell--full]="dayState(d.mmdd) === 'full'"
+              [class.day-cell--partial]="dayState(d.mmdd) === 'partial'"
+              (click)="openDayEditor(d.mmdd)"
+              [title]="d.mmdd">
+              <span class="day-cell__num">{{ d.day }}</span>
+              <span class="day-cell__dots">
+                <span class="dot" [class.dot--filled]="hasRecommendation(d.mmdd, 1)"></span>
+                <span class="dot" [class.dot--filled]="hasRecommendation(d.mmdd, 2)"></span>
+              </span>
+            </button>
+          }
+        </div>
+      }
+    </div>
+  }
+}
+
+<!-- ══ Bibliothèque tab ══ -->
+@if (activeTab() === 'bibliotheque') {
+  <div class="card" style="margin-bottom:12px;">
+    <div class="reco-library-toolbar">
+      <div class="reco-library-search">
+        <tui-icon icon="@tui.search" class="reco-library-search-icon" />
+        <input class="reco-library-search-input" type="text"
+               placeholder="Rechercher un événement par titre ou date…"
+               [value]="librarySearch()"
+               (input)="librarySearch.set($any($event.target).value)" />
+      </div>
+      @for (f of [
+        { id: 'tous',         label: 'Tous' },
+        { id: 'curateur',     label: 'Mes ajouts' },
+        { id: 'non-assignes', label: 'Non assignés' }
+      ]; track f.id) {
+        <button type="button" class="reco-filter-chip"
+                [class.reco-filter-chip--active]="libraryFilter() === f.id"
+                (click)="libraryFilter.set($any(f.id))">
+          {{ f.label }}
+        </button>
+      }
+      <div style="flex:1;"></div>
+      <button class="btn btn-primary btn-sm" type="button" (click)="openCreateModal()">
+        <tui-icon icon="@tui.plus" style="font-size:14px;" />
+        Nouvel événement
+      </button>
+    </div>
+
+    @if (libraryLoading()) {
+      <div style="padding:32px; text-align:center; color:var(--fg-3);">
+        <span class="spinner"></span> Chargement de la bibliothèque…
+      </div>
+    } @else if (filteredLibrary().length === 0) {
+      <div style="padding:40px 20px; text-align:center; color:var(--fg-3); font-style:italic;">
+        Aucun événement ne correspond à ces critères.
+      </div>
+    } @else {
+      <div style="padding:0 4px 4px; font-size:12px; color:var(--fg-3); text-align:right; padding-right:16px;">
+        {{ filteredLibrary().length }} événement(s)
+      </div>
+      <div class="table-wrap" style="border:none; border-radius:0; box-shadow:none;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:52px;"></th>
+              <th>Date</th>
+              <th>Titre</th>
+              <th>Statut</th>
+              <th>Origine</th>
+              <th>Assigné</th>
+              <th>Recommandé</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (e of filteredLibrary(); track e.id) {
+              <tr>
+                <td>
+                  @if (imageUrl(e); as url) {
+                    <img [src]="url" alt=""
+                         style="width:40px; height:30px; object-fit:cover; border-radius:4px; border:1px solid var(--border-1);" />
+                  } @else {
+                    <div style="width:40px; height:30px; border-radius:4px; background:var(--bg-sunken); display:flex; align-items:center; justify-content:center;">
+                      <tui-icon icon="@tui.image-off" style="font-size:12px; color:var(--fg-3);" />
+                    </div>
+                  }
+                </td>
+                <td style="white-space:nowrap; font-variant-numeric:tabular-nums;">{{ e.event_date }}</td>
+                <td style="font-weight:500; max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                    [title]="e.title">{{ e.title }}</td>
+                <td>
+                  <span class="badge" [class.badge-success]="e.status === 'published'"
+                        [class.badge-warning]="e.status === 'draft'" style="font-size:10.5px;">
+                    {{ e.status === 'published' ? 'Publié' : 'Réserve' }}
+                  </span>
+                </td>
+                <td>
+                  @if (e.origin === 'curateur') {
+                    <span class="badge badge-accent" style="font-size:10.5px;">Curateur</span>
+                  } @else {
+                    <span style="color:var(--fg-3); font-size:12px;">Éditorial</span>
+                  }
+                </td>
+                <td>
+                  @if (assignedEventIds().has(e.id)) {
+                    <span style="color:var(--success); font-weight:600;">✓</span>
+                  } @else {
+                    <span style="color:var(--fg-3);">—</span>
+                  }
+                </td>
+                <td>
+                  @if (recommendedEventIds().has(e.id)) {
+                    <span style="color:var(--accent); font-weight:600;">✓</span>
+                  } @else {
+                    <span style="color:var(--fg-3);">—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+<!-- ── Day editor modal ── -->
+@if (editorOpen()) {
+  <div class="modal-backdrop" (click)="closeDayEditor()">
+    <div class="modal" style="max-width:640px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin:0; font-size:16px;">Recommandation — {{ editorDayLabel() }}</h3>
+        <button class="btn btn-flat btn-sm" type="button" (click)="closeDayEditor()" aria-label="Fermer">
+          <tui-icon icon="@tui.x" style="font-size:14px;" />
+        </button>
+      </div>
+
+      <div class="modal-body">
+        @if (editorLoading()) {
+          <p style="font-style:italic; color:var(--fg-3);">Chargement de la bibliothèque…</p>
+        } @else if (editorLibrary().length === 0) {
+          <p style="font-style:italic; color:var(--fg-3); margin:0 0 8px;">
+            Aucun événement enregistré pour ce jour dans la bibliothèque.
+          </p>
+          <p style="font-size:12.5px; color:var(--fg-3); margin:0;">
+            Ajoutez-en un depuis l'onglet « Bibliothèque » (bouton « Nouvel événement »),
+            puis revenez proposer cette date.
+          </p>
+        } @else {
+          <div class="field">
+            <label class="field-label">Événement National</label>
+            <select class="select"
+                    [value]="editorPos1() ?? ''"
+                    (change)="pick(1, $any($event.target).value || null)">
+              <option value="">— Aucun —</option>
+              @for (ev of editorLibrary(); track ev.id) {
+                <option [value]="ev.id">{{ ev.title }} ({{ ev.event_date | slice:0:4 }})</option>
+              }
+            </select>
+          </div>
+
+          <div class="field" style="margin-top:14px;">
+            <label class="field-label">Date Internationale</label>
+            <select class="select"
+                    [value]="editorPos2() ?? ''"
+                    (change)="pick(2, $any($event.target).value || null)">
+              <option value="">— Aucun —</option>
+              @for (ev of editorLibrary(); track ev.id) {
+                <option [value]="ev.id">{{ ev.title }} ({{ ev.event_date | slice:0:4 }})</option>
+              }
+            </select>
+          </div>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeDayEditor()">Annuler</button>
+        <button class="btn btn-primary btn-sm" type="button"
+                [disabled]="editorSaving()"
+                (click)="saveDayEditor()">
+          @if (editorSaving()) { <span class="spinner"></span> }
+          Enregistrer la recommandation
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Create-event modal ── -->
+@if (createOpen()) {
+  <div class="modal-backdrop" (click)="closeCreateModal()">
+    <div class="modal" style="max-width:560px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin:0; font-size:16px;">Nouvel événement historique</h3>
+        <button class="btn btn-flat btn-sm" type="button"
+                [disabled]="createSaving()"
+                (click)="closeCreateModal()" aria-label="Fermer">
+          <tui-icon icon="@tui.x" style="font-size:14px;" />
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p style="margin:0 0 14px; font-size:12.5px; color:var(--fg-3); line-height:1.5;">
+          L'événement rejoint la bibliothèque partagée en « Réserve », marqué comme ajout du Curateur.
+          Vous pourrez ensuite le proposer à une date depuis l'onglet « Proposer ».
+        </p>
+
+        <div class="field">
+          <label class="field-label">Titre *</label>
+          <input class="input" type="text"
+                 placeholder="Titre de l'événement historique"
+                 [value]="createTitle()"
+                 (input)="createTitle.set($any($event.target).value)" />
+        </div>
+
+        <div class="field" style="margin-top:12px;">
+          <label class="field-label">Date historique *</label>
+          <input class="input" type="date" lang="fr-FR"
+                 [value]="createDate()"
+                 (input)="createDate.set($any($event.target).value)" />
+          <span class="field-hint">La date réelle de l'événement (le jour et le mois déterminent où il peut être proposé).</span>
+        </div>
+
+        <div class="field" style="margin-top:12px;">
+          <label class="field-label">Description</label>
+          <textarea class="textarea" rows="4"
+                    placeholder="Contexte, personnages, portée historique…"
+                    [value]="createDescription()"
+                    (input)="createDescription.set($any($event.target).value)"></textarea>
+        </div>
+
+        <div class="field" style="margin-top:12px;">
+          <label class="field-label">Illustration (optionnelle)</label>
+          <label class="reco-upload-zone">
+            @if (createImagePreview(); as preview) {
+              <img [src]="preview" alt="Aperçu" class="reco-upload-preview" />
+            } @else {
+              <tui-icon icon="@tui.image-plus" style="font-size:22px; color:var(--fg-3);" />
+              <span style="font-size:12.5px; color:var(--fg-3);">Cliquez pour choisir une image</span>
+            }
+            <input type="file" accept="image/jpeg,image/png,image/webp"
+                   style="display:none;"
+                   (change)="onCreateImageChange($event)" />
+          </label>
+          <span class="field-hint">Compressée automatiquement à 800×600 / ≤ 150 Ko avant l'envoi.</span>
+        </div>
+
+        @if (createError()) {
+          <div style="margin-top:12px; padding:8px 10px; background:rgba(217,21,21,0.08); border-radius:var(--r-sm); color:var(--danger); font-size:12.5px;">
+            {{ createError() }}
+          </div>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button"
+                [disabled]="createSaving()"
+                (click)="closeCreateModal()">
+          Annuler
+        </button>
+        <button class="btn btn-primary btn-sm" type="button"
+                [disabled]="createSaving()"
+                (click)="submitCreate()">
+          @if (createSaving()) { <span class="spinner"></span> }
+          <tui-icon icon="@tui.plus" style="font-size:13px;" />
+          Ajouter à la bibliothèque
+        </button>
+      </div>
+    </div>
+  </div>
+}

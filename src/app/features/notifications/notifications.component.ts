@@ -5,6 +5,7 @@ import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { Notification, NotificationActor, NotificationCategory } from '../../models';
 import { NotificationService } from '../../core/notifications/notification.service';
+import { getInitials } from '../../core/utils/labels.utils';
 
 type NotifFilter = 'all' | 'unread' | NotificationCategory;
 
@@ -201,7 +202,6 @@ export class NotificationsComponent implements OnInit {
   /** Initials for the actor avatar fallback (when avatar_url is null). */
   actorInitials(fullName: string | null): string {
     if (!fullName) return '?';
-    const parts = fullName.trim().split(/\s+/);
-    return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
+    return getInitials(fullName);
   }
 }

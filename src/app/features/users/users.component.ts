@@ -7,6 +7,7 @@ import { AppRole, ManageUserAction } from '../../models';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ROLE_LABELS } from '../../core/utils/labels.utils';
 
 interface UserRow {
   userId: string;
@@ -21,16 +22,6 @@ interface UserRow {
   emailConfirmedAt: string | null;
   invitedAt: string | null;
 }
-
-const ROLE_LABELS: Record<AppRole, string> = {
-  owner: 'Administrateur',
-  chef_equipe: "Chef d'équipe",
-  editeur: 'Éditeur',
-  charge_communication: 'Commercial',
-  presidence: 'Curateur',
-  chef_equipe_commerciale: 'Chef d\'équipe comm.',
-  system_admin: 'Admin plateforme',
-};
 
 @Component({
   selector: 'app-users',

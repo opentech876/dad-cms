@@ -13,6 +13,7 @@ import { NotificationService } from '../../notifications/notification.service';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { SearchService, SearchResult, SearchResults } from '../../search/search.service';
 import { RefreshRouteReuseStrategy } from '../../router/refresh-route-reuse.strategy';
+import { ROLE_LABELS, getInitials } from '../../utils/labels.utils';
 
 interface NavItem {
   id: string;
@@ -61,16 +62,7 @@ export class ShellComponent implements OnInit {
   readonly currentRoleLabel = computed(() => {
     const role = this.currentRole();
     if (!role) return '';
-    const labels: Record<string, string> = {
-      owner:                   'Administrateur',
-      chef_equipe:             "Chef d'équipe",
-      editeur:                 'Éditeur',
-      charge_communication:    'Commercial',
-      presidence:              'Curateur',
-      chef_equipe_commerciale: "Chef d'équipe commerciale",
-      system_admin:            'Administrateur plateforme',
-    };
-    return labels[role] ?? role;
+    return ROLE_LABELS[role] ?? role;
   });
 
   toastIcon(type: ToastType): string {
@@ -252,8 +244,7 @@ export class ShellComponent implements OnInit {
       const metaFullName = (user?.user_metadata?.full_name as string | undefined) ?? '';
       if (metaFullName.trim()) {
         this.userName.set(metaFullName.trim());
-        const np = metaFullName.trim().split(/\s+/);
-        this.userInitials.set(((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA');
+        this.userInitials.set(getInitials(metaFullName.trim(), 'AA'));
       } else {
         this.showSysadminSetup.set(true);
       }
@@ -266,8 +257,7 @@ export class ShellComponent implements OnInit {
       if (profile) {
         if (profile.full_name) {
           this.userName.set(profile.full_name);
-          const np = profile.full_name.trim().split(/\s+/);
-          this.userInitials.set(((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA');
+          this.userInitials.set(getInitials(profile.full_name.trim(), 'AA'));
         } else {
           this.profilePhone.set(profile.phone ?? '');
           this.showProfileSetup.set(true);

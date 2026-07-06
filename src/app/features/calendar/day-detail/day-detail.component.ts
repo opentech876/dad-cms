@@ -10,6 +10,7 @@ import { CampaignService } from '../../../core/campaigns/campaign.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AdCampaign, Event, EventPosition } from '../../../models';
 import { formatDateLong } from '../../../core/utils/date.utils';
+import { APPLY_TIER } from '../../../core/utils/labels.utils';
 import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
@@ -33,7 +34,7 @@ export class DayDetailComponent implements OnInit {
    * on /calendrier. presidence + charge_communication also see a read-only view.
    */
   readonly canEditAssignments = toSignal(
-    this.authService.hasRoleAtLeast('chef_equipe'),
+    this.authService.hasRoleAtLeast(APPLY_TIER),
     { initialValue: false },
   );
 
