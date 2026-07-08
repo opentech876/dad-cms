@@ -183,11 +183,11 @@
               [value]="inviteRole()"
               (change)="inviteRole.set($any($event.target).value)"
             >
-              <option value="chef_equipe">Chef d'équipe</option>
-              <option value="editeur">Éditeur</option>
-              <option value="charge_communication">Commercial</option>
-              <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
-              <option value="presidence">Curateur</option>
+              <option value="chef_equipe" [selected]="inviteRole() === 'chef_equipe'">Chef d'équipe</option>
+              <option value="editeur" [selected]="inviteRole() === 'editeur'">Éditeur</option>
+              <option value="charge_communication" [selected]="inviteRole() === 'charge_communication'">Commercial</option>
+              <option value="chef_equipe_commerciale" [selected]="inviteRole() === 'chef_equipe_commerciale'">Chef d'équipe commerciale</option>
+              <option value="presidence" [selected]="inviteRole() === 'presidence'">Curateur</option>
             </select>
             <button
               class="modal__btn-secondary"

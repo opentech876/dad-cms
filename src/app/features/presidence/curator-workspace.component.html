@@ -188,9 +188,9 @@
             <select class="select"
                     [value]="editorPos1() ?? ''"
                     (change)="pick(1, $any($event.target).value || null)">
-              <option value="">— Aucun —</option>
+              <option value="" [selected]="!editorPos1()">— Aucun —</option>
               @for (ev of editorLibrary(); track ev.id) {
-                <option [value]="ev.id">{{ ev.title }} ({{ ev.event_date | slice:0:4 }})</option>
+                <option [value]="ev.id" [selected]="ev.id === editorPos1()">{{ ev.title }} ({{ ev.event_date | slice:0:4 }})</option>
               }
             </select>
           </div>
@@ -200,9 +200,9 @@
             <select class="select"
                     [value]="editorPos2() ?? ''"
                     (change)="pick(2, $any($event.target).value || null)">
-              <option value="">— Aucun —</option>
+              <option value="" [selected]="!editorPos2()">— Aucun —</option>
               @for (ev of editorLibrary(); track ev.id) {
-                <option [value]="ev.id">{{ ev.title }} ({{ ev.event_date | slice:0:4 }})</option>
+                <option [value]="ev.id" [selected]="ev.id === editorPos2()">{{ ev.title }} ({{ ev.event_date | slice:0:4 }})</option>
               }
             </select>
           </div>

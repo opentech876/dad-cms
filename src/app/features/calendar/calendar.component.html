@@ -14,7 +14,7 @@
               [value]="selectedCalendarId()"
               (change)="selectCalendar($any($event.target).value)">
         @for (cal of sortedCalendars(); track cal.id) {
-          <option [value]="cal.id">{{ calLabel(cal) }}</option>
+          <option [value]="cal.id" [selected]="cal.id === selectedCalendarId()">{{ calLabel(cal) }}</option>
         }
       </select>
 
@@ -509,7 +509,7 @@
           @if (availableYears().length > 0) {
             <select class="select" [value]="newCalYear()" (change)="newCalYear.set(+$any($event.target).value)">
               @for (y of availableYears(); track y) {
-                <option [value]="y">{{ y }}</option>
+                <option [value]="y" [selected]="y === newCalYear()">{{ y }}</option>
               }
             </select>
           } @else {
@@ -599,7 +599,7 @@
             <label class="field-label">Calendrier source</label>
             <select class="select" [value]="dupSourceId()" (change)="dupSourceId.set($any($event.target).value)">
               @for (cal of sortedCalendars(); track cal.id) {
-                <option [value]="cal.id">{{ calLabel(cal) }}</option>
+                <option [value]="cal.id" [selected]="cal.id === dupSourceId()">{{ calLabel(cal) }}</option>
               }
             </select>
             @if (dupSourceCalendar(); as src) {
@@ -648,7 +648,7 @@
                               (change)="dupTargetId.set($any($event.target).value)"
                               (click)="$event.stopPropagation()">
                         @for (cal of dupTargetCalendars(); track cal.id) {
-                          <option [value]="cal.id">{{ calLabel(cal) }}</option>
+                          <option [value]="cal.id" [selected]="cal.id === dupTargetId()">{{ calLabel(cal) }}</option>
                         }
                       </select>
                     } @else {
@@ -678,7 +678,7 @@
                           <select class="select" [value]="dupNewYear()"
                                   (change)="dupNewYear.set(+$any($event.target).value)">
                             @for (y of availableYears(); track y) {
-                              <option [value]="y">{{ y }}</option>
+                              <option [value]="y" [selected]="y === dupNewYear()">{{ y }}</option>
                             }
                           </select>
                         } @else {

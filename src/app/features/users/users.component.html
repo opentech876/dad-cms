@@ -509,11 +509,11 @@
             [value]="roleModalTargetRole()"
             (change)="roleModalTargetRole.set($any($event.target).value)"
           >
-            <option value="chef_equipe">Chef d'équipe</option>
-            <option value="editeur">Éditeur</option>
-            <option value="charge_communication">Commercial</option>
-            <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
-            <option value="presidence">Curateur</option>
+            <option value="chef_equipe" [selected]="roleModalTargetRole() === 'chef_equipe'">Chef d'équipe</option>
+            <option value="editeur" [selected]="roleModalTargetRole() === 'editeur'">Éditeur</option>
+            <option value="charge_communication" [selected]="roleModalTargetRole() === 'charge_communication'">Commercial</option>
+            <option value="chef_equipe_commerciale" [selected]="roleModalTargetRole() === 'chef_equipe_commerciale'">Chef d'équipe commerciale</option>
+            <option value="presidence" [selected]="roleModalTargetRole() === 'presidence'">Curateur</option>
           </select>
           <span class="field-hint">
             @if (roleModalTargetRole() === 'chef_equipe') {
@@ -738,13 +738,13 @@
                    owner or chef d'équipe would get a 403 from invite-user EF
                    because minting `owner` is a platform-management concern. -->
               @if (isSysadmin()) {
-                <option value="owner">Administrateur</option>
+                <option value="owner" [selected]="inviteRole() === 'owner'">Administrateur</option>
               }
-              <option value="chef_equipe">Chef d'équipe</option>
-              <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
-              <option value="editeur">Éditeur</option>
-              <option value="charge_communication">Commercial</option>
-              <option value="presidence">Curateur</option>
+              <option value="chef_equipe" [selected]="inviteRole() === 'chef_equipe'">Chef d'équipe</option>
+              <option value="chef_equipe_commerciale" [selected]="inviteRole() === 'chef_equipe_commerciale'">Chef d'équipe commerciale</option>
+              <option value="editeur" [selected]="inviteRole() === 'editeur'">Éditeur</option>
+              <option value="charge_communication" [selected]="inviteRole() === 'charge_communication'">Commercial</option>
+              <option value="presidence" [selected]="inviteRole() === 'presidence'">Curateur</option>
             </select>
             <span class="field-hint">
               L'invitation sera envoyée par e-mail. Le rôle sera appliqué dès la première connexion.
