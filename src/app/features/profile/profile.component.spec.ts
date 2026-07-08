@@ -196,15 +196,6 @@ describe('ProfileComponent', () => {
     });
   });
 
-  // ── navigation ─────────────────────────────────────────────────────────────
-
-  describe('goBack()', () => {
-    it('navigue vers /dashboard', () => {
-      component.goBack();
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/dashboard']);
-    });
-  });
-
   // ── changePassword() ───────────────────────────────────────────────────────
 
   describe('changePassword()', () => {
@@ -297,6 +288,63 @@ describe('ProfileComponent', () => {
       expect(component.showNewPassword()).toBe(true);
       component.toggleShowNewPassword();
       expect(component.showNewPassword()).toBe(false);
+    });
+  });
+
+  // ── system_admin specific rendering + persistence ────────────────────────
+
+  describe('profil pour un system_admin', () => {
+    async function makeSysadmin(userMeta: Record<string, unknown> = {}, updateUserResult: any = { data: { user: {} }, error: null }) {
+      // Wipe call history from the beforeEach owner-role ngOnInit run so
+      // assertions about "was/wasn't called" only see the sysadmin pass.
+      mockWorkspace.getMyProfile.mockClear();
+      mockWorkspace.upsertProfile.mockClear();
+      mockToast.success.mockClear();
+      mockToast.error.mockClear();
+      mockAuth.getCurrentUser = jest.fn().mockReturnValue(of({
+        id: 'admin-1',
+        email: 'admin@test.com',
+        user_metadata: userMeta,
+      }));
+      mockAuth.currentRole$ = of('system_admin');
+      mockSupabase.client = { auth: { updateUser: jest.fn().mockResolvedValue(updateUserResult) } };
+      // Re-instantiate so ngOnInit re-runs with the new mocks
+      fixture = TestBed.createComponent(ProfileComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      await component.ngOnInit();
+    }
+
+    it("isSysadmin() retourne true quand currentRole est system_admin", async () => {
+      await makeSysadmin();
+      expect(component.isSysadmin()).toBe(true);
+    });
+
+    it("hydrate fullName depuis user_metadata.full_name au lieu de getMyProfile", async () => {
+      await makeSysadmin({ full_name: 'Elvis Destin OLEMBE' });
+      expect(component.fullName()).toBe('Elvis Destin OLEMBE');
+      // Le chemin workspace-scoped ne doit PAS être emprunté
+      expect(mockWorkspace.getMyProfile).not.toHaveBeenCalled();
+    });
+
+    it("saveProfile écrit dans user_metadata via updateUser, pas dans profiles", async () => {
+      await makeSysadmin({ full_name: '' });
+      component.fullName.set('Nouveau Nom');
+      await component.saveProfile();
+      expect(mockSupabase.client.auth.updateUser).toHaveBeenCalledWith({
+        data: { full_name: 'Nouveau Nom' },
+      });
+      expect(mockWorkspace.upsertProfile).not.toHaveBeenCalled();
+      expect(mockToast.success).toHaveBeenCalled();
+    });
+
+    it("saveProfile affiche un toast d'erreur quand updateUser échoue", async () => {
+      await makeSysadmin({ full_name: '' }, { data: null, error: { message: 'rate limited' } });
+      component.fullName.set('Nom');
+      await component.saveProfile();
+      expect(mockToast.error).toHaveBeenCalledWith(
+        expect.stringContaining('rate limited'),
+      );
     });
   });
 });

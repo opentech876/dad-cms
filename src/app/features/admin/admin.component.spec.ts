@@ -21,8 +21,8 @@ const FAKE: AdminWorkspace[] = [
 describe('AdminComponent', () => {
   let component: AdminComponent;
   let fixture: ComponentFixture<AdminComponent>;
-  let admin: jest.Mocked<Pick<AdminService, 'listWorkspaces' | 'createWorkspace' | 'softDeleteWorkspace' | 'restoreWorkspace' | 'renameWorkspace'>>;
-  let mockContext: { setActiveWorkspace: jest.Mock };
+  let admin: jest.Mocked<Pick<AdminService, 'listWorkspaces' | 'createWorkspace' | 'softDeleteWorkspace' | 'restoreWorkspace' | 'renameWorkspace' | 'inviteManager'>>;
+  let mockContext: { setActiveWorkspace: jest.Mock; notifyWorkspacesChanged: jest.Mock };
   let mockRouter: { navigate: jest.Mock };
   let mockReuse: { triggerRefresh: jest.Mock };
 
@@ -33,8 +33,9 @@ describe('AdminComponent', () => {
       softDeleteWorkspace: jest.fn().mockReturnValue(of({ success: true })),
       restoreWorkspace:    jest.fn().mockReturnValue(of({ success: true })),
       renameWorkspace:     jest.fn().mockReturnValue(of({ success: true })),
+      inviteManager:       jest.fn().mockReturnValue(of({ success: true })),
     };
-    mockContext = { setActiveWorkspace: jest.fn() };
+    mockContext = { setActiveWorkspace: jest.fn(), notifyWorkspacesChanged: jest.fn() };
     mockRouter  = { navigate: jest.fn() };
     mockReuse   = { triggerRefresh: jest.fn() };
 
@@ -158,6 +159,50 @@ describe('AdminComponent', () => {
       expect(mockContext.setActiveWorkspace).toHaveBeenCalledWith('ws-1');
       expect(mockReuse.triggerRefresh).toHaveBeenCalled();
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/dashboard']);
+    });
+  });
+
+  describe('inviteManager (sysadmin → owner)', () => {
+    beforeEach(async () => { await component.ngOnInit(); });
+
+    it("openInviteManager ouvre le modal avec l'espace cible", () => {
+      component.openInviteManager('ws-1', 'DIOUGA-DIOP Media');
+      expect(component.showInviteModal()).toBe(true);
+      expect(component.inviteWorkspaceId()).toBe('ws-1');
+      expect(component.inviteWorkspaceName()).toBe('DIOUGA-DIOP Media');
+    });
+
+    it("closeInviteManager ferme le modal et purge l'état", () => {
+      component.openInviteManager('ws-1', 'DIOUGA-DIOP Media');
+      component.inviteEmail.set('x@y.com');
+      component.closeInviteManager();
+      expect(component.showInviteModal()).toBe(false);
+      expect(component.inviteEmail()).toBe('');
+    });
+
+    it("submitInviteManager appelle inviteManager et affiche le message de succès", async () => {
+      component.openInviteManager('ws-1', 'DIOUGA-DIOP Media');
+      component.inviteEmail.set('mgr@x.com');
+      await component.submitInviteManager();
+      expect(admin.inviteManager).toHaveBeenCalledWith('ws-1', 'mgr@x.com');
+      expect(component.inviteSuccess()).toContain('mgr@x.com');
+      expect(component.inviteError()).toBe('');
+    });
+
+    it("submitInviteManager expose l'erreur retournée par le service", async () => {
+      admin.inviteManager.mockReturnValueOnce(of({ success: false, error: 'rate limit' }));
+      component.openInviteManager('ws-1', 'DIOUGA-DIOP Media');
+      component.inviteEmail.set('mgr@x.com');
+      await component.submitInviteManager();
+      expect(component.inviteError()).toContain('rate limit');
+      expect(component.inviteSuccess()).toBe('');
+    });
+
+    it("submitInviteManager ne fait rien quand l'email est vide", async () => {
+      component.openInviteManager('ws-1', 'DIOUGA-DIOP Media');
+      component.inviteEmail.set('   ');
+      await component.submitInviteManager();
+      expect(admin.inviteManager).not.toHaveBeenCalled();
     });
   });
 });

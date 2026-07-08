@@ -5,6 +5,11 @@ import { CreateEventDto, Event } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
 import { WorkspaceContextService } from '../workspace/workspace-context.service';
 
+/** How long a cached full-library snapshot stays valid. Mutations through
+ *  this service invalidate immediately; the TTL only bounds staleness from
+ *  OTHER users' edits (acceptable for pickers / grids that reload on save). */
+const LIBRARY_CACHE_TTL_MS = 60_000;
+
 @Injectable({ providedIn: 'root' })
 export class EventService {
   constructor(
@@ -12,14 +17,37 @@ export class EventService {
     private workspaceContext: WorkspaceContextService,
   ) {}
 
+  // In-flight-aware cache of the full library, keyed by workspace. The day
+  // editor calls listEventsByMmdd() on EVERY day click — without the cache
+  // each click re-fetched the entire library (1000+ rows, paginated).
+  private libraryCache: { wsId: string | null; at: number; promise: Promise<Event[]> } | null = null;
+
+  /** Drop the cached library. Called by every mutation in this service so
+   *  the next read reflects the write; also callable by features that
+   *  mutate events through other paths. */
+  invalidateCache(): void {
+    this.libraryCache = null;
+  }
+
   /**
    * Returns all non-deleted events for the active workspace.
    * Paginates with `.range()` to work around Supabase's default
    * `max-rows=1000` PostgREST limit — keeps fetching until a page
    * comes back with fewer than PAGE_SIZE rows.
+   *
+   * Served from a short-lived cache (see LIBRARY_CACHE_TTL_MS); pass
+   * `forceRefresh` to bypass it (explicit refresh buttons).
    */
-  listEvents(): Observable<Event[]> {
+  listEvents(forceRefresh = false): Observable<Event[]> {
     const wsId = this.workspaceContext.activeWorkspaceId();
+    const cache = this.libraryCache;
+    const fresh = cache
+      && cache.wsId === wsId
+      && (Date.now() - cache.at) < LIBRARY_CACHE_TTL_MS;
+    if (!forceRefresh && fresh) {
+      return from(cache.promise);
+    }
+
     const PAGE_SIZE = 1000;
 
     const fetchPage = (offset: number): Promise<Event[]> => {
@@ -47,10 +75,16 @@ export class EventService {
       return all;
     };
 
-    return from(fetchAll());
+    const promise = fetchAll();
+    // Cache the promise itself so concurrent callers share one round-trip;
+    // evict on failure so an error doesn't poison the next minute.
+    this.libraryCache = { wsId, at: Date.now(), promise };
+    promise.catch(() => { this.libraryCache = null; });
+    return from(promise);
   }
 
-  /** Returns all non-deleted events whose MM-DD matches the given string (e.g. '08-15'). */
+  /** Returns all non-deleted events whose MM-DD matches the given string (e.g. '08-15').
+   *  Rides the listEvents() cache — repeated day-editor opens cost one fetch. */
   listEventsByMmdd(mmdd: string): Observable<Event[]> {
     return this.listEvents().pipe(
       map(events => events.filter(e => e.event_date.slice(5) === mmdd)),
@@ -72,6 +106,7 @@ export class EventService {
             source: dto.source ?? null,
             historian: dto.historian ?? null,
             status: 'draft',
+            origin: dto.origin ?? 'editorial',
             workspace_id: wsId,
             created_by: user?.id ?? null,
           })
@@ -79,11 +114,12 @@ export class EventService {
           .single(),
       ) as Promise<{ data: { id: string } | null; error: any }>,
     ).pipe(
-      map(({ data, error }) =>
-        error
+      map(({ data, error }) => {
+        this.invalidateCache();
+        return error
           ? { success: false, error: error.message }
-          : { success: true, id: data?.id },
-      ),
+          : { success: true, id: data?.id };
+      }),
     );
   }
 
@@ -96,9 +132,10 @@ export class EventService {
           .eq('id', id),
       ),
     ).pipe(
-      map(({ error }: any) =>
-        error ? { success: false, error: error.message } : { success: true },
-      ),
+      map(({ error }: any) => {
+        this.invalidateCache();
+        return error ? { success: false, error: error.message } : { success: true };
+      }),
     );
   }
 
@@ -148,9 +185,10 @@ export class EventService {
           }))),
       ),
     ).pipe(
-      map(({ error }: any) =>
-        error ? { inserted: 0, error: error.message } : { inserted: dtos.length },
-      ),
+      map(({ error }: any) => {
+        this.invalidateCache();
+        return error ? { inserted: 0, error: error.message } : { inserted: dtos.length };
+      }),
     );
   }
 
@@ -163,9 +201,10 @@ export class EventService {
           .eq('id', id),
       ),
     ).pipe(
-      map(({ error }: any) =>
-        error ? { success: false, error: error.message } : { success: true },
-      ),
+      map(({ error }: any) => {
+        this.invalidateCache();
+        return error ? { success: false, error: error.message } : { success: true };
+      }),
     );
   }
 }

@@ -1,12 +1,25 @@
 import { TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { of } from 'rxjs';
 import { DashboardComponent } from './dashboard.component';
 import { SupabaseService } from '../../core/supabase/supabase.service';
-import { CampaignService } from '../../core/campaigns/campaign.service';
 import { CompanyService } from '../../core/companies/company.service';
 import { MetriquesService } from '../../core/metriques/metriques.service';
+import { DashboardOperationalStats, InsightsService } from '../../core/insights/insights.service';
+
+/** Minimal valid operational snapshot; tests override slices as needed. */
+function makeOpStats(overrides: Partial<DashboardOperationalStats> = {}): DashboardOperationalStats {
+  return {
+    activity: [],
+    empty_days: { count: 0, next: [] },
+    events_no_image: 0,
+    validations_soon: [],
+    pending_recommendations: 0,
+    inventory: [],
+    risky_days: [],
+    ...overrides,
+  };
+}
 
 const TODAY = new Date().toISOString().split('T')[0];
 const [, todayMonthStr, todayDayStr] = TODAY.split('-');
@@ -129,23 +142,23 @@ describe('DashboardComponent', () => {
   let component: DashboardComponent;
   let mockSupabase: { client: any };
 
-  let mockCampaigns: { listCampaigns: jest.Mock };
   let mockCompanies: { listCompanies: jest.Mock };
-  let mockMetriques: { getCampaignTaps: jest.Mock };
+  let mockMetriques: { getCalendarCoverage: jest.Mock };
+  let mockInsights: { getDashboardStats: jest.Mock };
 
   beforeEach(() => {
     mockSupabase = { client: buildClient() };
-    mockCampaigns = { listCampaigns: jest.fn().mockReturnValue(of([])) };
     mockCompanies = { listCompanies: jest.fn().mockReturnValue(of([])) };
-    mockMetriques = { getCampaignTaps: jest.fn().mockReturnValue(of([])) };
+    mockMetriques = { getCalendarCoverage: jest.fn().mockReturnValue(of([])) };
+    mockInsights  = { getDashboardStats: jest.fn().mockReturnValue(of(makeOpStats())) };
 
     TestBed.configureTestingModule({
       imports: [DashboardComponent],
       providers: [
         { provide: SupabaseService,   useValue: mockSupabase },
-        { provide: CampaignService,   useValue: mockCampaigns },
         { provide: CompanyService,    useValue: mockCompanies },
         { provide: MetriquesService,  useValue: mockMetriques },
+        { provide: InsightsService,   useValue: mockInsights },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     });
@@ -318,37 +331,139 @@ describe('DashboardComponent', () => {
     });
   });
 
-  // ── Top ad performers (Round 4) ──────────────────────────────────────────
+  // ── Operational snapshot (dashboard_operational_stats) ───────────────────
 
-  describe('topAdPerformers', () => {
-    it('garde au plus 5 lignes', async () => {
-      const taps = Array.from({ length: 8 }, (_, i) => ({
-        campaign_id: `c-${i}`, campaign_name: `Camp ${i}`, advertiser: 'A',
-        tap_count: 100 - i, click_count: 5, ctr: 0.05,
-      }));
-      mockMetriques.getCampaignTaps.mockReturnValue(of(taps));
+  describe('activityFeed', () => {
+    it('mappe les entrées audit_log en lignes lisibles', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats({
+        activity: [{
+          actor_name: 'Alice Martin', action: 'INSERT', table_name: 'events',
+          record_label: 'Indépendance du Congo', changed_at: new Date().toISOString(),
+        }],
+      })));
       await component.ngOnInit();
-      expect(component.topAdPerformers().length).toBe(5);
+      const row = component.activityFeed()[0];
+      expect(row.who).toBe('Alice Martin');
+      expect(row.initials).toBe('AM');
+      expect(row.action).toBe('a créé');
+      expect(row.target).toBe('Indépendance du Congo');
+      expect(row.meta).toBe('Événement');
     });
 
-    it('mappe campaign_name → name et tap_count → impressions', async () => {
-      mockMetriques.getCampaignTaps.mockReturnValue(of([
-        { campaign_id: 'c1', campaign_name: 'Forfait', advertiser: 'MTN',
-          tap_count: 1500, click_count: 30, ctr: 0.02 },
+    it('utilise le libellé de table quand record_label est null', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats({
+        activity: [{
+          actor_name: 'Bob', action: 'DELETE', table_name: 'calendars',
+          record_label: null, changed_at: new Date().toISOString(),
+        }],
+      })));
+      await component.ngOnInit();
+      expect(component.activityFeed()[0].target).toBe('Calendrier');
+      expect(component.activityFeed()[0].action).toBe('a supprimé');
+    });
+
+    it('renvoie [] quand opStats est null (pas de workspace)', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(null));
+      await component.ngOnInit();
+      expect(component.activityFeed()).toEqual([]);
+    });
+  });
+
+  describe('publicationTodos', () => {
+    it('affiche les dates vides avec les prochaines occurrences', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats({
+        empty_days: { count: 4, next: ['08-07', '09-22'] },
+      })));
+      await component.ngOnInit();
+      const todo = component.publicationTodos().find(t => t.text.includes('sans événement'))!;
+      expect(todo.text).toBe('4 dates sans événement');
+      expect(todo.meta).toBe('7 août · 22 septembre');
+      expect(todo.link).toBe('/calendrier');
+    });
+
+    it("signale l'absence de calendrier pour l'année (empty_days null)", async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats({ empty_days: null })));
+      await component.ngOnInit();
+      expect(component.publicationTodos().some(t => t.text.startsWith('Aucun calendrier'))).toBe(true);
+    });
+
+    it('inclut images manquantes / validations / recommandations quand > 0', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats({
+        events_no_image: 12,
+        validations_soon: [{ name: 'Campagne X', start_date: '2026-07-08' }],
+        pending_recommendations: 3,
+      })));
+      await component.ngOnInit();
+      const texts = component.publicationTodos().map(t => t.text);
+      expect(texts).toContain('12 événements sans illustration');
+      expect(texts).toContain('1 campagne à valider avant diffusion');
+      expect(texts).toContain('3 recommandations du Curateur à appliquer');
+    });
+
+    it('renvoie [] (all-clear) quand tout est vert', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats()));
+      await component.ngOnInit();
+      expect(component.publicationTodos()).toEqual([]);
+    });
+  });
+
+  describe('jours à risque', () => {
+    it('expose les risky_days du snapshot', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats({
+        risky_days: [{ date: '2026-07-04', mmdd: '07-04', entries: 1, days_until: 1 }],
+      })));
+      await component.ngOnInit();
+      expect(component.riskyDays().length).toBe(1);
+    });
+
+    it('sévérité: vide + ≤7 jours → critical', () => {
+      expect(component.riskySeverity({ date: '', mmdd: '07-04', entries: 0, days_until: 3 })).toBe('critical');
+    });
+
+    it('sévérité: vide + >7 jours → warning', () => {
+      expect(component.riskySeverity({ date: '', mmdd: '07-20', entries: 0, days_until: 17 })).toBe('warning');
+    });
+
+    it('sévérité: partiel (1/2) → info quelle que soit l\'échéance', () => {
+      expect(component.riskySeverity({ date: '', mmdd: '07-04', entries: 1, days_until: 1 })).toBe('info');
+    });
+
+    it('riskyCountdown: aujourd\'hui / demain / dans N j', () => {
+      expect(component.riskyCountdown({ date: '', mmdd: '', entries: 0, days_until: 0 })).toBe("aujourd'hui");
+      expect(component.riskyCountdown({ date: '', mmdd: '', entries: 0, days_until: 1 })).toBe('demain');
+      expect(component.riskyCountdown({ date: '', mmdd: '', entries: 0, days_until: 12 })).toBe('dans 12 j');
+    });
+
+    it('riskyDateLabel: MM-DD → jour + mois en français', () => {
+      expect(component.riskyDateLabel({ date: '', mmdd: '08-07', entries: 0, days_until: 30 })).toBe('7 août');
+    });
+  });
+
+  describe('inventaire publicitaire', () => {
+    it('compte les jours invendus par position', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(of(makeOpStats({
+        inventory: [
+          { d: '2026-07-03', h: true,  f: false },
+          { d: '2026-07-04', h: false, f: false },
+          { d: '2026-07-05', h: true,  f: true  },
+        ],
+      })));
+      await component.ngOnInit();
+      expect(component.unsoldHeaderDays()).toBe(1);
+      expect(component.unsoldFooterDays()).toBe(2);
+    });
+  });
+
+  describe('coverageBars', () => {
+    it('dérive les barres depuis getCalendarCoverage()', async () => {
+      mockMetriques.getCalendarCoverage.mockReturnValue(of([
+        { month: 1, filled_days: 15, total_days: 31, percent: 48 },
+        { month: 2, filled_days: 28, total_days: 28, percent: 100 },
       ]));
       await component.ngOnInit();
-      const row = component.topAdPerformers()[0];
-      expect(row.name).toBe('Forfait');
-      expect(row.advertiser).toBe('MTN');
-      expect(row.impressions).toBe(1500);
-      expect(row.clicks).toBe(30);
-      expect(row.ctr).toBe(0.02);
-    });
-
-    it('retourne [] quand aucun tap', async () => {
-      mockMetriques.getCampaignTaps.mockReturnValue(of([]));
-      await component.ngOnInit();
-      expect(component.topAdPerformers()).toEqual([]);
+      expect(component.coverageBars().length).toBe(2);
+      expect(component.coverageBars()[0]).toMatchObject({ pct: 48, label: 'J' });
+      expect(component.coverageBars()[1]).toMatchObject({ pct: 100, label: 'F' });
     });
   });
 });

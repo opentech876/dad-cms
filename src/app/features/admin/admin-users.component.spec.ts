@@ -1,6 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AdminUsersComponent } from './admin-users.component';
 import { AdminService, AdminUser } from '../../core/admin/admin.service';
 
@@ -9,18 +9,21 @@ const FAKE_USERS: AdminUser[] = [
     user_id: 'u1', email: 'admin@open-tech.cg', display_name: 'Elvis O.',
     global_role: 'system_admin', email_confirmed_at: '2026-01-01T08:00:00Z',
     banned: false, created_at: '2026-01-01T08:00:00Z',
+    last_sign_in_at: '2026-07-01T09:15:00Z',
     memberships: [{ workspace_id: 'ws-1', workspace_name: 'DIOUGA-DIOP Media', role: 'owner', joined_at: '2026-01-01T08:00:00Z', deleted: false }],
   },
   {
     user_id: 'u2', email: 'editor@test.com', display_name: 'Alice Martin',
     global_role: 'editeur', email_confirmed_at: '2026-02-01T08:00:00Z',
     banned: false, created_at: '2026-02-01T08:00:00Z',
+    last_sign_in_at: '2026-06-15T11:00:00Z',
     memberships: [{ workspace_id: 'ws-1', workspace_name: 'DIOUGA-DIOP Media', role: 'editeur', joined_at: '2026-02-01T08:00:00Z', deleted: false }],
   },
   {
     user_id: 'u3', email: 'pending@test.com', display_name: null,
     global_role: 'editeur', email_confirmed_at: null,
     banned: false, created_at: '2026-06-20T14:00:00Z',
+    last_sign_in_at: null,  // Invited but never signed in yet.
     memberships: [{ workspace_id: 'ws-1', workspace_name: 'DIOUGA-DIOP Media', role: 'editeur', joined_at: '2026-06-20T14:00:00Z', deleted: false }],
   },
 ];
@@ -72,5 +75,58 @@ describe('AdminUsersComponent', () => {
   it('compte les system_admin', async () => {
     await component.ngOnInit();
     expect(component.systemAdminCount()).toBe(1);
+  });
+
+  it('remplit la bannière d\'erreur et vide la liste si le RPC échoue', async () => {
+    admin.listAllUsers.mockReturnValueOnce(throwError(() => new Error('boom')));
+    await component.ngOnInit();
+    expect(component.error()).toBe('boom');
+    expect(component.users()).toEqual([]);
+    expect(component.loading()).toBe(false);
+  });
+
+  it('reload() efface l\'erreur et recharge les données', async () => {
+    admin.listAllUsers.mockReturnValueOnce(throwError(() => new Error('boom')));
+    await component.ngOnInit();
+    expect(component.error()).toBe('boom');
+
+    admin.listAllUsers.mockReturnValueOnce(of(FAKE_USERS));
+    await component.reload();
+    expect(component.error()).toBeNull();
+    expect(component.users().length).toBe(3);
+  });
+
+  describe('activeMemberships() + orphanCount() ignorent les espaces supprimés', () => {
+    // Two memberships: one active, one on a deleted workspace.
+    const USER_WITH_MIXED: AdminUser = {
+      user_id: 'u-mix', email: 'mix@test.com', display_name: 'Mix User',
+      global_role: 'editeur', email_confirmed_at: '2026-05-01T00:00:00Z',
+      banned: false, created_at: '2026-05-01T00:00:00Z',
+      last_sign_in_at: '2026-06-30T00:00:00Z',
+      memberships: [
+        { workspace_id: 'ws-alive', workspace_name: 'Actif',    role: 'editeur', joined_at: '2026-05-01T00:00:00Z', deleted: false },
+        { workspace_id: 'ws-dead',  workspace_name: 'Supprimé', role: 'owner',   joined_at: '2026-04-01T00:00:00Z', deleted: true  },
+      ],
+    };
+    // All memberships deleted — effectively orphaned.
+    const USER_ALL_DELETED: AdminUser = {
+      user_id: 'u-orphan', email: 'orphan@test.com', display_name: null,
+      global_role: null, email_confirmed_at: '2026-05-01T00:00:00Z',
+      banned: false, created_at: '2026-05-01T00:00:00Z',
+      last_sign_in_at: null,
+      memberships: [
+        { workspace_id: 'ws-x', workspace_name: 'Old', role: 'owner', joined_at: '2026-04-01T00:00:00Z', deleted: true },
+      ],
+    };
+
+    it('activeMemberships() ne renvoie que les memberships non supprimés', () => {
+      expect(component.activeMemberships(USER_WITH_MIXED).map(m => m.workspace_id)).toEqual(['ws-alive']);
+    });
+
+    it('orphanCount() compte comme orphelin un utilisateur dont tous les memberships sont supprimés', async () => {
+      admin.listAllUsers.mockReturnValueOnce(of([USER_WITH_MIXED, USER_ALL_DELETED, ...FAKE_USERS]));
+      await component.reload();
+      expect(component.orphanCount()).toBe(1); // Only USER_ALL_DELETED
+    });
   });
 });

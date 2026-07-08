@@ -8,6 +8,7 @@ describe('CalendarService', () => {
   let service: CalendarService;
   let insertSpy: jest.Mock;
   let updateSpy: jest.Mock;
+  let rpcSpy:    jest.Mock;
   let eqCalls: Array<[string, any]>;
   let mockSupabase: { client: any };
   let mockWorkspaceContext: { activeWorkspaceId: jest.Mock };
@@ -57,6 +58,14 @@ describe('CalendarService', () => {
 
     insertSpy = jest.fn().mockImplementation(() => makeQuery([{ id: newId }]));
     updateSpy = jest.fn().mockImplementation(() => makeQuery(null));
+    // .rpc() covers soft_delete_calendar, restore_calendar, list_deleted_calendars.
+    // The service reads { data, error } from the promise result — mirror that shape.
+    rpcSpy = jest.fn().mockImplementation((_fnName: string, _args?: any) =>
+      Promise.resolve({
+        data:  simulateError ? null : [],
+        error: simulateError ? { message: simulateError } : null,
+      }),
+    );
 
     return {
       auth: {
@@ -70,6 +79,7 @@ describe('CalendarService', () => {
           update: updateSpy,
         };
       },
+      rpc: rpcSpy,
     };
   }
 
@@ -223,41 +233,133 @@ describe('CalendarService', () => {
   // ── deleteCalendar() ────────────────────────────────────────────────────────
 
   describe('deleteCalendar()', () => {
-    it('appelle update avec un champ deleted_at non null', async () => {
+    it('délègue à la RPC soft_delete_calendar avec p_calendar_id', async () => {
       mockSupabase.client = buildClient();
-
       await firstValueFrom(service.deleteCalendar('cal-1'));
-
-      expect(updateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ deleted_at: expect.any(String) }),
-      );
+      expect(rpcSpy).toHaveBeenCalledWith('soft_delete_calendar', { p_calendar_id: 'cal-1' });
     });
 
-    it('inclut deleted_by dans le payload', async () => {
+    it('retourne success: true quand la RPC réussit', async () => {
       mockSupabase.client = buildClient();
-
-      await firstValueFrom(service.deleteCalendar('cal-1'));
-
-      expect(updateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ deleted_by: 'user-1' }),
-      );
-    });
-
-    it('retourne success: true quand la suppression réussit', async () => {
-      mockSupabase.client = buildClient();
-
       const result = await firstValueFrom(service.deleteCalendar('cal-1'));
-
       expect(result.success).toBe(true);
     });
 
     it("retourne success: false avec un message d'erreur en cas d'erreur DB", async () => {
       mockSupabase.client = buildClient({ simulateError: 'Suppression impossible' });
-
       const result = await firstValueFrom(service.deleteCalendar('cal-1'));
-
       expect(result.success).toBe(false);
       expect(result.error).toBe('Suppression impossible');
+    });
+  });
+
+  // ── restoreCalendar() ───────────────────────────────────────────────────────
+
+  describe('restoreCalendar()', () => {
+    it('délègue à la RPC restore_calendar avec p_calendar_id', async () => {
+      mockSupabase.client = buildClient();
+      await firstValueFrom(service.restoreCalendar('cal-1'));
+      expect(rpcSpy).toHaveBeenCalledWith('restore_calendar', { p_calendar_id: 'cal-1' });
+    });
+
+    it('retourne success: true quand la RPC réussit', async () => {
+      mockSupabase.client = buildClient();
+      const result = await firstValueFrom(service.restoreCalendar('cal-1'));
+      expect(result.success).toBe(true);
+    });
+
+    it("retourne success: false avec un message d'erreur en cas d'erreur DB", async () => {
+      mockSupabase.client = buildClient({ simulateError: 'Restauration impossible' });
+      const result = await firstValueFrom(service.restoreCalendar('cal-1'));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Restauration impossible');
+    });
+  });
+
+  // ── listDeletedCalendars() ──────────────────────────────────────────────────
+
+  describe('listDeletedCalendars()', () => {
+    it('délègue à la RPC list_deleted_calendars', async () => {
+      mockSupabase.client = buildClient();
+      await firstValueFrom(service.listDeletedCalendars());
+      expect(rpcSpy).toHaveBeenCalledWith('list_deleted_calendars');
+    });
+
+    it('mappe les colonnes snake_case en camelCase', async () => {
+      const deletedRow = {
+        id: 'cal-x', workspace_id: 'ws-1', year: 2026, name: 'Test',
+        status: 'draft', deleted_at: '2026-07-01T10:00:00Z',
+        deleted_by: 'u-1', deleter_email: 'a@b.c', deleter_name: 'Alice',
+        entries_count: 5,
+      };
+      mockSupabase.client = {
+        auth: { getUser: jest.fn() },
+        from: jest.fn(),
+        rpc: jest.fn().mockResolvedValue({ data: [deletedRow], error: null }),
+      };
+      const result = await firstValueFrom(service.listDeletedCalendars());
+      expect(result[0]).toEqual({
+        id: 'cal-x', workspaceId: 'ws-1', year: 2026, name: 'Test',
+        status: 'draft', deletedAt: '2026-07-01T10:00:00Z',
+        deletedBy: 'u-1', deleterEmail: 'a@b.c', deleterName: 'Alice',
+        entriesCount: 5,
+      });
+    });
+
+    it('renvoie [] si la RPC renvoie une erreur', async () => {
+      mockSupabase.client = buildClient({ simulateError: 'no' });
+      const result = await firstValueFrom(service.listDeletedCalendars());
+      expect(result).toEqual([]);
+    });
+  });
+
+  // ── purgeCalendar() ────────────────────────────────────────────────────────
+
+  describe('purgeCalendar()', () => {
+    it('délègue à la RPC purge_calendar avec p_calendar_id', async () => {
+      mockSupabase.client = buildClient();
+      await firstValueFrom(service.purgeCalendar('cal-1'));
+      expect(rpcSpy).toHaveBeenCalledWith('purge_calendar', { p_calendar_id: 'cal-1' });
+    });
+
+    it('retourne success: true quand la RPC réussit', async () => {
+      mockSupabase.client = buildClient();
+      const result = await firstValueFrom(service.purgeCalendar('cal-1'));
+      expect(result.success).toBe(true);
+    });
+
+    it("retourne success: false avec un message en cas d'erreur", async () => {
+      mockSupabase.client = buildClient({ simulateError: 'Not purgeable' });
+      const result = await firstValueFrom(service.purgeCalendar('cal-1'));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Not purgeable');
+    });
+  });
+
+  // ── emptyCalendarTrash() ───────────────────────────────────────────────────
+
+  describe('emptyCalendarTrash()', () => {
+    it('délègue à la RPC empty_calendar_trash sans argument', async () => {
+      mockSupabase.client = buildClient();
+      await firstValueFrom(service.emptyCalendarTrash());
+      expect(rpcSpy).toHaveBeenCalledWith('empty_calendar_trash');
+    });
+
+    it('renvoie le compteur "purged" quand la RPC réussit', async () => {
+      mockSupabase.client = {
+        auth: { getUser: jest.fn() },
+        from: jest.fn(),
+        rpc: jest.fn().mockResolvedValue({ data: 3, error: null }),
+      };
+      const result = await firstValueFrom(service.emptyCalendarTrash());
+      expect(result).toEqual({ success: true, purged: 3 });
+    });
+
+    it("retourne success: false avec un message en cas d'erreur", async () => {
+      mockSupabase.client = buildClient({ simulateError: 'Access denied' });
+      const result = await firstValueFrom(service.emptyCalendarTrash());
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Access denied');
     });
   });
 });

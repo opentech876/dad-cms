@@ -36,11 +36,19 @@
   --bg-surface: #fbf8f1;
   --bg-surface-2: #f7f1e3;
   --bg-sunken: #ece5d4;
+  --bg-elev: #ffffff;
   --bg-overlay: rgba(36, 24, 16, 0.42);
 
   --fg-1: #1f1a14;
   --fg-2: #4a4036;
-  --fg-3: #7a6f60;
+  // Was #7a6f60 which passed WCAG AA against --bg-surface (~4.7:1) but
+  // failed against --bg-sunken (~4.1:1) — every chip / hover / muted
+  // meta row on the corbeille + tags + admin-logs read as "washed
+  // out" because those secondary surfaces are the common pairing.
+  // #5c5145 is ~6.4:1 on bg-surface and ~5.7:1 on bg-sunken (AA even
+  // for small text), while staying close enough to the original tone
+  // that the archive palette still feels warm.
+  --fg-3: #5c5145;
   --fg-inverse: #fbf8f1;
 
   --border-1: #d9cfb9;
@@ -64,6 +72,10 @@
   --sidebar-fg-active: #fbf8f1;
   --sidebar-active-bg: rgba(251, 248, 241, 0.08);
   --sidebar-accent: #d8a155;
+  // Soft variant for sidebar chips (role pill under user card, etc.).
+  // Shell.scss referenced this but it was never defined, so the chip
+  // fell back to a hardcoded rgba. Explicit token so themes can override.
+  --sidebar-accent-soft: rgba(216, 161, 85, 0.18);
 }
 
 /* ── Reset ───────────────────────────────────────────────── */
@@ -207,7 +219,11 @@ input, textarea, select { font-family: inherit; }
 /* ── Tables ──────────────────────────────────────────────── */
 .table-wrap {
   background: var(--bg-surface); border: 1px solid var(--border-1);
-  border-radius: var(--r-lg); overflow: hidden;
+  border-radius: var(--r-lg);
+  // overflow-x:auto so a wide table can scroll instead of clipping at
+  // narrow content widths (e.g. 1024px laptop with sidebar open). Vertical
+  // overflow is still handled by the border-radius clipping.
+  overflow-x: auto;
 }
 .table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 .table thead th {
@@ -407,8 +423,18 @@ input, textarea, select { font-family: inherit; }
 
 /* ── Dashboard layout ────────────────────────────────────── */
 .dashboard-page { display: flex; flex-direction: column; gap: 20px; max-width: 1400px; }
-.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+// KPI grids default to 4-up on wide screens but degrade gracefully via
+// auto-fit: any card that can't hit 200px wraps to the next row. Keeps
+// the layout readable down to ~500px content width (1024px viewport with
+// sidebar open) without a media query.
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 .dashboard-two-col { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+// Collapse the 1.4/1 hero split into a single column when the content
+// area drops below the point where the narrow column stops carrying
+// its own weight (~720px content = ~1024px viewport with sidebar open).
+@media (max-width: 1024px) {
+  .dashboard-two-col { grid-template-columns: 1fr; }
+}
 
 /* ============================================================
  * Theme System — two attributes:
@@ -424,6 +450,7 @@ input, textarea, select { font-family: inherit; }
   --bg-surface:   #ffffff;
   --bg-surface-2: #f5f1e8;
   --bg-sunken:    #ebe5d6;
+  --bg-elev:      #ffffff;
   --fg-1:        #14110d;
   --fg-2:        #3d3830;
   --fg-3:        #524c43;
@@ -456,6 +483,13 @@ input, textarea, select { font-family: inherit; }
   --bg-surface:   #f5efe1;
   --bg-surface-2: #ebe3cf;
   --bg-sunken:    #ddd3bb;
+  // Elevated surface for cards / modals / dropdowns. Was #f5efe1, i.e.
+  // the SAME value as --bg-surface — cards using it disappeared into
+  // the page background (no perceptible edge, only the border-1 outline
+  // hinted at their presence). Lifted to a slightly warmer, brighter
+  // kraft so modals and admin-logs / admin-users cards stand out. Still
+  // firmly kraft (fits Field's earth palette), not white.
+  --bg-elev:      #fbf6ea;
   --fg-1:        #18221f;
   --fg-2:        #3a4641;
   --fg-3:        #4e5850;
@@ -488,6 +522,7 @@ input, textarea, select { font-family: inherit; }
   --bg-surface:   #1d1812;
   --bg-surface-2: #2a241b;
   --bg-sunken:    #18140e;
+  --bg-elev:      #1d1812;
   --bg-overlay:   rgba(0, 0, 0, 0.6);
   --fg-1:        #f0e8d8;
   --fg-2:        #c3b89f;
@@ -544,6 +579,7 @@ input, textarea, select { font-family: inherit; }
     --bg-surface:   #1d1812;
     --bg-surface-2: #2a241b;
     --bg-sunken:    #18140e;
+    --bg-elev:      #1d1812;
     --bg-overlay:   rgba(0, 0, 0, 0.6);
     --fg-1:        #f0e8d8;
     --fg-2:        #c3b89f;
@@ -591,3 +627,117 @@ input, textarea, select { font-family: inherit; }
   }
 }
 .quick-access-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Platform-admin mode — distinctive "ops console" palette
+ *
+ * Triggered when the shell wrapper carries data-platform-mode="true", which
+ * the ShellComponent toggles only when the user is system_admin AND on
+ * /admin/*. The override cascades into every descendant (sidebar, topbar,
+ * page content) and pivots the editorial warm-cream/blood-red palette to a
+ * cooler neutral-white + indigo-blue palette appropriate for cross-workspace
+ * operations.
+ *
+ * Two key principles:
+ *   1) Only OVERRIDE existing tokens (--accent, --bg-app, etc.) — never
+ *      define new ones the rest of the app doesn't know about. That way the
+ *      mode swap is a 1:1 visual diff with no markup changes.
+ *   2) Respect [data-mode="dark"] inside the override so the platform palette
+ *      has its own coherent dark variant, not a half-cooked tinted dark.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+[data-platform-mode="true"] {
+  /* Brand swap: warm editorial → cool ops indigo-blue. */
+  --accent:        #2563eb;   /* Tailwind blue-600 */
+  --accent-hover:  #1d4ed8;   /* blue-700 */
+  --accent-soft:   #dbeafe;   /* blue-100 */
+  --accent-fg:     #ffffff;
+  --accent-2:      #475569;   /* slate-600 — secondary tone, replaces warm gold */
+  --accent-2-soft: #e2e8f0;   /* slate-200 */
+
+  /* Surfaces: warm cream → near-white, with a faint blue tint to separate
+   * from a plain white page so cards still have edge contrast. */
+  --bg-app:       #f8fafc;     /* slate-50 */
+  --bg-canvas:    #f1f5f9;     /* slate-100 */
+  --bg-surface:   #ffffff;
+  --bg-surface-2: #f8fafc;
+  --bg-sunken:    #e2e8f0;     /* slate-200 */
+  --bg-elev:      #ffffff;     /* card surfaces — was undefined globally */
+  --bg-overlay:   rgba(15, 23, 42, 0.5);   /* slate-900 @ 50 % */
+
+  /* Foregrounds match the cooler palette. */
+  --fg-1: #0f172a;             /* slate-900 */
+  --fg-2: #334155;             /* slate-700 */
+  /* slate-500 was 4.2:1 on --bg-sunken (slate-200) — fails AA. Bumped
+   * to slate-600 which sits at ~5.9:1 on the same surface. Still lighter
+   * than fg-2 so the muted/primary hierarchy stays intact. */
+  --fg-3: #475569;             /* slate-600 */
+  --fg-inverse: #ffffff;
+
+  /* Borders — slightly stronger than editorial, less than full slate-300. */
+  --border-1: #cbd5e1;         /* slate-300 */
+
+  /* Sidebar: cool dark slate, not warm near-black. */
+  --sidebar-bg:        #0f172a;
+  --sidebar-fg:        #cbd5e1;
+  --sidebar-fg-active: #ffffff;
+  --sidebar-accent:    #60a5fa;     /* blue-400 — gentler than the body accent */
+}
+
+/* Dark mode override under platform mode — same blue, deeper surfaces. */
+html[data-mode="dark"] [data-platform-mode="true"],
+[data-platform-mode="true"][data-mode="dark"] {
+  --accent:        #3b82f6;
+  --accent-hover:  #60a5fa;
+  --accent-soft:   rgba(59, 130, 246, 0.18);
+  --accent-fg:     #0f172a;
+  --accent-2:      #94a3b8;
+  --accent-2-soft: rgba(148, 163, 184, 0.16);
+
+  --bg-app:       #0b1220;
+  --bg-canvas:    #0f172a;
+  --bg-surface:   #111c2f;
+  --bg-surface-2: #142339;
+  --bg-sunken:    #0a1424;
+  --bg-elev:      #141f33;
+  --bg-overlay:   rgba(0, 0, 0, 0.6);
+
+  --fg-1: #e2e8f0;
+  --fg-2: #cbd5e1;
+  --fg-3: #94a3b8;
+  --fg-inverse: #0f172a;
+
+  --border-1: #1e2a44;
+
+  --sidebar-bg:        #0a1424;
+  --sidebar-fg:        #cbd5e1;
+  --sidebar-fg-active: #ffffff;
+  --sidebar-accent:    #60a5fa;
+}
+
+/* In platform mode the editorial serif hero-titles become sans-serif for an
+ * ops-console feel. We target only obvious "editorial" hooks (.profile-hero-name,
+ * the dashboard headline, KPI values) so workspace-mode typography is untouched. */
+[data-platform-mode="true"] .admin-dashboard-title,
+[data-platform-mode="true"] .admin-kpi-card-value,
+[data-platform-mode="true"] .topbar-title {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+/* Surface the "Plateforme" sidebar section with a subtle accent stripe so a
+ * sysadmin can always tell at a glance that they're in cross-workspace mode. */
+[data-platform-mode="true"] .sidebar-nav-section--first {
+  position: relative;
+}
+[data-platform-mode="true"] .sidebar-nav-section--first::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--sidebar-accent);
+  border-radius: var(--r-pill);
+  opacity: 0.85;
+}

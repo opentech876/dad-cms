@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
@@ -12,6 +13,7 @@ import { RecommendationService } from '../../core/presidency/recommendation.serv
 import { AuthService } from '../../core/auth/auth.service';
 import { AdCampaign, Event as HistoricalEvent, EventPosition } from '../../models';
 import { MONTHS_FR_LONG as MONTHS_FR, MONTHS_FR_LONG_CAP as MONTHS_FR_CAP } from '../../core/utils/date.utils';
+import { APPLY_TIER } from '../../core/utils/labels.utils';
 
 type CalendarView = 'year' | 'month' | 'list';
 export type CalendarFilter = 'all' | 'full' | 'partial' | 'empty' | 'has_campaign';
@@ -97,7 +99,7 @@ function isoDate(year: number, month: number, day: number): string {
 @Component({
   selector: 'app-calendar',
   standalone: true,
-  imports: [TuiIcon],
+  imports: [TuiIcon, DatePipe],
   templateUrl: './calendar.component.html',
   styleUrl: './calendar.component.scss',
 })
@@ -112,19 +114,68 @@ export class CalendarComponent implements OnInit {
   private readonly toast = inject(ToastService);
 
   /**
-   * Editorial-tier visibility for the "Appliquer la recommandation" button.
-   * Mirrors the RPC's `has_role_at_least('editeur')` check so we don't show
-   * a button that would return `42501 insufficient_privilege` for
-   * `charge_communication` or `presidence` users who also reach /calendrier.
+   * Visibility for the "Appliquer la recommandation" button. Apply rights
+   * were tightened to chef_equipe (product decision 2026-07-03): the team
+   * lead decides what lands on the calendar; editors review on
+   * /recommandations. Mirrors the RPC's has_role_at_least('chef_equipe').
    */
   readonly canApplyRecommendations = toSignal(
-    this.authService.hasRoleAtLeast('editeur'),
+    this.authService.hasRoleAtLeast(APPLY_TIER),
+    { initialValue: false },
+  );
+
+  /** Owner + chef_equipe. Gates the "Supprimer" button on the toolbar,
+   *  the Corbeille tab access, and the Restore action inside the tab.
+   *  Mirrors the SECURITY DEFINER role check on soft_delete_calendar()
+   *  and restore_calendar() — hiding the button avoids a 42501 error. */
+  readonly canDeleteCalendars = toSignal(
+    this.authService.hasRoleAtLeast(APPLY_TIER),
     { initialValue: false },
   );
 
   // Pending Presidence recommendations for the selected calendar (count only).
   readonly pendingRecommendationsCount = signal(0);
   readonly recommendationsApplying = signal(false);
+
+  // ── Delete-calendar modal state ─────────────────────────────────────────
+  readonly deleteModalOpen  = signal(false);
+  readonly deleteConfirmName = signal('');
+  readonly deleting          = signal(false);
+  readonly deleteError       = signal<string | null>(null);
+
+  /** Two levels of gate: an empty draft only needs a click; a calendar
+   *  with entries OR published status forces the user to type the exact
+   *  name (GitHub-style) before the delete button enables. */
+  readonly deleteRequiresNameConfirmation = computed(() => {
+    const cal = this.selectedCalendar();
+    if (!cal) return false;
+    return cal.eventCount > 0 || cal.status === 'published';
+  });
+
+  readonly deleteCanConfirm = computed(() => {
+    const cal = this.selectedCalendar();
+    if (!cal) return false;
+    if (!this.deleteRequiresNameConfirmation()) return true;
+    return this.deleteConfirmName().trim() === cal.name;
+  });
+
+  // ── Corbeille (trash) tab state ─────────────────────────────────────────
+  readonly showTrash    = signal(false);
+  readonly trashLoading = signal(false);
+  readonly trashItems   = signal<import('../../core/calendar/calendar.service').DeletedCalendarSummary[]>([]);
+  readonly trashError   = signal<string | null>(null);
+  readonly restoringId  = signal<string | null>(null);
+  readonly purgingId    = signal<string | null>(null);
+
+  // Empty-trash confirmation modal state. Requires typing "SUPPRIMER" to
+  // enable the button since this is unrecoverable.
+  readonly emptyTrashModalOpen = signal(false);
+  readonly emptyTrashConfirm   = signal('');
+  readonly emptyingTrash       = signal(false);
+  readonly emptyTrashError     = signal<string | null>(null);
+  readonly emptyTrashCanConfirm = computed(() =>
+    this.emptyTrashConfirm().trim() === 'SUPPRIMER',
+  );
 
   // Confirm dialog state for the apply flow.
   readonly applyDialogVisible = signal(false);
@@ -489,7 +540,11 @@ export class CalendarComponent implements OnInit {
   }
 
   calLabel(cal: Calendar): string {
-    return `${cal.year} — ${cal.name}`;
+    // Show only the user-chosen name. The year used to be prepended
+    // ("2026 — Mon Calendrier"), but that overrides whatever the user
+    // typed. If they want the year in the label they can include it
+    // themselves; the badge next to the selector still shows status.
+    return cal.name;
   }
 
   intensityBg(intensity: 0 | 1 | 2 | 3): string {
@@ -570,6 +625,134 @@ export class CalendarComponent implements OnInit {
     if (result.success) {
       await this._reloadCalendars();
     }
+  }
+
+  // ── Delete calendar flow ───────────────────────────────────────────────
+
+  openDeleteModal(): void {
+    if (!this.canDeleteCalendars()) return;
+    if (!this.selectedCalendar()) return;
+    this.deleteConfirmName.set('');
+    this.deleteError.set(null);
+    this.deleteModalOpen.set(true);
+  }
+
+  closeDeleteModal(): void {
+    if (this.deleting()) return;
+    this.deleteModalOpen.set(false);
+    this.deleteConfirmName.set('');
+  }
+
+  async confirmDelete(): Promise<void> {
+    const cal = this.selectedCalendar();
+    if (!cal || this.deleting()) return;
+    if (!this.deleteCanConfirm()) return;
+
+    this.deleting.set(true);
+    this.deleteError.set(null);
+    const result = await firstValueFrom(this.calendarService.deleteCalendar(cal.id));
+    this.deleting.set(false);
+
+    if (!result.success) {
+      this.deleteError.set(result.error ?? 'Échec de la suppression du calendrier.');
+      return;
+    }
+
+    this.toast.success(`Calendrier « ${cal.name} » déplacé dans la corbeille.`);
+    this.deleteModalOpen.set(false);
+    this.selectedCalendarId.set('');
+    await this._reloadCalendars();
+  }
+
+  // ── Corbeille (trash) view ────────────────────────────────────────────
+
+  async openTrash(): Promise<void> {
+    if (!this.canDeleteCalendars()) return;
+    this.showTrash.set(true);
+    await this.refreshTrash();
+  }
+
+  closeTrash(): void {
+    this.showTrash.set(false);
+    this.trashItems.set([]);
+    this.trashError.set(null);
+  }
+
+  async refreshTrash(): Promise<void> {
+    this.trashLoading.set(true);
+    this.trashError.set(null);
+    try {
+      const items = await firstValueFrom(this.calendarService.listDeletedCalendars());
+      this.trashItems.set(items);
+    } catch (e: any) {
+      console.error('[calendar] listDeletedCalendars failed:', e);
+      this.trashError.set(e?.message ?? 'Impossible de charger la corbeille.');
+      this.trashItems.set([]);
+    } finally {
+      this.trashLoading.set(false);
+    }
+  }
+
+  async restoreCalendar(id: string): Promise<void> {
+    if (this.restoringId()) return;
+    if (!this.canDeleteCalendars()) return;
+    this.restoringId.set(id);
+    const result = await firstValueFrom(this.calendarService.restoreCalendar(id));
+    this.restoringId.set(null);
+    if (!result.success) {
+      this.toast.error(result.error ?? 'Échec de la restauration.');
+      return;
+    }
+    this.toast.success('Calendrier restauré.');
+    await this.refreshTrash();
+    await this._reloadCalendars();
+  }
+
+  /** Per-row hard delete. No modal — the corbeille is already the danger
+   *  zone; user has already reviewed the row and chose to click purge. */
+  async purgeCalendar(id: string, name: string): Promise<void> {
+    if (this.purgingId() || this.restoringId()) return;
+    if (!this.canDeleteCalendars()) return;
+    this.purgingId.set(id);
+    const result = await firstValueFrom(this.calendarService.purgeCalendar(id));
+    this.purgingId.set(null);
+    if (!result.success) {
+      this.toast.error(result.error ?? 'Échec de la suppression définitive.');
+      return;
+    }
+    this.toast.success(`« ${name} » supprimé définitivement.`);
+    await this.refreshTrash();
+  }
+
+  openEmptyTrashModal(): void {
+    if (!this.canDeleteCalendars()) return;
+    if (this.trashItems().length === 0) return;
+    this.emptyTrashConfirm.set('');
+    this.emptyTrashError.set(null);
+    this.emptyTrashModalOpen.set(true);
+  }
+
+  closeEmptyTrashModal(): void {
+    if (this.emptyingTrash()) return;
+    this.emptyTrashModalOpen.set(false);
+    this.emptyTrashConfirm.set('');
+    this.emptyTrashError.set(null);
+  }
+
+  async confirmEmptyTrash(): Promise<void> {
+    if (!this.emptyTrashCanConfirm() || this.emptyingTrash()) return;
+    if (!this.canDeleteCalendars()) return;
+    this.emptyingTrash.set(true);
+    this.emptyTrashError.set(null);
+    const result = await firstValueFrom(this.calendarService.emptyCalendarTrash());
+    this.emptyingTrash.set(false);
+    if (!result.success) {
+      this.emptyTrashError.set(result.error ?? 'Échec du vidage de la corbeille.');
+      return;
+    }
+    this.toast.success(`${result.purged ?? 0} calendrier(s) supprimé(s) définitivement.`);
+    this.emptyTrashModalOpen.set(false);
+    await this.refreshTrash();
   }
 
   // ── Computed views ────────────────────────────────

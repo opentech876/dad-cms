@@ -70,10 +70,35 @@ describe('NotificationService', () => {
 
   });
 
-  describe('unreadCount()', () => {
-    it('devrait retourner le nombre de notifications non lues', async () => {
-      const count = await firstValueFrom(service.unreadCount());
-      expect(count).toBe(1);
+  describe('unreadCount signal', () => {
+    it('démarre à 0 avant tout appel', () => {
+      expect(service.unreadCount()).toBe(0);
+    });
+
+    it('refreshUnread() remplit le signal depuis le serveur', async () => {
+      await service.refreshUnread();
+      expect(service.unreadCount()).toBe(1);
+    });
+
+    it('markAsRead décrémente le signal', async () => {
+      await service.refreshUnread();
+      expect(service.unreadCount()).toBe(1);
+      await firstValueFrom(service.markAsRead('n2'));
+      expect(service.unreadCount()).toBe(0);
+    });
+
+    it('markAsRead ne descend jamais sous zéro', async () => {
+      // Force the signal to 0 without calling refresh, then mark another.
+      expect(service.unreadCount()).toBe(0);
+      await firstValueFrom(service.markAsRead('n1'));
+      expect(service.unreadCount()).toBe(0);
+    });
+
+    it('markAllAsRead met le signal à 0 même si des notifications restaient', async () => {
+      await service.refreshUnread();
+      expect(service.unreadCount()).toBe(1);
+      await firstValueFrom(service.markAllAsRead(['n1', 'n2']));
+      expect(service.unreadCount()).toBe(0);
     });
   });
 

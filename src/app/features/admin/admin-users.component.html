@@ -1,73 +1,122 @@
 <div class="admin-users-page">
 
-  <div class="admin-header">
+  <!-- ── Page header ── -->
+  <header class="admin-users-header">
     <div>
-      <h2 class="admin-title">Utilisateurs de la plateforme</h2>
-      <p class="admin-subtitle">
+      <h1 class="admin-users-title">Utilisateurs de la plateforme</h1>
+      <p class="admin-users-sub">
         Vue globale de tous les comptes, tous espaces de travail confondus.
         Inclut les invitations en attente et les administrateurs plateforme.
       </p>
     </div>
-  </div>
+    <div class="admin-users-header-actions">
+      <button class="btn btn-flat btn-sm" type="button" (click)="reload()" [disabled]="loading()">
+        <tui-icon icon="@tui.refresh-cw" style="font-size:14px;" />
+        Rafraîchir
+      </button>
+    </div>
+  </header>
 
   @if (loading()) {
-    <div class="admin-loading">
+    <div class="admin-users-state">
       <span class="spinner"></span>
       Chargement des utilisateurs…
     </div>
+  } @else if (error(); as err) {
+    <div class="admin-users-state admin-users-state--error">
+      <tui-icon icon="@tui.alert-triangle" style="font-size:16px; flex-shrink:0;" />
+      <div style="flex:1;">
+        <div style="font-weight:600; margin-bottom:2px;">Impossible de charger les utilisateurs</div>
+        <div style="font-size:12.5px; opacity:0.8;">{{ err }}</div>
+      </div>
+      <button class="btn btn-flat btn-sm" type="button" (click)="reload()">
+        <tui-icon icon="@tui.refresh-cw" style="font-size:13px;" />
+        Réessayer
+      </button>
+    </div>
   } @else {
 
-    <!-- KPI strip -->
-    <div class="admin-users-kpi-grid">
-      <div class="admin-users-kpi">
-        <div class="admin-users-kpi-label">Comptes</div>
-        <div class="admin-users-kpi-value">{{ totalCount() }}</div>
+    <!-- ── KPI strip ── -->
+    <div class="admin-kpi-grid">
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-card-icon">
+          <tui-icon icon="@tui.users" style="font-size:20px;" />
+        </div>
+        <div>
+          <div class="admin-kpi-card-value">{{ totalCount() }}</div>
+          <div class="admin-kpi-card-label">Comptes</div>
+        </div>
       </div>
-      <div class="admin-users-kpi">
-        <div class="admin-users-kpi-label">Admins plateforme</div>
-        <div class="admin-users-kpi-value" style="color:var(--accent);">{{ systemAdminCount() }}</div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-card-icon">
+          <tui-icon icon="@tui.shield" style="font-size:20px;" />
+        </div>
+        <div>
+          <div class="admin-kpi-card-value" style="color:var(--accent);">{{ systemAdminCount() }}</div>
+          <div class="admin-kpi-card-label">Admins plateforme</div>
+        </div>
       </div>
-      <div class="admin-users-kpi">
-        <div class="admin-users-kpi-label">Invitations en attente</div>
-        <div class="admin-users-kpi-value" style="color:var(--warning);">{{ pendingCount() }}</div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-card-icon">
+          <tui-icon icon="@tui.mail-question" style="font-size:20px;" />
+        </div>
+        <div>
+          <div class="admin-kpi-card-value" style="color:var(--warning);">{{ pendingCount() }}</div>
+          <div class="admin-kpi-card-label">Invitations en attente</div>
+        </div>
       </div>
-      <div class="admin-users-kpi">
-        <div class="admin-users-kpi-label">Sans espace</div>
-        <div class="admin-users-kpi-value" style="color:var(--danger);">{{ orphanCount() }}</div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-card-icon">
+          <tui-icon icon="@tui.user-x" style="font-size:20px;" />
+        </div>
+        <div>
+          <div class="admin-kpi-card-value" style="color:var(--danger);">{{ orphanCount() }}</div>
+          <div class="admin-kpi-card-label">Sans espace</div>
+        </div>
       </div>
     </div>
 
-    <!-- Search bar -->
-    <div style="display:flex; align-items:center; gap:10px;">
-      <div class="input-group" style="flex:1; position:relative;">
-        <span class="input-icon"><tui-icon icon="@tui.search" style="font-size:14px;" /></span>
-        <input
-          class="input has-icon"
-          type="text"
-          placeholder="Rechercher par e-mail, nom ou espace de travail…"
-          [value]="searchQuery()"
-          (input)="searchQuery.set($any($event.target).value)"
-        />
-      </div>
-      <span style="font-size:12.5px; color:var(--fg-3);">{{ filteredUsers().length }} sur {{ totalCount() }}</span>
-    </div>
+    <!-- ── Search + user list card ── -->
+    <section class="admin-users-list-card">
+      <header class="admin-users-list-header">
+        <div class="admin-users-search">
+          <tui-icon icon="@tui.search" class="admin-users-search-icon" />
+          <input
+            class="admin-users-search-input"
+            type="text"
+            placeholder="Rechercher par e-mail, nom ou espace de travail…"
+            [value]="searchQuery()"
+            (input)="searchQuery.set($any($event.target).value)"
+          />
+        </div>
+        <span class="admin-users-count">
+          {{ filteredUsers().length }} sur {{ totalCount() }}
+        </span>
+      </header>
 
-    <!-- Users table -->
-    <div class="card">
       @if (filteredUsers().length === 0) {
-        <div class="admin-empty">
-          <tui-icon icon="@tui.users" style="font-size:24px; color:var(--fg-3);" />
-          <p>Aucun utilisateur ne correspond à cette recherche.</p>
+        <div class="admin-users-empty">
+          <tui-icon icon="@tui.users" style="font-size:28px; color:var(--fg-3);" />
+          @if (totalCount() === 0) {
+            <p class="admin-users-empty-title">Aucun utilisateur enregistré.</p>
+            <p class="admin-users-empty-sub">
+              Utilisez « Inviter un Administrateur » depuis un espace de travail pour créer le premier compte.
+            </p>
+          } @else {
+            <p class="admin-users-empty-title">Aucun résultat pour cette recherche.</p>
+            <p class="admin-users-empty-sub">Essayez avec un autre e-mail ou nom d'espace.</p>
+          }
         </div>
       } @else {
-        <div class="table-wrap" style="border-radius:0; border:none; box-shadow:none;">
-          <table class="table">
+        <div class="admin-users-table-wrap">
+          <table class="admin-users-table">
             <thead>
               <tr>
                 <th>Utilisateur</th>
                 <th>Rôle plateforme</th>
                 <th>Espaces de travail</th>
                 <th>Statut</th>
+                <th>Dernière connexion</th>
                 <th>Créé le</th>
               </tr>
             </thead>
@@ -75,34 +124,42 @@
               @for (user of filteredUsers(); track user.user_id) {
                 <tr>
                   <td>
-                    <div style="display:flex; flex-direction:column;">
-                      <span style="font-weight:500;">{{ user.display_name ?? user.email ?? '—' }}</span>
-                      @if (user.display_name && user.email) {
-                        <span style="font-size:11.5px; color:var(--fg-3);">{{ user.email }}</span>
-                      }
+                    <div class="admin-users-user-cell">
+                      <div class="admin-users-user-avatar">
+                        {{ (user.display_name || user.email || '?').charAt(0).toUpperCase() }}
+                      </div>
+                      <div class="admin-users-user-info">
+                        <span class="admin-users-user-name">{{ user.display_name ?? user.email ?? '—' }}</span>
+                        @if (user.display_name && user.email) {
+                          <span class="admin-users-user-email">{{ user.email }}</span>
+                        }
+                      </div>
                     </div>
                   </td>
                   <td>
                     @if (user.global_role === 'system_admin') {
-                      <span class="badge badge-success" style="font-size:11px;">Admin plateforme</span>
+                      <span class="admin-users-tag admin-users-tag--accent">Admin plateforme</span>
                     } @else if (user.global_role) {
-                      <span class="badge" style="font-size:11px;">{{ user.global_role }}</span>
+                      <span class="admin-users-tag">{{ user.global_role }}</span>
                     } @else {
                       <span style="color:var(--fg-3);">—</span>
                     }
                   </td>
                   <td>
-                    @if (user.memberships.length === 0) {
-                      <span class="badge badge-warning" style="font-size:11px;">Aucun</span>
+                    <!-- Hide deleted-workspace memberships: they're noise
+                         and take up space that a busy operator doesn't
+                         need. Deletion events belong in the audit log. -->
+                    @let activeMs = activeMemberships(user);
+                    @if (activeMs.length === 0) {
+                      <span class="admin-users-tag admin-users-tag--warning">Aucun</span>
                     } @else {
-                      <div style="display:flex; flex-wrap:wrap; gap:4px; max-width:340px;">
-                        @for (m of user.memberships; track m.workspace_id) {
-                          <span class="badge"
-                                style="font-size:11px;"
-                                [class.badge-success]="m.role === 'owner'"
-                                [style.opacity]="m.deleted ? '0.5' : '1'"
-                                [attr.title]="m.role + (m.deleted ? ' · espace supprimé' : '')">
-                            {{ m.workspace_name }} · {{ m.role }}
+                      <div class="admin-users-ws-tags">
+                        @for (m of activeMs; track m.workspace_id) {
+                          <span class="admin-users-tag"
+                                [class.admin-users-tag--owner]="m.role === 'owner'"
+                                [attr.title]="'Rôle : ' + m.role">
+                            {{ m.workspace_name }}
+                            <span class="admin-users-tag-sub">· {{ m.role }}</span>
                           </span>
                         }
                       </div>
@@ -110,14 +167,32 @@
                   </td>
                   <td>
                     @if (user.banned) {
-                      <span class="badge badge-danger badge-dot" style="font-size:11px;">Bloqué</span>
+                      <span class="admin-users-tag admin-users-tag--danger">
+                        <span class="admin-users-status-dot admin-users-status-dot--danger"></span>
+                        Bloqué
+                      </span>
                     } @else if (!user.email_confirmed_at) {
-                      <span class="badge badge-warning badge-dot" style="font-size:11px;">En attente</span>
+                      <span class="admin-users-tag admin-users-tag--warning">
+                        <span class="admin-users-status-dot admin-users-status-dot--warning"></span>
+                        En attente
+                      </span>
                     } @else {
-                      <span class="badge badge-success badge-dot" style="font-size:11px;">Actif</span>
+                      <span class="admin-users-tag admin-users-tag--success">
+                        <span class="admin-users-status-dot admin-users-status-dot--success"></span>
+                        Actif
+                      </span>
                     }
                   </td>
-                  <td style="font-size:12.5px; color:var(--fg-3);">
+                  <td class="admin-users-date-cell">
+                    @if (user.last_sign_in_at) {
+                      {{ user.last_sign_in_at | date:'d MMM yyyy, HH:mm':'':'fr' }}
+                    } @else {
+                      <span class="admin-users-never" title="Cet utilisateur ne s'est jamais connecté">
+                        Jamais
+                      </span>
+                    }
+                  </td>
+                  <td class="admin-users-date-cell">
                     @if (user.created_at) {
                       {{ user.created_at | date:'d MMM yyyy':'':'fr' }}
                     } @else {
@@ -130,6 +205,6 @@
           </table>
         </div>
       }
-    </div>
+    </section>
   }
 </div>

@@ -13,6 +13,7 @@ import { NotificationService } from '../../notifications/notification.service';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { SearchService, SearchResult, SearchResults } from '../../search/search.service';
 import { RefreshRouteReuseStrategy } from '../../router/refresh-route-reuse.strategy';
+import { ROLE_LABELS, getInitials } from '../../utils/labels.utils';
 
 interface NavItem {
   id: string;
@@ -50,7 +51,19 @@ export class ShellComponent implements OnInit {
   readonly isSystemAdmin = toSignal(this.auth.isSystemAdmin(), { initialValue: false });
 
   readonly toastService = inject(ToastService);
-  readonly notifUnread  = signal(0);
+  // Reactive signal owned by NotificationService. When the user marks
+  // notifications as read (individually or all-at-once) the service
+  // updates this signal and the bell badge disappears automatically.
+  readonly notifUnread = this.notifService.unreadCount;
+
+  /** Human-readable French label for the current role, shown as a chip
+   *  under the user email in the sidebar footer. Empty string when the
+   *  role isn't loaded yet — the template hides the chip in that case. */
+  readonly currentRoleLabel = computed(() => {
+    const role = this.currentRole();
+    if (!role) return '';
+    return ROLE_LABELS[role] ?? role;
+  });
 
   toastIcon(type: ToastType): string {
     const map: Record<ToastType, string> = {
@@ -64,9 +77,14 @@ export class ShellComponent implements OnInit {
 
   private userId = '';
 
-  userEmail = '';
-  userInitials = 'AA';
-  userName = 'Utilisateur';
+  // Sidebar user card + avatar signals — reactive so a save on /profil
+  // (which pings workspaceContext.profileChanged$) makes the sidebar
+  // re-render without a page refresh. Templates read these as function
+  // calls: {{ userName() }} etc.
+  readonly userEmail    = signal('');
+  readonly userInitials = signal('AA');
+  readonly userName     = signal('Utilisateur');
+  readonly userAvatarUrl = signal<string | null>(null);
 
   readonly workspaces = signal<WorkspaceSummary[]>([]);
   /** Active workspace is the one stored in WorkspaceContextService (localStorage-backed). */
@@ -83,25 +101,61 @@ export class ShellComponent implements OnInit {
   readonly currentWorkspaceColor = computed<string | null>(() => {
     const ws = this.currentWorkspace();
     if (!ws) return null;
+    return this.workspaceColorFor(ws.id);
+  });
+
+  /**
+   * Deterministic hue per workspace id. Same id → same color forever, so
+   * the switcher dropdown items keep their color across sessions and the
+   * user can build "blue = Tenant A, orange = Tenant B" muscle memory.
+   */
+  workspaceColorFor(id: string): string {
     let hash = 0;
-    for (let i = 0; i < ws.id.length; i++) hash = (hash * 31 + ws.id.charCodeAt(i)) | 0;
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
     const hue = Math.abs(hash) % 360;
     return `hsl(${hue}, 62%, 52%)`;
-  });
-  readonly workspaceName = computed(() => this.currentWorkspace()?.name ?? 'Day After Day');
+  }
+  /**
+   * Current URL, kept reactive via the NavigationEnd subscription in
+   * ngOnInit. Drives the "platform mode" detection — when the URL is under
+   * /admin, the sidebar + switcher pivot to platform-admin appearance.
+   */
+  readonly currentUrl = signal(this.router.url);
+
+  /**
+   * True when the URL is under /admin. Deliberately does NOT re-check
+   * `isSystemAdmin()` — `systemAdminGuard` has already blocked any
+   * non-sysadmin from reaching that URL. Removing the isSystemAdmin
+   * dependency also eliminates a first-frame race: on a hard load of
+   * /admin the async user_roles query returns `false` initially, and
+   * gating on it made the sidebar flash the workspace layout before
+   * settling on the platform layout.
+   */
+  readonly inPlatformMode = computed(() => this.currentUrl().startsWith('/admin'));
+
+  readonly workspaceName = computed(() =>
+    this.inPlatformMode()
+      ? 'Administration plateforme'
+      : (this.currentWorkspace()?.name ?? 'Day After Day'),
+  );
   readonly workspaceInitials = computed(() => {
+    if (this.inPlatformMode()) return 'AP';
     const name = this.currentWorkspace()?.name ?? 'Day After Day';
     const parts = name.trim().split(/\s+/);
     return ((parts[0]?.[0] ?? 'D') + (parts[1]?.[0] ?? parts[0]?.[1] ?? 'A')).toUpperCase();
   });
   readonly workspaceMemberLabel = computed(() => {
+    if (this.inPlatformMode()) return 'Cross-workspace';
     const count = this.currentWorkspace()?.member_count ?? 0;
     return count === 1 ? '1 membre' : `${count} membres`;
   });
   readonly workspaceMenuOpen = signal(false);
-  readonly otherWorkspaces = computed(() =>
-    this.workspaces().filter(w => w.id !== this.currentWorkspace()?.id),
-  );
+  readonly otherWorkspaces = computed(() => {
+    // In platform mode the "active" entry is the synthetic platform one, so
+    // every real workspace counts as an "other" entry the user can switch to.
+    if (this.inPlatformMode()) return this.workspaces();
+    return this.workspaces().filter(w => w.id !== this.currentWorkspace()?.id);
+  });
 
   toggleWorkspaceMenu(): void {
     this.workspaceMenuOpen.update(v => !v);
@@ -127,14 +181,103 @@ export class ShellComponent implements OnInit {
    * current URL with a one-shot RouteReuseStrategy override + onSameUrlNavigation,
    * forcing every workspace-scoped component to re-init and re-fetch under the
    * new tenant. Cheaper than `window.location.reload()` — no JS bundle re-parse.
+   *
+   * If we were in /admin (platform mode), we jump out to /dashboard so the user
+   * lands inside the chosen workspace, not in an admin section that has nothing
+   * to do with it.
    */
   async switchWorkspace(id: string): Promise<void> {
-    if (id === this.currentWorkspace()?.id) { this.closeWorkspaceMenu(); return; }
+    if (id === this.currentWorkspace()?.id && !this.inPlatformMode()) { this.closeWorkspaceMenu(); return; }
     this.workspaceContext.setActiveWorkspace(id);
     this.closeWorkspaceMenu();
-    const target = this.router.url;
+    const target = this.inPlatformMode() ? '/dashboard' : this.router.url;
     this.routeReuse.triggerRefresh();
     await this.router.navigateByUrl(target);
+  }
+
+  /**
+   * Fetch the caller's workspace memberships and repopulate the switcher.
+   * Idempotent: safe to call at any time (initial load, workspacesChanged$
+   * emission, post-create in /admin/espaces, etc.). Preserves whatever
+   * workspace was active if it still exists in the list.
+   */
+  private async _reloadWorkspaceSummaries(): Promise<void> {
+    try {
+      const summaries = await firstValueFrom(this.workspaceService.getWorkspaceSummaries());
+      this.workspaces.set(summaries);
+      if (summaries.length > 0) {
+        const stored = localStorage.getItem('dad-workspace-id');
+        const active = summaries.find(w => w.id === stored) ?? summaries[0];
+        this.workspaceContext.setActiveWorkspace(active.id);
+        this.activeWorkspaceName.set(active.name);
+      }
+    } catch {
+      // Non-blocking — leave whatever we had cached.
+    }
+  }
+
+  /**
+   * Populate the sidebar identity block (email, name, initials, avatar).
+   * Split out of ngOnInit so it can be re-run after /profil saves a new
+   * name via workspaceContext.profileChanged$ — keeps the sidebar in sync
+   * without a page refresh. Handles all three sources of truth:
+   *   1. email prefix (fallback if nothing else is set),
+   *   2. auth.users.raw_user_meta_data.full_name (sysadmin path),
+   *   3. profiles.full_name + avatar_url (workspace-scoped path).
+   * Later branches shadow earlier ones.
+   */
+  private async _refreshDisplayInfo(user: any, isSysadmin: boolean): Promise<void> {
+    // 1. Baseline from email. Explicit string annotation because `user` is
+    // `any` (Supabase auth types leak through) — without it, `email` +
+    // `parts` inherit `any` and `.map(p => ...)` fails noImplicitAny.
+    const email: string = user?.email ?? '';
+    this.userEmail.set(email);
+    const parts: string[] = email.split('@')[0].split('.');
+    this.userInitials.set(
+      ((parts[0]?.[0] ?? 'A') + (parts[1]?.[0] ?? parts[0]?.[1] ?? '')).toUpperCase(),
+    );
+    this.userName.set(parts.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' '));
+    this.userAvatarUrl.set(null);
+
+    // 2. Sysadmin path — name lives in auth metadata, avatar via storage.
+    if (isSysadmin) {
+      const metaFullName = (user?.user_metadata?.full_name as string | undefined) ?? '';
+      if (metaFullName.trim()) {
+        this.userName.set(metaFullName.trim());
+        this.userInitials.set(getInitials(metaFullName.trim(), 'AA'));
+      } else {
+        this.showSysadminSetup.set(true);
+      }
+      return;
+    }
+
+    // 3. Workspace-scoped profile path.
+    try {
+      const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
+      if (profile) {
+        if (profile.full_name) {
+          this.userName.set(profile.full_name);
+          this.userInitials.set(getInitials(profile.full_name.trim(), 'AA'));
+        } else {
+          this.profilePhone.set(profile.phone ?? '');
+          this.showProfileSetup.set(true);
+        }
+        if (profile.avatar_url) this.userAvatarUrl.set(profile.avatar_url);
+      }
+    } catch {
+      // Profile check failed — leave email-derived defaults in place.
+    }
+  }
+
+  /**
+   * Sysadmin-only entry in the switcher: jumps into platform admin mode by
+   * routing to /admin. The "active" workspace state isn't cleared — the user
+   * just visits a different URL. inPlatformMode() = true while on /admin/*.
+   */
+  async enterPlatformMode(): Promise<void> {
+    this.closeWorkspaceMenu();
+    if (this.router.url.startsWith('/admin')) return;
+    await this.router.navigateByUrl('/admin');
   }
 
   collapsed = signal(false);
@@ -195,6 +338,21 @@ export class ShellComponent implements OnInit {
   readonly profileSaveError = signal('');
   readonly showProfilePassword = signal(false);
   toggleShowProfilePassword(): void { this.showProfilePassword.update(v => !v); }
+
+  // ── Sysadmin first-run setup modal ───────────────────────────────────────
+  // Separate from the workspace-scoped profile-setup modal because the
+  // seeded system_admin has no workspace and the upsertProfile path would
+  // fail with "Aucun espace de travail actif". This modal writes the name
+  // straight to auth.users.raw_user_meta_data.full_name (a true platform
+  // identity field, not workspace-scoped).
+  readonly showSysadminSetup       = signal(false);
+  readonly sysadminName            = signal('');
+  readonly sysadminPassword        = signal('');
+  readonly sysadminSaveLoading     = signal(false);
+  readonly sysadminPasswordError   = signal('');
+  readonly sysadminSaveError       = signal('');
+  readonly showSysadminPassword    = signal(false);
+  toggleShowSysadminPassword(): void { this.showSysadminPassword.update(v => !v); }
 
   /** Name of the active workspace — shown in the invitation welcome modal. */
   readonly activeWorkspaceName = signal('');
@@ -257,7 +415,7 @@ export class ShellComponent implements OnInit {
       label: 'Éditorial',
       items: [
         { id: 'calendrier',      label: 'Calendrier éditorial',       icon: '@tui.calendar',    path: '/calendrier',      roles: [] },
-        { id: 'recommandations', label: 'Recommandations',            icon: '@tui.list-checks', path: '/recommandations', roles: ['owner', 'presidence'] },
+        { id: 'recommandations', label: 'Recommandations',            icon: '@tui.list-checks', path: '/recommandations', roles: [] },
         { id: 'evenements',      label: "Bibliothèque d'événements",  icon: '@tui.book-open',   path: '/evenements',      roles: ['owner', 'chef_equipe', 'editeur'] },
       ],
     },
@@ -282,34 +440,63 @@ export class ShellComponent implements OnInit {
       label: 'Administration',
       items: [
         { id: 'workspace',  label: 'Espace de travail', icon: '@tui.building', path: '/espace-de-travail', roles: [] },
-        { id: 'parametres', label: 'Paramètres',         icon: '@tui.settings', path: '/parametres',        roles: [] },
+        { id: 'parametres', label: 'Customisation',      icon: '@tui.settings', path: '/parametres',        roles: [] },
       ],
     },
   ];
 
-  /** Platform-level admin section, only surfaced when the user has the
-   *  global system_admin role. It sits outside the per-workspace sections
-   *  because system_admin is by design not workspace-scoped. */
+  /** Platform-level admin section — only rendered while the sysadmin is
+   *  in platform mode (URL under /admin). Labels are explicit about being
+   *  "plateforme" so if a mode transition renders both sections briefly,
+   *  the two "Tableau de bord" links are still distinguishable. */
   private readonly platformSection: NavSection = {
     id: 'plateforme',
     label: 'Plateforme',
     items: [
-      { id: 'admin',             label: 'Espaces de travail', icon: '@tui.shield', path: '/admin',             roles: [] },
-      { id: 'admin-utilisateurs', label: 'Tous les utilisateurs', icon: '@tui.users', path: '/admin/utilisateurs', roles: [] },
+      { id: 'admin-dashboard',    label: 'Tableau de bord plateforme', icon: '@tui.layout-dashboard', path: '/admin',              roles: [] },
+      { id: 'admin-espaces',      label: 'Espaces de travail',         icon: '@tui.building',         path: '/admin/espaces',      roles: [] },
+      { id: 'admin-utilisateurs', label: 'Tous les utilisateurs',      icon: '@tui.users',            path: '/admin/utilisateurs', roles: [] },
+      { id: 'admin-logs',         label: "Journal d'activité",         icon: '@tui.scroll-text',      path: '/admin/logs',         roles: [] },
     ],
   };
 
+  /** "Compte" utility section — Profil / Paramètres / Notifications.
+   *  Rendered ONLY in platform mode. The paths point at /admin/* aliases
+   *  (defined in app.routes.ts) so clicking them keeps the URL under
+   *  /admin and inPlatformMode stays true — otherwise the shell would
+   *  drop back into workspace mode and the palette would revert. */
+  private readonly accountSection: NavSection = {
+    id: 'compte',
+    label: 'Compte',
+    items: [
+      { id: 'admin-notifications', label: 'Notifications', icon: '@tui.bell',     path: '/admin/notifications', roles: [] },
+      { id: 'admin-profil',        label: 'Mon profil',    icon: '@tui.user',     path: '/admin/profil',        roles: [] },
+      { id: 'admin-parametres',    label: 'Customisation', icon: '@tui.settings', path: '/admin/parametres',    roles: [] },
+    ],
+  };
+
+  /**
+   * Mode-aware sidebar:
+   *   • platform mode → platformSection + accountSection only. Workspace
+   *     items don't belong here — clicking one would just teleport the
+   *     user out of admin.
+   *   • workspace mode → the existing role-filtered workspace sections.
+   *     platformSection intentionally hidden even for a sysadmin; they
+   *     re-enter platform mode via the workspace switcher's "Administration
+   *     plateforme" entry.
+   */
   readonly visibleNavSections = computed<NavSection[]>(() => {
+    if (this.inPlatformMode()) {
+      return [this.platformSection, this.accountSection];
+    }
     const role = this.currentRole();
     if (!role && !this.isSystemAdmin()) return [];
-    const sections = this.navSections
+    return this.navSections
       .map(s => ({
         ...s,
         items: s.items.filter((i: NavItem) => i.roles.length === 0 || (role ? i.roles.includes(role) : false)),
       }))
       .filter(s => s.items.length > 0);
-    // Prepend the platform-admin section when the user is a system_admin.
-    return this.isSystemAdmin() ? [this.platformSection, ...sections] : sections;
   });
 
   /** Flat list of all role-visible nav items, in section order. Useful for cross-checks. */
@@ -320,7 +507,7 @@ export class ShellComponent implements OnInit {
   private readonly routeTitles: Record<string, string> = {
     dashboard:           'Tableau de bord',
     calendrier:          'Calendrier éditorial',
-    recommandations:     'Recommandations Présidence',
+    recommandations:     'Recommandations du Curateur',
     evenements:          'Bibliothèque d\'événements historiques',
     campagnes:           'Encarts publicitaires',
     compagnies:          'Annonceurs',
@@ -328,21 +515,35 @@ export class ShellComponent implements OnInit {
     metriques:           'Métriques',
     notifications:       'Notifications',
     profil:              'Mon profil',
-    parametres:          'Paramètres',
+    parametres:          'Customisation',
     'espace-de-travail': 'Espace de travail',
-    admin:                   'Administration plateforme · Espaces',
+    admin:                   'Administration plateforme · Tableau de bord',
+    'admin/espaces':         'Administration plateforme · Espaces',
     'admin/utilisateurs':    'Administration plateforme · Utilisateurs',
+    'admin/logs':            "Administration plateforme · Journal d'activité",
+    'admin/notifications':   'Administration plateforme · Notifications',
+    'admin/profil':          'Administration plateforme · Mon profil',
+    'admin/parametres':      'Administration plateforme · Customisation',
   };
 
   async ngOnInit(): Promise<void> {
     // Wire the topbar-title subscription FIRST so we don't miss any NavigationEnd
     // that fires while the rest of ngOnInit awaits profile / workspace data.
-    // Also seed from the current URL since the initial NavigationEnd may have
-    // already fired by the time this component instantiates.
+    // Also seed BOTH the title and currentUrl from router.url — the initial
+    // NavigationEnd may have already fired before this component instantiated,
+    // and the property-initializer read of router.url (line above signal())
+    // can happen before Angular's initial navigation resolves, leaving
+    // currentUrl at '/'. That would keep inPlatformMode false on hard reloads
+    // of /admin, causing the switcher to render the previous workspace's
+    // color/name instead of the platform "AP" icon.
     this.applyTitleFromUrl(this.router.url);
+    this.currentUrl.set(this.router.url);
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-    ).subscribe(e => this.applyTitleFromUrl(e.urlAfterRedirects));
+    ).subscribe(e => {
+      this.applyTitleFromUrl(e.urlAfterRedirects);
+      this.currentUrl.set(e.urlAfterRedirects);
+    });
 
     // Debounced topbar search — fires SearchService after 300ms of idle typing.
     this.searchInput$.pipe(
@@ -363,49 +564,78 @@ export class ShellComponent implements OnInit {
 
     const user = await firstValueFrom(this.auth.getCurrentUser().pipe(filter(Boolean)));
     this.userId = user.id ?? '';
-    this.userEmail = user.email ?? '';
-    const parts = this.userEmail.split('@')[0].split('.');
-    this.userInitials = ((parts[0]?.[0] ?? 'A') + (parts[1]?.[0] ?? parts[0]?.[1] ?? '')).toUpperCase();
-    this.userName = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+    const isSysadmin = await firstValueFrom(this.auth.isSystemAdmin());
+    await this._refreshDisplayInfo(user, isSysadmin);
 
-    try {
-      const summaries = await firstValueFrom(this.workspaceService.getWorkspaceSummaries());
-      this.workspaces.set(summaries);
-      if (summaries.length > 0) {
-        const stored = localStorage.getItem('dad-workspace-id');
-        const active = summaries.find(w => w.id === stored) ?? summaries[0];
-        this.workspaceContext.setActiveWorkspace(active.id);
-        this.activeWorkspaceName.set(active.name);
-      }
-    } catch {
-      // Workspace fetch failed — use fallback name
-    }
+    // Load workspace summaries for BOTH branches. A sysadmin can also be a
+    // member of one or more workspaces (either invited as manager, or
+    // impersonating into a workspace to help operate it) — they need the
+    // switcher to be populated. For a sysadmin with zero memberships the
+    // fetch just returns [] and nothing changes.
+    await this._reloadWorkspaceSummaries();
 
-    try {
-      const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
-      if (profile !== null) {
-        if (profile.full_name) {
-          this.userName = profile.full_name;
-          const parts = profile.full_name.trim().split(/\s+/);
-          this.userInitials = ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'AA';
-        } else {
-          this.profilePhone.set(profile.phone ?? '');
-          this.showProfileSetup.set(true);
-        }
-      }
-    } catch {
-      // Profile check failed — skip setup modal
-    }
+    // When /profil saves a new name / avatar / phone, it fires
+    // workspaceContext.profileChanged$. Re-run the loader so the
+    // sidebar identity block reflects the change immediately.
+    this.workspaceContext.profileChanged$.subscribe(() => {
+      void (async () => {
+        const u = await firstValueFrom(this.auth.getCurrentUser());
+        if (!u) return;
+        const isAdmin = await firstValueFrom(this.auth.isSystemAdmin());
+        await this._refreshDisplayInfo(u, isAdmin);
+      })();
+    });
 
-    try {
-      const count = await firstValueFrom(this.notifService.unreadCount());
-      this.notifUnread.set(count);
-    } catch {
-      // Notifications non disponibles — pas bloquant
-    }
+    // Live-reload the switcher whenever a workspace is created / renamed /
+    // soft-deleted from anywhere in the app (currently /admin/espaces).
+    this.workspaceContext.workspacesChanged$
+      .subscribe(() => { void this._reloadWorkspaceSummaries(); });
+
+    // Prime the notification-unread signal from the server. The service
+    // swallows failures internally so this is fire-and-forget.
+    void this.notifService.refreshUnread();
 
     const pwdSet = await this.supabase.hasPasswordSet();
     this.hasPasswordNotSet.set(!pwdSet);
+  }
+
+  /**
+   * Save handler for the sysadmin first-run setup modal. Writes the chosen
+   * name to auth.users.raw_user_meta_data.full_name (true platform identity,
+   * not workspace-scoped) and sets the initial password in one
+   * `auth.updateUser` call. Password is required — sysadmin needs a
+   * non-OTP login path because the free-plan OTP quota is 2/h.
+   */
+  async saveSysadminSetup(): Promise<void> {
+    if (!this.sysadminName().trim() || this.sysadminSaveLoading()) return;
+    const pwd = this.sysadminPassword();
+    if (!pwd || pwd.length < 8) {
+      this.sysadminPasswordError.set('Le mot de passe doit comporter au moins 8 caractères.');
+      return;
+    }
+    this.sysadminPasswordError.set('');
+    this.sysadminSaveError.set('');
+    this.sysadminSaveLoading.set(true);
+
+    const fullName = this.sysadminName().trim();
+    const { error } = await this.supabase.client.auth.updateUser({
+      data:     { full_name: fullName },
+      password: pwd,
+    });
+
+    if (error) {
+      this.sysadminSaveError.set("Échec de l'enregistrement : " + error.message);
+      this.sysadminSaveLoading.set(false);
+      return;
+    }
+
+    this.supabase.markPasswordSet();
+    this.hasPasswordNotSet.set(false);
+    this.userName.set(fullName);
+    const np = fullName.split(/\s+/);
+    this.userInitials.set(((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA');
+    this.sysadminSaveLoading.set(false);
+    this.showSysadminSetup.set(false);
   }
 
   private applyTitleFromUrl(url: string | undefined | null): void {

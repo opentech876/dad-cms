@@ -1,5 +1,10 @@
 .notif-page {
-  max-width: 720px;
+  // Use the full width of the shell content area (up to a comfortable
+  // reading cap). Previous 720px cap left the page pinned to the left
+  // on wide displays which read as "broken layout" to the user.
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -235,4 +240,127 @@
   flex-shrink: 0;
   margin-top: 6px;
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+// ── Pagination ──────────────────────────────────────────
+
+.notif-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 4px 0;
+  flex-wrap: wrap;
+}
+
+.notif-pagination-range {
+  font-size: 12px;
+  color: var(--fg-3);
+}
+
+.notif-pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.notif-page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-1);
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+
+  &:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.notif-page-label {
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+// ── Detail modal ────────────────────────────────────────
+
+.notif-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-1);
+  font-size: 13px;
+
+  &:first-of-type { border-top: none; padding-top: 0; }
+}
+
+.notif-detail-label {
+  width: 110px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.notif-detail-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg-1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notif-detail-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: var(--font-serif);
+  overflow: hidden;
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.notif-detail-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+
+  &--INSERT  { background: rgba(34,197,94,0.12);  color: var(--success); }
+  &--UPDATE  { background: var(--accent-soft);    color: var(--accent); }
+  &--DELETE  { background: rgba(239,68,68,0.12);  color: var(--danger); }
 }

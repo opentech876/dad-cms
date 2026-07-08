@@ -528,9 +528,9 @@ describe('CalendarComponent', () => {
       expect(component.statusLabel('draft')).toBe('Brouillon');
     });
 
-    it('calLabel retourne le format "année — nom"', () => {
+    it("calLabel retourne uniquement le nom saisi par l'utilisateur", () => {
       const cal = component.calendars()[0];
-      expect(component.calLabel(cal)).toBe(`${cal.year} — ${cal.name}`);
+      expect(component.calLabel(cal)).toBe(cal.name);
     });
 
     it('intensityBg retourne une couleur pour chaque intensité', () => {
@@ -685,7 +685,7 @@ describe('CalendarComponent', () => {
   });
 
   // ── Presidency apply flow ──────────────────────────────────────────────
-  describe('flux d\'application des recommandations Présidence', () => {
+  describe('flux d\'application des recommandations du Curateur', () => {
     it('canApplyRecommendations est true pour un rôle éditorial', () => {
       expect(component.canApplyRecommendations()).toBe(true);
     });
@@ -695,9 +695,9 @@ describe('CalendarComponent', () => {
       expect(component.canApplyRecommendations()).toBe(false);
     });
 
-    it('hasRoleAtLeast est appelé avec "editeur" (le tier minimal accepté par la RPC)', () => {
+    it('hasRoleAtLeast est appelé avec "chef_equipe" (le tier minimal accepté par la RPC)', () => {
       const auth = TestBed.inject(AuthService) as unknown as { hasRoleAtLeast: jest.Mock };
-      expect(auth.hasRoleAtLeast).toHaveBeenCalledWith('editeur');
+      expect(auth.hasRoleAtLeast).toHaveBeenCalledWith('chef_equipe');
     });
 
     it('refreshPendingCount met à jour pendingRecommendationsCount depuis le service', async () => {

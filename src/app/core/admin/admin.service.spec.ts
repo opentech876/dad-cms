@@ -6,13 +6,15 @@ import { SupabaseService } from '../supabase/supabase.service';
 describe('AdminService', () => {
   let service: AdminService;
   let rpc: jest.Mock;
+  let invoke: jest.Mock;
 
   beforeEach(() => {
     rpc = jest.fn();
+    invoke = jest.fn();
     TestBed.configureTestingModule({
       providers: [
         AdminService,
-        { provide: SupabaseService, useValue: { client: { rpc } } },
+        { provide: SupabaseService, useValue: { client: { rpc }, invoke } },
       ],
     });
     service = TestBed.inject(AdminService);
@@ -71,5 +73,45 @@ describe('AdminService', () => {
     rpc.mockResolvedValueOnce({ data: null, error: null });
     await firstValueFrom(service.restoreWorkspace('ws-1'));
     expect(rpc).toHaveBeenCalledWith('admin_restore_workspace', { p_workspace_id: 'ws-1' });
+  });
+
+  describe('dashboardStats()', () => {
+    it('appelle admin_dashboard_stats et renvoie le payload', async () => {
+      const payload = {
+        workspaces: { active: 1, deleted: 0 },
+        users: { total: 1, confirmed: 1, pending: 0, system_admins: 1 },
+        recent_workspaces: [],
+        pending_invitations: [],
+      };
+      rpc.mockResolvedValueOnce({ data: payload, error: null });
+      const res = await firstValueFrom(service.dashboardStats());
+      expect(rpc).toHaveBeenCalledWith('admin_dashboard_stats');
+      expect(res).toEqual(payload);
+    });
+
+    it("propage l'erreur RPC", async () => {
+      rpc.mockResolvedValueOnce({ data: null, error: new Error('Rôle system_admin requis') });
+      await expect(firstValueFrom(service.dashboardStats())).rejects.toThrow('system_admin');
+    });
+  });
+
+  describe('inviteManager()', () => {
+    it("invoque l'EF invite-user avec role='owner' (sysadmin → manager)", async () => {
+      invoke.mockResolvedValueOnce({ data: { id: 'u-2', email: 'mgr@x.com' }, error: null });
+      const res = await firstValueFrom(service.inviteManager('ws-1', 'mgr@x.com'));
+      expect(invoke).toHaveBeenCalledWith('invite-user', {
+        email: 'mgr@x.com',
+        role: 'owner',
+        workspace_id: 'ws-1',
+      });
+      expect(res).toEqual({ success: true });
+    });
+
+    it("renvoie success:false quand l'EF échoue", async () => {
+      invoke.mockResolvedValueOnce({ data: null, error: { message: 'rate limit' } });
+      const res = await firstValueFrom(service.inviteManager('ws-1', 'mgr@x.com'));
+      expect(res.success).toBe(false);
+      expect(res.error).toContain('rate limit');
+    });
   });
 });

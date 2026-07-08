@@ -44,18 +44,29 @@ Deno.serve(async (req: Request) => {
       throw new Error("L'identifiant de l'espace de travail est requis");
     }
 
-    // Per-workspace authorization: the caller must be owner of THIS workspace.
-    // The previous global user_roles check let a user who was owner anywhere
-    // act as owner everywhere — incompatible with real multi-tenancy.
-    const { data: callerMembership } = await supabase
-      .from('workspace_members')
+    // Authorization: workspace owner OR platform sysadmin.
+    // Platform sysadmins bypass the per-workspace membership check —
+    // they can act on any workspace's users without being members. Owners
+    // are checked per-workspace so an owner of workspace A can't reach
+    // into workspace B's members.
+    const { data: platformRoleRow } = await supabase
+      .from('user_roles')
       .select('role')
-      .eq('workspace_id', workspace_id)
       .eq('user_id', user.id)
       .maybeSingle();
+    const isSysadmin = platformRoleRow?.role === 'system_admin';
 
-    if (!callerMembership || callerMembership.role !== 'owner') {
-      throw new Error('Accès refusé : rôle owner requis pour cet espace de travail');
+    if (!isSysadmin) {
+      const { data: callerMembership } = await supabase
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', workspace_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!callerMembership || callerMembership.role !== 'owner') {
+        throw new Error("Accès refusé : rôle owner de l'espace ou administrateur plateforme requis");
+      }
     }
 
     // The target user must also be a member of THIS workspace — owners of

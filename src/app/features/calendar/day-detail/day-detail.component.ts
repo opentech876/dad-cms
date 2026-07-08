@@ -10,6 +10,7 @@ import { CampaignService } from '../../../core/campaigns/campaign.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AdCampaign, Event, EventPosition } from '../../../models';
 import { formatDateLong } from '../../../core/utils/date.utils';
+import { APPLY_TIER } from '../../../core/utils/labels.utils';
 import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
@@ -33,7 +34,7 @@ export class DayDetailComponent implements OnInit {
    * on /calendrier. presidence + charge_communication also see a read-only view.
    */
   readonly canEditAssignments = toSignal(
-    this.authService.hasRoleAtLeast('chef_equipe'),
+    this.authService.hasRoleAtLeast(APPLY_TIER),
     { initialValue: false },
   );
 
@@ -98,7 +99,7 @@ export class DayDetailComponent implements OnInit {
   async save(): Promise<void> {
     if (this.saveLoading()) return;
     if (!this.canEditAssignments()) {
-      this.toast.error('Les affectations sont gérées par la Présidence et appliquées par l\'équipe éditoriale.');
+      this.toast.error('Les affectations sont gérées par le Curateur et appliquées par le chef d\'équipe.');
       return;
     }
     this.saveLoading.set(true);

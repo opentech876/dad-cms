@@ -1,9 +1,13 @@
 import { Component, computed, HostListener, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, SlicePipe } from '@angular/common';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { AppRole, ManageUserAction } from '../../models';
+import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { ToastService } from '../../core/services/toast.service';
+import { ROLE_LABELS } from '../../core/utils/labels.utils';
 
 interface UserRow {
   userId: string;
@@ -19,16 +23,6 @@ interface UserRow {
   invitedAt: string | null;
 }
 
-const ROLE_LABELS: Record<AppRole, string> = {
-  owner: 'Propriétaire',
-  chef_equipe: "Chef d'équipe",
-  editeur: 'Éditeur',
-  charge_communication: 'Chargé comm.',
-  presidence: 'Présidence',
-  chef_equipe_commerciale: 'Chef d\'équipe comm.',
-  system_admin: 'Admin plateforme',
-};
-
 @Component({
   selector: 'app-users',
   standalone: true,
@@ -38,6 +32,16 @@ const ROLE_LABELS: Record<AppRole, string> = {
 })
 export class UsersComponent implements OnInit {
   private workspaceService = inject(WorkspaceService);
+  private authService      = inject(AuthService);
+  private toast            = inject(ToastService);
+
+  /** True when the caller is a platform system_admin — used to unlock the
+   *  "Administrateur" option in the invite-role dropdown when they've
+   *  impersonated into a workspace. The invite-user Edge Function
+   *  authorises owner-role minting for sysadmins server-side; this signal
+   *  only controls whether the option is *visible*. Regular workspace
+   *  owner / chef_equipe never see it — they'd hit a 403 anyway. */
+  readonly isSysadmin = toSignal(this.authService.isSystemAdmin(), { initialValue: false });
 
   /** Active workspace name — used in destructive confirmation modals so the
    *  user can't mistake which tenant they're acting on. Fetched once in
@@ -129,7 +133,7 @@ export class UsersComponent implements OnInit {
     this.users().find(u => u.userId === this.confirmModalUserId()) ?? null
   );
 
-  // Columns (after the label): Propriétaire | Chef d'équipe | Éditeur | Chargé comm. | Présidence | Chef d'équipe comm.
+  // Columns (after the label): Administrateur | Chef d'équipe | Éditeur | Commercial | Curateur | Chef d'équipe comm.
   readonly permissionsMatrix: (string | number)[][] = [
     ["Créer / configurer l'espace",                       1, 0, 0, 0, 0, 0],
     ['Inviter / bloquer un membre',                       1, 0, 0, 0, 0, 0],
@@ -138,8 +142,8 @@ export class UsersComponent implements OnInit {
     ['Dupliquer un calendrier',                           1, 1, 0, 0, 0, 0],
     ['CRUD entrées de la bibliothèque historique',        1, 1, 1, 0, 0, 0],
     ['Assigner un événement à un jour (calendrier)',      1, 1, 0, 0, 0, 0],
-    ['Recommander un événement à un jour (Présidence)',   1, 0, 0, 0, 1, 0],
-    ['Appliquer une recommandation Présidence',           1, 1, 1, 0, 0, 0],
+    ['Recommander un événement à un jour (Curateur)',     1, 0, 0, 0, 1, 0],
+    ['Appliquer une recommandation du Curateur',          1, 1, 1, 0, 0, 0],
     ['CRUD compagnies (annonceurs)',                      1, 0, 0, 0, 0, 1],
     ['CRUD encarts publicitaires',                        1, 1, 0, 1, 0, 1],
     ['Tableaux de bord (lecture seule)',                  1, 1, 1, 1, 1, 1],
@@ -203,7 +207,23 @@ export class UsersComponent implements OnInit {
   async handleAction(userId: string, action: ManageUserAction, role?: AppRole): Promise<void> {
     const result = await firstValueFrom(this.workspaceService.manageUser(userId, action, role));
     if (result.success) {
+      const messages: Record<ManageUserAction, string> = {
+        update_role:        'Rôle mis à jour.',
+        block:              'Utilisateur bloqué.',
+        unblock:            'Utilisateur débloqué.',
+        remove:             'Utilisateur retiré de cet espace.',
+        set_password:       'Mot de passe mis à jour.',
+        resend_invitation:  'Invitation renvoyée.',
+        revoke_invitation:  'Invitation révoquée.',
+      };
+      this.toast.success(messages[action] ?? 'Action effectuée.');
       await this.loadUsers();
+    } else {
+      // Previously the failure was silently swallowed — the modal just closed
+      // and the user saw no feedback (which is why "I cannot change a user's
+      // role" felt like a missing feature rather than a permission error).
+      // Surface the real EF message.
+      this.toast.error(result.error ?? "L'action n'a pas pu être exécutée.");
     }
   }
 

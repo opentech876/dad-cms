@@ -1,40 +1,26 @@
 <div class="profile-page">
 
-  <!-- ── Topbar ── -->
-  <div class="profile-topbar">
-    <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="goBack()" title="Retour">
-      <tui-icon icon="@tui.arrow-left" style="font-size:16px;" />
-    </button>
-    <span class="profile-topbar-title">Mon profil</span>
-  </div>
-
-  <!-- ── system_admin AAL2 gate banner ── -->
-  @if (mfaRequiredBanner()) {
-    <div class="profile-pending-box"
-         style="margin: 12px 0; background: var(--warning-soft, rgba(217,143,21,0.08)); border: 1px solid rgba(217,143,21,0.3); color: var(--warning, #b76c00); padding: 14px 16px; border-radius: 6px; display: flex; gap: 12px; align-items: flex-start;">
-      <tui-icon icon="@tui.shield-alert" style="font-size:20px; flex-shrink:0; margin-top:2px;" />
-      <div style="flex:1; font-size:13.5px; line-height:1.5;">
-        <strong style="display:block; margin-bottom:4px;">Double authentification requise</strong>
-        L'accès à l'espace d'administration exige l'activation de la double authentification.
-        Activez-la dans la section <strong>Double authentification</strong> ci-dessous, puis
-        retournez à <a routerLink="/admin" style="color:inherit; text-decoration:underline;">l'administration</a>.
-      </div>
+  <!-- ── Page header ── -->
+  <header class="profile-page-header">
+    <div>
+      <h1 class="profile-page-title">Mon profil</h1>
+      <p class="profile-page-sub">
+        Gérez vos informations personnelles et vos identifiants de connexion.
+      </p>
     </div>
-  }
+  </header>
 
-  <!-- ── Hero + Personal info (one visual card) ── -->
-  <div class="profile-section-stack profile-section-stack--hero">
-
-    <!-- Hero -->
-    <div class="profile-hero">
-      <div class="profile-avatar-wrap">
-        <div class="profile-avatar-circle">
-          @if (avatarPreview() || avatarUrl()) {
-            <img [src]="avatarPreview() || avatarUrl()!" class="profile-avatar-img" alt="Avatar" />
-          } @else {
-            {{ initials() }}
-          }
-        </div>
+  <!-- ── Hero (avatar + name + chips) ── -->
+  <section class="profile-hero-card">
+    <div class="profile-avatar-wrap">
+      <div class="profile-avatar-circle">
+        @if (avatarPreview() || avatarUrl()) {
+          <img [src]="avatarPreview() || avatarUrl()!" class="profile-avatar-img" alt="Avatar" />
+        } @else {
+          {{ initials() }}
+        }
+      </div>
+      @if (!isSysadmin()) {
         <label class="profile-avatar-upload-btn" title="Changer la photo de profil">
           <tui-icon icon="@tui.camera" style="font-size:13px;" />
           <input type="file" accept="image/jpeg,image/png,image/webp"
@@ -52,39 +38,51 @@
             }
           </button>
         }
-      </div>
-      <div class="profile-hero-info">
-        <h2 class="profile-hero-name">{{ displayName() }}</h2>
-        <p class="profile-hero-email">{{ userEmail() }}</p>
+      }
+    </div>
+    <div class="profile-hero-info">
+      <h2 class="profile-hero-name">{{ displayName() }}</h2>
+      <p class="profile-hero-email">{{ userEmail() }}</p>
+      <div class="profile-hero-chips">
         @if (role()) {
-          <div class="profile-hero-badge">
-            <span class="role-badge role-badge--{{ role() }}">{{ roleLabel() }}</span>
-          </div>
+          <span class="role-badge role-badge--{{ role() }}">{{ roleLabel() }}</span>
         }
+        <span class="profile-hero-chip">
+          <tui-icon icon="@tui.mail" style="font-size:12px;" />
+          Mot de passe ou code par e-mail
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Informations personnelles ── -->
+  <section class="settings-section">
+    <div class="settings-section-header">
+      <div class="settings-section-icon">
+        <tui-icon icon="@tui.user" style="font-size:18px;" />
+      </div>
+      <div>
+        <div class="settings-section-title">Informations personnelles</div>
+        <div class="settings-section-sub">
+          @if (isSysadmin()) {
+            Votre nom affiché dans l'interface d'administration
+          } @else {
+            Votre nom affiché dans l'interface et votre numéro de contact
+          }
+        </div>
       </div>
     </div>
 
-    <!-- Personal info section -->
-    <div class="settings-section">
-      <div class="settings-section-header">
-        <div class="settings-section-icon">
-          <tui-icon icon="@tui.user" style="font-size:18px;" />
+    <div class="settings-group">
+      <div class="profile-fields">
+        <div class="field">
+          <label class="field-label" for="fullName">Nom complet</label>
+          <input id="fullName" class="input" type="text"
+                 placeholder="Votre nom complet"
+                 [value]="fullName()"
+                 (input)="fullName.set($any($event.target).value)" />
         </div>
-        <div>
-          <div class="settings-section-title">Informations personnelles</div>
-          <div class="settings-section-sub">Votre nom affiché dans l'interface et votre numéro de contact</div>
-        </div>
-      </div>
-
-      <div class="settings-group">
-        <div class="profile-fields">
-          <div class="field">
-            <label class="field-label" for="fullName">Nom complet</label>
-            <input id="fullName" class="input" type="text"
-                   placeholder="Votre nom complet"
-                   [value]="fullName()"
-                   (input)="fullName.set($any($event.target).value)" />
-          </div>
+        @if (!isSysadmin()) {
           <div class="field">
             <label class="field-label" for="phone">Téléphone</label>
             <input id="phone" class="input" type="tel"
@@ -93,10 +91,10 @@
                    (input)="phone.set($any($event.target).value)" />
             <span class="field-hint">Utilisé pour le contact au sein de l'équipe</span>
           </div>
-        </div>
+        }
       </div>
 
-      <div class="profile-save-row">
+      <div class="profile-actions">
         <button class="btn btn-primary btn-sm" type="button"
                 [disabled]="saving()"
                 (click)="saveProfile()">
@@ -108,58 +106,24 @@
         </button>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- ── Account info ── -->
-  <div class="profile-section-stack">
-    <div class="settings-section">
-      <div class="settings-section-header">
-        <div class="settings-section-icon">
-          <tui-icon icon="@tui.shield" style="font-size:18px;" />
+  <!-- ── Adresse e-mail ── -->
+  <section class="settings-section">
+    <div class="settings-section-header">
+      <div class="settings-section-icon">
+        <tui-icon icon="@tui.mail" style="font-size:18px;" />
+      </div>
+      <div>
+        <div class="settings-section-title">Adresse e-mail</div>
+        <div class="settings-section-sub">
+          Changez l'adresse e-mail associée à votre compte. Un lien de confirmation sera envoyé
+          à la nouvelle adresse.
         </div>
-        <div>
-          <div class="settings-section-title">Compte</div>
-          <div class="settings-section-sub">Informations de connexion et permissions</div>
-        </div>
-      </div>
-
-      <div class="profile-info-row">
-        <span class="profile-info-label">Adresse e-mail</span>
-        <span class="profile-info-value">{{ userEmail() }}</span>
-      </div>
-
-      <div class="profile-info-row">
-        <span class="profile-info-label">Rôle</span>
-        <span class="profile-info-value">
-          @if (role()) {
-            <span class="role-badge role-badge--{{ role() }}">{{ roleLabel() }}</span>
-          } @else {
-            <span style="color:var(--fg-3);">—</span>
-          }
-        </span>
-      </div>
-
-      <div class="profile-info-row">
-        <span class="profile-info-label">Authentification</span>
-        <span class="profile-info-value" style="display:flex; align-items:center; gap:6px;">
-          <tui-icon icon="@tui.mail" style="font-size:14px; color:var(--fg-3);" />
-          Mot de passe ou code par e-mail
-        </span>
       </div>
     </div>
 
-    <!-- ── Email change ── -->
-    <div class="settings-section">
-      <div class="settings-section-header">
-        <div class="settings-section-icon">
-          <tui-icon icon="@tui.mail" style="font-size:18px;" />
-        </div>
-        <div>
-          <div class="settings-section-title">Adresse e-mail</div>
-          <div class="settings-section-sub">Changez l'adresse e-mail associée à votre compte. Un lien de confirmation sera envoyé à la nouvelle adresse.</div>
-        </div>
-      </div>
-
+    <div class="settings-group">
       @if (pendingNewEmail()) {
         <div class="profile-pending-box">
           <tui-icon icon="@tui.mail-check" style="font-size:18px; flex-shrink:0;" />
@@ -174,7 +138,7 @@
           </button>
         </div>
       } @else {
-        <div class="field" style="margin-bottom:14px;">
+        <div class="field">
           <label class="field-label">Nouvelle adresse e-mail</label>
           <input class="input" type="email"
                  placeholder="prenom.nom@open-tech.cg"
@@ -184,33 +148,37 @@
         </div>
 
         @if (emailError()) {
-          <div style="color: var(--danger); font-size: 12.5px; margin-bottom: 12px;">
-            {{ emailError() }}
-          </div>
+          <div class="profile-error">{{ emailError() }}</div>
         }
 
-        <button class="btn btn-primary btn-sm" type="button"
-                [disabled]="emailChanging() || !newEmail()"
-                (click)="changeEmail()">
-          @if (emailChanging()) { <span class="spinner"></span> }
-          Envoyer le lien de confirmation
-        </button>
+        <div class="profile-actions">
+          <button class="btn btn-primary btn-sm" type="button"
+                  [disabled]="emailChanging() || !newEmail()"
+                  (click)="changeEmail()">
+            @if (emailChanging()) { <span class="spinner"></span> }
+            Envoyer le lien de confirmation
+          </button>
+        </div>
       }
     </div>
+  </section>
 
-    <!-- ── Password change ── -->
-    <div class="settings-section">
-      <div class="settings-section-header">
-        <div class="settings-section-icon">
-          <tui-icon icon="@tui.lock" style="font-size:18px;" />
-        </div>
-        <div>
-          <div class="settings-section-title">Mot de passe</div>
-          <div class="settings-section-sub">Définissez ou changez votre mot de passe pour vous connecter sans recevoir de code par e-mail.</div>
+  <!-- ── Mot de passe ── -->
+  <section class="settings-section">
+    <div class="settings-section-header">
+      <div class="settings-section-icon">
+        <tui-icon icon="@tui.lock" style="font-size:18px;" />
+      </div>
+      <div>
+        <div class="settings-section-title">Mot de passe</div>
+        <div class="settings-section-sub">
+          Définissez ou changez votre mot de passe pour vous connecter sans recevoir de code par e-mail.
         </div>
       </div>
+    </div>
 
-      <div class="field" style="margin-bottom:14px;">
+    <div class="settings-group">
+      <div class="field">
         <label class="field-label">Nouveau mot de passe</label>
         <div style="position:relative;">
           <input class="input" [type]="showNewPassword() ? 'text' : 'password'"
@@ -228,130 +196,54 @@
       </div>
 
       @if (passwordError()) {
-        <div style="color: var(--danger); font-size: 12.5px; margin-bottom: 12px;">
-          {{ passwordError() }}
-        </div>
+        <div class="profile-error">{{ passwordError() }}</div>
       }
 
-      <button class="btn btn-primary btn-sm" type="button"
-              [disabled]="passwordSaving() || !newPassword()"
-              (click)="changePassword()">
-        @if (passwordSaving()) { <span class="spinner"></span> }
-        Enregistrer le mot de passe
-      </button>
+      <div class="profile-actions">
+        <button class="btn btn-primary btn-sm" type="button"
+                [disabled]="passwordSaving() || !newPassword()"
+                (click)="changePassword()">
+          @if (passwordSaving()) { <span class="spinner"></span> }
+          Enregistrer le mot de passe
+        </button>
+      </div>
     </div>
+  </section>
 
-    <!-- ── Secondary recovery e-mail ── -->
-    <div class="settings-section">
-      <div class="settings-section-header">
-        <div class="settings-section-icon">
-          <tui-icon icon="@tui.mail-question" style="font-size:18px;" />
-        </div>
-        <div>
-          <div class="settings-section-title">Adresse e-mail de secours</div>
-          <div class="settings-section-sub">
-            Une seconde adresse pour récupérer votre compte si vous perdez l'accès à votre e-mail principal.
-            Laissez vide pour la supprimer.
-          </div>
+  <!-- ── Adresse e-mail de secours ── -->
+  <section class="settings-section">
+    <div class="settings-section-header">
+      <div class="settings-section-icon">
+        <tui-icon icon="@tui.mail-question" style="font-size:18px;" />
+      </div>
+      <div>
+        <div class="settings-section-title">Adresse e-mail de secours</div>
+        <div class="settings-section-sub">
+          Une seconde adresse pour récupérer votre compte si vous perdez l'accès à votre e-mail principal.
+          Laissez vide pour la supprimer.
         </div>
       </div>
+    </div>
 
-      <div class="field" style="margin-bottom:14px;">
+    <div class="settings-group">
+      <div class="field">
         <label class="field-label">Adresse de secours</label>
         <input class="input" type="email" placeholder="autre.adresse@exemple.com"
                autocomplete="email"
                [value]="secondaryEmail()" (input)="secondaryEmail.set($any($event.target).value)" />
       </div>
       @if (secondaryEmailError()) {
-        <div style="color: var(--danger); font-size: 12.5px; margin-bottom: 8px;">
-          {{ secondaryEmailError() }}
-        </div>
+        <div class="profile-error">{{ secondaryEmailError() }}</div>
       }
-      <button class="btn btn-primary btn-sm" type="button"
-              [disabled]="secondaryEmailSaving()"
-              (click)="saveSecondaryEmail()">
-        @if (secondaryEmailSaving()) { <span class="spinner"></span> }
-        Enregistrer
-      </button>
-    </div>
-
-    <!-- ── Double authentification (TOTP) ── -->
-    <div class="settings-section">
-      <div class="settings-section-header">
-        <div class="settings-section-icon">
-          <tui-icon icon="@tui.shield-check" style="font-size:18px;" />
-        </div>
-        <div>
-          <div class="settings-section-title">Double authentification</div>
-          <div class="settings-section-sub">
-            Ajoutez une couche de sécurité supplémentaire à votre compte avec une application
-            d'authentification (Google Authenticator, Authy, 1Password…).
-          </div>
-        </div>
-      </div>
-
-      @if (mfaEnrolled() && !mfaPendingFactor()) {
-        <div class="profile-pending-box" style="background:var(--success-soft); border-color:rgba(34,120,60,0.2); color:var(--success);">
-          <tui-icon icon="@tui.check-circle" style="font-size:18px; flex-shrink:0;" />
-          <div style="flex:1;">
-            <strong>Double authentification activée.</strong>
-            Un code à 6 chiffres vous sera demandé à chaque connexion.
-          </div>
-          @for (f of mfaFactors(); track f.id) {
-            @if (f.status === 'verified') {
-              <button class="btn btn-flat btn-sm" type="button" style="color:var(--danger);"
-                      (click)="disableMfa(f.id)">
-                Désactiver
-              </button>
-            }
-          }
-        </div>
-      } @else if (mfaPendingFactor(); as pending) {
-        <div style="display:flex; flex-direction:column; gap:14px;">
-          <p style="font-size:13px; color:var(--fg-2); line-height:1.55; margin:0;">
-            <strong>1.</strong> Ouvrez votre application d'authentification et scannez ce QR code,
-            ou copiez le secret manuellement :
-          </p>
-          <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
-            <img [src]="pending.qr" alt="QR code" style="width:160px; height:160px; border:1px solid var(--border-1); border-radius:8px; padding:6px; background:#fff;" />
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label class="field-label">Secret (saisie manuelle)</label>
-              <code style="font-family:var(--font-mono); font-size:13px; padding:8px 10px; background:var(--bg-sunken); border:1px solid var(--border-1); border-radius:4px; letter-spacing:0.08em;">
-                {{ pending.secret }}
-              </code>
-            </div>
-          </div>
-          <div class="field" style="margin-top:6px;">
-            <label class="field-label">2. Saisissez le code à 6 chiffres affiché par votre application</label>
-            <input class="input" type="text" inputmode="numeric" maxlength="6"
-                   placeholder="123 456"
-                   style="font-family:var(--font-mono); letter-spacing:0.3em; font-size:18px;"
-                   [value]="mfaCode()" (input)="mfaCode.set($any($event.target).value)"
-                   (keydown.enter)="confirmMfaEnrollment()" />
-          </div>
-          @if (mfaError()) {
-            <div style="color:var(--danger); font-size:12.5px;">{{ mfaError() }}</div>
-          }
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-primary btn-sm" type="button"
-                    [disabled]="mfaCode().length < 6"
-                    (click)="confirmMfaEnrollment()">
-              Activer la double authentification
-            </button>
-            <button class="btn btn-flat btn-sm" type="button" (click)="cancelMfaEnrollment()">
-              Annuler
-            </button>
-          </div>
-        </div>
-      } @else {
+      <div class="profile-actions">
         <button class="btn btn-primary btn-sm" type="button"
-                [disabled]="mfaEnrolling()"
-                (click)="startMfaEnrollment()">
-          @if (mfaEnrolling()) { <span class="spinner"></span> }
-          Activer la double authentification
+                [disabled]="secondaryEmailSaving()"
+                (click)="saveSecondaryEmail()">
+          @if (secondaryEmailSaving()) { <span class="spinner"></span> }
+          Enregistrer
         </button>
-      }
+      </div>
     </div>
-  </div>
+  </section>
 
 </div>

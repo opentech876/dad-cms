@@ -92,10 +92,13 @@ CREATE TABLE IF NOT EXISTS public.calendars (
   updated_by    uuid REFERENCES auth.users(id),
   deleted_by    uuid REFERENCES auth.users(id),
   published_at  timestamptz,
-  workspace_id  uuid NOT NULL REFERENCES public.workspaces(id),
-  CONSTRAINT calendars_year_workspace_unique UNIQUE (year, workspace_id)
+  workspace_id  uuid NOT NULL REFERENCES public.workspaces(id)
 );
-CREATE INDEX IF NOT EXISTS idx_calendars_workspace_year_live
+-- Partial unique index: at most one ACTIVE calendar per (workspace, year).
+-- Soft-deleted rows are ignored so a workspace that trashed its 2024
+-- calendar can create a new one for the same year. Also serves as the
+-- workspace-year lookup index for the picker.
+CREATE UNIQUE INDEX IF NOT EXISTS calendars_year_workspace_unique_live
   ON public.calendars (workspace_id, year) WHERE deleted_at IS NULL;
 
 -- 3.6 events
@@ -118,9 +121,15 @@ CREATE TABLE IF NOT EXISTS public.events (
   updated_by    uuid REFERENCES auth.users(id),
   deleted_by    uuid REFERENCES auth.users(id),
   status        text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
-  workspace_id  uuid NOT NULL REFERENCES public.workspaces(id)
+  workspace_id  uuid NOT NULL REFERENCES public.workspaces(id),
+  -- Who authored the entry: 'editorial' (default) or 'curateur' — Curateur-
+  -- created events live in the same library but stay tag-separable for
+  -- listing / indexing purposes.
+  origin        text NOT NULL DEFAULT 'editorial' CHECK (origin IN ('editorial','curateur'))
 );
 CREATE INDEX IF NOT EXISTS idx_events_event_date ON public.events (event_date);
+CREATE INDEX IF NOT EXISTS idx_events_origin_curateur
+  ON public.events (workspace_id) WHERE origin = 'curateur';
 
 -- 3.7 calendar_entries
 CREATE TABLE IF NOT EXISTS public.calendar_entries (
@@ -656,6 +665,54 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_create_workspace(text, uuid) TO authenticated;
 
+-- One-round-trip platform-level stats that power the /admin landing dashboard.
+-- Returns a JSONB blob with workspaces (active/deleted counts), users (total,
+-- confirmed, pending, system_admins), the 5 most recent workspaces and the 5
+-- most recent pending invitations. system_admin-only via _assert_system_admin.
+CREATE OR REPLACE FUNCTION public.admin_dashboard_stats()
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_result jsonb;
+BEGIN
+  PERFORM public._assert_system_admin();
+  SELECT jsonb_build_object(
+    'workspaces', jsonb_build_object(
+      'active',  (SELECT COUNT(*) FROM public.workspaces WHERE deleted_at IS NULL),
+      'deleted', (SELECT COUNT(*) FROM public.workspaces WHERE deleted_at IS NOT NULL)
+    ),
+    'users', jsonb_build_object(
+      'total',         (SELECT COUNT(*) FROM auth.users),
+      'confirmed',     (SELECT COUNT(*) FROM auth.users WHERE email_confirmed_at IS NOT NULL),
+      'pending',       (SELECT COUNT(*) FROM auth.users WHERE email_confirmed_at IS NULL),
+      'system_admins', (SELECT COUNT(*) FROM public.user_roles WHERE role = 'system_admin')
+    ),
+    'recent_workspaces', COALESCE((
+      SELECT jsonb_agg(row_to_json(t))
+      FROM (
+        SELECT w.id, w.name, w.created_at, w.deleted_at,
+               (SELECT COUNT(*) FROM public.workspace_members wm WHERE wm.workspace_id = w.id) AS member_count
+        FROM public.workspaces w
+        ORDER BY w.created_at DESC
+        LIMIT 5
+      ) t
+    ), '[]'::jsonb),
+    'pending_invitations', COALESCE((
+      SELECT jsonb_agg(row_to_json(t))
+      FROM (
+        SELECT u.id, u.email, u.created_at,
+               COALESCE((u.raw_user_meta_data ->> 'role'), '') AS invited_role,
+               (u.raw_user_meta_data ->> 'workspace_id') AS workspace_id
+        FROM auth.users u
+        WHERE u.email_confirmed_at IS NULL
+        ORDER BY u.created_at DESC
+        LIMIT 5
+      ) t
+    ), '[]'::jsonb)
+  ) INTO v_result;
+  RETURN v_result;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_dashboard_stats() TO authenticated;
+
 -- Returns every user that exists in the platform, with the workspaces they
 -- belong to and their roles per workspace. Powers /admin/utilisateurs.
 CREATE OR REPLACE FUNCTION public.admin_list_all_users()
@@ -667,6 +724,7 @@ RETURNS TABLE (
   email_confirmed_at timestamptz,
   banned             boolean,
   created_at         timestamptz,
+  last_sign_in_at    timestamptz,
   memberships        jsonb
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
@@ -674,8 +732,12 @@ BEGIN
   PERFORM public._assert_system_admin();
   RETURN QUERY
   WITH any_profile AS (
-    SELECT DISTINCT ON (user_id) user_id, full_name
-    FROM public.profiles ORDER BY user_id, created_at ASC
+    -- Qualify with the alias — user_id / created_at are also OUT parameters
+    -- of the enclosing RETURNS TABLE(...), so unqualified references are
+    -- ambiguous and Postgres refuses to plan the query.
+    SELECT DISTINCT ON (pf.user_id) pf.user_id, pf.full_name
+    FROM public.profiles pf
+    ORDER BY pf.user_id, pf.created_at ASC
   ),
   ws_list AS (
     SELECT wm.user_id,
@@ -692,6 +754,7 @@ BEGIN
          u.email_confirmed_at,
          (u.banned_until IS NOT NULL AND u.banned_until > now()),
          u.created_at,
+         u.last_sign_in_at,
          COALESCE(wl.memberships, '[]'::jsonb)
   FROM auth.users u
   LEFT JOIN any_profile p ON p.user_id = u.id
@@ -701,6 +764,59 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_list_all_users() TO authenticated;
+
+-- Cursor-paginated feed of admin-scope audit events. Filters to
+-- workspaces / user_roles / workspace_members so /admin/logs doesn't
+-- drown in editorial noise. Joins actor identity + workspace name.
+CREATE FUNCTION public.admin_list_audit_log(
+  p_limit  int         DEFAULT 50,
+  p_before timestamptz DEFAULT NULL,
+  p_table  text        DEFAULT NULL
+)
+RETURNS TABLE (
+  id             uuid,
+  table_name     text,
+  action         text,
+  record_id      uuid,
+  actor_id       uuid,
+  actor_email    text,
+  actor_name     text,
+  workspace_id   uuid,
+  workspace_name text,
+  old_data       jsonb,
+  new_data       jsonb,
+  changed_at     timestamptz
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  PERFORM public._assert_system_admin();
+  RETURN QUERY
+  WITH any_profile AS (
+    SELECT DISTINCT ON (pf.user_id) pf.user_id, pf.full_name
+    FROM public.profiles pf
+    ORDER BY pf.user_id, pf.created_at ASC
+  )
+  SELECT
+    al.id, al.table_name, al.action, al.record_id, al.actor_id,
+    u.email::text, p.full_name,
+    -- For workspaces-table rows the record IS the workspace; derive ws_id.
+    COALESCE(al.workspace_id,
+             CASE WHEN al.table_name = 'workspaces' THEN al.record_id END),
+    w.name,
+    al.old_data, al.new_data, al.changed_at
+  FROM public.audit_log al
+  LEFT JOIN auth.users u        ON u.id = al.actor_id
+  LEFT JOIN any_profile p       ON p.user_id = al.actor_id
+  LEFT JOIN public.workspaces w ON w.id = COALESCE(al.workspace_id,
+                                          CASE WHEN al.table_name = 'workspaces' THEN al.record_id END)
+  WHERE al.table_name IN ('workspaces', 'user_roles', 'workspace_members')
+    AND (p_before IS NULL OR al.changed_at < p_before)
+    AND (p_table  IS NULL OR al.table_name = p_table)
+  ORDER BY al.changed_at DESC
+  LIMIT p_limit;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_list_audit_log(int, timestamptz, text) TO authenticated;
 
 -- ─── 6. Audit logging ───────────────────────────────────────
 -- Captures workspace_id from the source row when present (every workspace-
@@ -1197,9 +1313,10 @@ RETURNS numeric LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
 $$;
 
 -- ─── 9b. Presidency apply RPC ───────────────────────────────
--- Editors (and chef_equipe/owner) call this to copy Presidence drafts into
--- calendar_entries. SECURITY DEFINER lets it bypass the chef_equipe-only RLS
--- on calendar_entries so plain editeurs can still apply.
+-- Chef d'équipe (and owner) call this to copy Curateur drafts into
+-- calendar_entries. Apply rights were tightened from editeur to
+-- chef_equipe (product decision 2026-07-03) — plain editeurs review
+-- the recommendations but the team lead decides what lands.
 CREATE OR REPLACE FUNCTION public.apply_presidency_recommendations(
   p_calendar_id uuid,
   p_overwrite   boolean DEFAULT true
@@ -1210,7 +1327,7 @@ DECLARE
   v_skipped_count int := 0;
   r record;
 BEGIN
-  IF NOT public.has_role_at_least('editeur'::public.app_role) THEN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
     RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
   END IF;
 
@@ -1244,6 +1361,177 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.apply_presidency_recommendations(uuid, boolean) TO authenticated;
+
+-- Per-item variant for the recommendations list UI: apply exactly one
+-- pending recommendation. Same chef_equipe gate + overwrite semantics
+-- as the bulk RPC. 22023 when the row is missing, already applied, or
+-- belongs to a workspace the caller isn't a member of.
+CREATE FUNCTION public.apply_single_recommendation(p_recommendation_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE
+  r record;
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT id, calendar_id, mmdd, position, event_id, workspace_id
+    INTO r
+  FROM public.presidency_recommendations
+  WHERE id = p_recommendation_id
+    AND status = 'pending'
+    AND workspace_id IN (SELECT public.get_my_workspace_ids());
+
+  IF r.id IS NULL THEN
+    RAISE EXCEPTION 'recommendation_not_applicable' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.calendar_entries (calendar_id, mmdd, position, event_id, workspace_id, created_by)
+  VALUES (r.calendar_id, r.mmdd, r.position, r.event_id, r.workspace_id, auth.uid())
+  ON CONFLICT (calendar_id, mmdd, position) DO UPDATE
+    SET event_id = EXCLUDED.event_id, updated_at = now();
+
+  UPDATE public.presidency_recommendations
+    SET status = 'applied', applied_at = now(), applied_by = auth.uid()
+    WHERE id = r.id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.apply_single_recommendation(uuid) TO authenticated;
+
+-- ─── 9b. Calendar soft-delete + restore + trash-list RPCs ────────────────
+-- The calendars table already has deleted_at + deleted_by. Direct writes
+-- would be authorized by the editor+ RLS policy on calendars, but we want
+-- the delete flow restricted to chef_equipe+. These SECURITY DEFINER RPCs
+-- enforce that role gate above the RLS layer.
+
+CREATE FUNCTION public.soft_delete_calendar(p_calendar_id uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.calendars
+     SET deleted_at = now(),
+         deleted_by = auth.uid(),
+         updated_at = now(),
+         updated_by = auth.uid()
+   WHERE id = p_calendar_id
+     AND deleted_at IS NULL;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.soft_delete_calendar(uuid) TO authenticated;
+
+CREATE FUNCTION public.restore_calendar(p_calendar_id uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.calendars
+     SET deleted_at = NULL,
+         deleted_by = NULL,
+         updated_at = now(),
+         updated_by = auth.uid()
+   WHERE id = p_calendar_id
+     AND deleted_at IS NOT NULL;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.restore_calendar(uuid) TO authenticated;
+
+CREATE FUNCTION public.list_deleted_calendars()
+RETURNS TABLE (
+  id            uuid,
+  workspace_id  uuid,
+  year          int,
+  name          text,
+  status        text,
+  deleted_at    timestamptz,
+  deleted_by    uuid,
+  deleter_email text,
+  deleter_name  text,
+  entries_count int
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
+  WITH any_profile AS (
+    SELECT DISTINCT ON (pf.user_id) pf.user_id, pf.full_name
+    FROM public.profiles pf
+    ORDER BY pf.user_id, pf.created_at ASC
+  )
+  SELECT
+    c.id, c.workspace_id, c.year, c.name, c.status,
+    c.deleted_at, c.deleted_by,
+    u.email::text, p.full_name,
+    (SELECT count(*)::int FROM public.calendar_entries WHERE calendar_id = c.id)
+  FROM public.calendars c
+  LEFT JOIN auth.users u  ON u.id = c.deleted_by
+  LEFT JOIN any_profile p ON p.user_id = c.deleted_by
+  WHERE c.deleted_at IS NOT NULL
+    AND c.workspace_id IN (SELECT public.get_my_workspace_ids())
+  ORDER BY c.deleted_at DESC;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.list_deleted_calendars() TO authenticated;
+
+-- Hard-delete RPCs for the calendar Corbeille. Only rows already soft-
+-- deleted are eligible. Children (calendar_entries + presidency_recommendations)
+-- are deleted explicitly since the schema doesn't cascade them.
+
+CREATE FUNCTION public.purge_calendar(p_calendar_id uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE
+  v_workspace_id uuid;
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  SELECT workspace_id INTO v_workspace_id
+  FROM public.calendars
+  WHERE id = p_calendar_id
+    AND deleted_at IS NOT NULL
+    AND workspace_id IN (SELECT public.get_my_workspace_ids());
+  IF v_workspace_id IS NULL THEN
+    RAISE EXCEPTION 'calendar_not_purgeable' USING ERRCODE = '22023';
+  END IF;
+  DELETE FROM public.presidency_recommendations WHERE calendar_id = p_calendar_id;
+  DELETE FROM public.calendar_entries           WHERE calendar_id = p_calendar_id;
+  DELETE FROM public.calendars                  WHERE id          = p_calendar_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.purge_calendar(uuid) TO authenticated;
+
+CREATE FUNCTION public.empty_calendar_trash()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE
+  v_purged_count int := 0;
+  r record;
+BEGIN
+  IF NOT public.has_role_at_least('chef_equipe'::public.app_role) THEN
+    RAISE EXCEPTION 'insufficient_privilege' USING ERRCODE = '42501';
+  END IF;
+  FOR r IN
+    SELECT id
+    FROM public.calendars
+    WHERE deleted_at IS NOT NULL
+      AND workspace_id IN (SELECT public.get_my_workspace_ids())
+  LOOP
+    DELETE FROM public.presidency_recommendations WHERE calendar_id = r.id;
+    DELETE FROM public.calendar_entries           WHERE calendar_id = r.id;
+    DELETE FROM public.calendars                  WHERE id          = r.id;
+    v_purged_count := v_purged_count + 1;
+  END LOOP;
+  RETURN v_purged_count;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.empty_calendar_trash() TO authenticated;
 
 -- ─── 10. Notification trigger functions ─────────────────────
 CREATE OR REPLACE FUNCTION public.create_notification_from_calendar()
@@ -1400,6 +1688,13 @@ CREATE TRIGGER companies_audit               AFTER INSERT OR UPDATE OR DELETE ON
 CREATE TRIGGER companies_track_modifications BEFORE UPDATE ON public.companies FOR EACH ROW EXECUTE FUNCTION public.track_modifications();
 CREATE TRIGGER trg_companies_timestamps      BEFORE UPDATE ON public.companies FOR EACH ROW EXECUTE FUNCTION public.update_timestamps();
 
+-- Admin-scope audit triggers (power /admin/logs). No workspace_id on the
+-- rows themselves — log_audit_event falls back to NULL and the admin_list
+-- RPC derives workspace context via record_id when table_name='workspaces'.
+CREATE TRIGGER workspaces_audit        AFTER INSERT OR UPDATE OR DELETE ON public.workspaces        FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
+CREATE TRIGGER user_roles_audit        AFTER INSERT OR UPDATE OR DELETE ON public.user_roles        FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
+CREATE TRIGGER workspace_members_audit AFTER INSERT OR UPDATE OR DELETE ON public.workspace_members FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
+
 -- Hook auth.users → handle_new_user (must be created here as auth schema is created before this migration runs)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -1474,6 +1769,12 @@ CREATE POLICY "Events - Read all"             ON public.events FOR SELECT TO aut
 CREATE POLICY "Events - Write editorial roles" ON public.events TO authenticated
   USING (public.has_role_at_least('editeur'::public.app_role))
   WITH CHECK (public.has_role_at_least('editeur'::public.app_role));
+-- The Curateur can create / edit / soft-delete HIS slice of the library
+-- (origin='curateur' rows only) — never editorial rows, and he can't
+-- re-tag his rows as editorial (both USING and WITH CHECK pin origin).
+CREATE POLICY "Events - Curateur writes own curated" ON public.events
+  USING (public.has_role_at_least('presidence'::public.app_role) AND origin = 'curateur')
+  WITH CHECK (public.has_role_at_least('presidence'::public.app_role) AND origin = 'curateur');
 
 -- calendar_entries (note: policies live without explicit role list — applies to public)
 CREATE POLICY "Calendar Entries - Read authenticated" ON public.calendar_entries FOR SELECT USING (auth.uid() IS NOT NULL);
@@ -1538,11 +1839,22 @@ CREATE POLICY "Allow anonymous update on devices"     ON public.devices FOR UPDA
 CREATE POLICY "devices_logs_insert_anon"          ON public.devices_logs FOR INSERT TO anon          WITH CHECK (true);
 CREATE POLICY "devices_logs_insert_authenticated" ON public.devices_logs FOR INSERT TO authenticated WITH CHECK (true);
 
--- notifications
+-- notifications — scoped to the reader's join date so newly-invited members
+-- don't inherit the workspace's entire notification history on first login.
+-- The workspaces.created_by branch is a safety net for the creator.
 CREATE POLICY "Members read workspace notifications" ON public.notifications FOR SELECT TO authenticated
   USING (
-    workspace_id IN (SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid())
-    OR workspace_id IN (SELECT id FROM public.workspaces WHERE created_by = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.workspace_members wm
+      WHERE wm.user_id      = auth.uid()
+        AND wm.workspace_id = notifications.workspace_id
+        AND notifications.created_at >= wm.joined_at
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.workspaces w
+      WHERE w.created_by = auth.uid()
+        AND w.id         = notifications.workspace_id
+    )
   );
 CREATE POLICY "System inserts notifications" ON public.notifications FOR INSERT TO authenticated WITH CHECK (true);
 

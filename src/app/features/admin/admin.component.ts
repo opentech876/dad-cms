@@ -38,6 +38,15 @@ export class AdminComponent implements OnInit {
   readonly renameValue    = signal('');
   readonly renameSaving   = signal(false);
 
+  // Invite-manager modal (sysadmin-only path to mint a workspace `owner`)
+  readonly inviteWorkspaceId   = signal<string | null>(null);
+  readonly inviteWorkspaceName = signal('');
+  readonly inviteEmail         = signal('');
+  readonly inviteSaving        = signal(false);
+  readonly inviteError         = signal('');
+  readonly inviteSuccess       = signal('');
+  readonly showInviteModal = computed(() => this.inviteWorkspaceId() !== null);
+
   async ngOnInit(): Promise<void> {
     await this.reload();
   }
@@ -79,6 +88,8 @@ export class AdminComponent implements OnInit {
       if (!res.success) { this.createError.set(res.error ?? 'Échec de la création.'); return; }
       this.showCreateModal.set(false);
       await this.reload();
+      // Nudge the shell so its switcher dropdown picks the new row up.
+      this.context.notifyWorkspacesChanged();
     } finally {
       this.createSaving.set(false);
     }
@@ -89,7 +100,10 @@ export class AdminComponent implements OnInit {
     this.busyWorkspaceId.set(workspaceId);
     try {
       const res = await firstValueFrom(this.admin.softDeleteWorkspace(workspaceId));
-      if (res.success) await this.reload();
+      if (res.success) {
+        await this.reload();
+        this.context.notifyWorkspacesChanged();
+      }
     } finally {
       this.busyWorkspaceId.set(null);
     }
@@ -100,7 +114,10 @@ export class AdminComponent implements OnInit {
     this.busyWorkspaceId.set(workspaceId);
     try {
       const res = await firstValueFrom(this.admin.restoreWorkspace(workspaceId));
-      if (res.success) await this.reload();
+      if (res.success) {
+        await this.reload();
+        this.context.notifyWorkspacesChanged();
+      }
     } finally {
       this.busyWorkspaceId.set(null);
     }
@@ -128,11 +145,51 @@ export class AdminComponent implements OnInit {
       const res = await firstValueFrom(this.admin.renameWorkspace(id, name));
       if (res.success) {
         await this.reload();
+        this.context.notifyWorkspacesChanged();
         this.renameTargetId.set(null);
         this.renameValue.set('');
       }
     } finally {
       this.renameSaving.set(false);
+    }
+  }
+
+  // ── Invite manager (system_admin → owner) ─────────────────────────────
+
+  openInviteManager(workspaceId: string, workspaceName: string): void {
+    this.inviteWorkspaceId.set(workspaceId);
+    this.inviteWorkspaceName.set(workspaceName);
+    this.inviteEmail.set('');
+    this.inviteError.set('');
+    this.inviteSuccess.set('');
+  }
+
+  closeInviteManager(): void {
+    if (this.inviteSaving()) return;
+    this.inviteWorkspaceId.set(null);
+    this.inviteWorkspaceName.set('');
+    this.inviteEmail.set('');
+    this.inviteError.set('');
+    this.inviteSuccess.set('');
+  }
+
+  async submitInviteManager(): Promise<void> {
+    const workspaceId = this.inviteWorkspaceId();
+    const email = this.inviteEmail().trim();
+    if (!workspaceId || !email || this.inviteSaving()) return;
+    this.inviteSaving.set(true);
+    this.inviteError.set('');
+    this.inviteSuccess.set('');
+    try {
+      const res = await firstValueFrom(this.admin.inviteManager(workspaceId, email));
+      if (!res.success) {
+        this.inviteError.set(res.error ?? "Échec de l'invitation.");
+        return;
+      }
+      this.inviteSuccess.set(`Invitation envoyée à ${email}.`);
+      this.inviteEmail.set('');
+    } finally {
+      this.inviteSaving.set(false);
     }
   }
 

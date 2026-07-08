@@ -1,6 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { BehaviorSubject, EMPTY, of } from 'rxjs';
+import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
+import { BehaviorSubject, EMPTY, of, Subject } from 'rxjs';
 import { Router } from '@angular/router';
 import { ShellComponent } from './shell.component';
 import { AuthService } from '../../auth/auth.service';
@@ -20,7 +20,14 @@ describe('ShellComponent — navigation par rôle', () => {
   let mockWorkspace: { getMyProfile: jest.Mock; upsertProfile: jest.Mock; getWorkspaceSummaries: jest.Mock };
   let mockRouter: { events: any; navigate: jest.Mock; navigateByUrl: jest.Mock; url: string };
   let mockRouteReuse: { triggerRefresh: jest.Mock };
-  let mockWorkspaceContext: { activeWorkspaceId: jest.Mock; setActiveWorkspace: jest.Mock };
+  let mockWorkspaceContext: {
+    activeWorkspaceId: jest.Mock;
+    setActiveWorkspace: jest.Mock;
+    workspacesChanged$: Subject<void>;
+    notifyWorkspacesChanged: jest.Mock;
+    profileChanged$: Subject<void>;
+    notifyProfileChanged: jest.Mock;
+  };
 
   const MOCK_WORKSPACES: WorkspaceSummary[] = [
     { id: 'ws-1', name: 'DIOUGA-DIOP Media', logo_url: null, member_count: 5, last_accessed_at: null },
@@ -30,6 +37,7 @@ describe('ShellComponent — navigation par rôle', () => {
     role: AppRole | null,
     profileOverride?: { full_name: string | null; phone: string | null; avatar_url: string | null },
     workspacesOverride?: WorkspaceSummary[],
+    opts?: { isSysadmin?: boolean; userMetadata?: Record<string, unknown>; updateUserResult?: any },
   ): void {
     roleSubject = new BehaviorSubject<AppRole | null>(role);
     mockRouter = {
@@ -46,10 +54,17 @@ describe('ShellComponent — navigation par rôle', () => {
       upsertProfile: jest.fn().mockReturnValue(of({ success: true })),
       getWorkspaceSummaries: jest.fn().mockReturnValue(of(workspacesOverride ?? MOCK_WORKSPACES)),
     };
+    const workspacesChanged$ = new Subject<void>();
+    const profileChanged$    = new Subject<void>();
     mockWorkspaceContext = {
       activeWorkspaceId: jest.fn().mockReturnValue('ws-1'),
       setActiveWorkspace: jest.fn(),
+      workspacesChanged$,
+      notifyWorkspacesChanged: jest.fn(() => workspacesChanged$.next()),
+      profileChanged$,
+      notifyProfileChanged: jest.fn(() => profileChanged$.next()),
     };
+    const updateUserSpy = jest.fn().mockResolvedValue(opts?.updateUserResult ?? { data: { user: {} }, error: null });
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -59,9 +74,13 @@ describe('ShellComponent — navigation par rôle', () => {
           provide: AuthService,
           useValue: {
             currentRole$: roleSubject.asObservable(),
-            getCurrentUser: jest.fn().mockReturnValue(of({ id: 'mock-user-id', email: 'test@example.com' })),
+            getCurrentUser: jest.fn().mockReturnValue(of({
+              id: 'mock-user-id',
+              email: 'test@example.com',
+              user_metadata: opts?.userMetadata ?? {},
+            })),
             signOut: jest.fn().mockReturnValue(of(null)),
-            isSystemAdmin: jest.fn().mockReturnValue(of(false)),
+            isSystemAdmin: jest.fn().mockReturnValue(of(opts?.isSysadmin ?? false)),
           },
         },
         {
@@ -78,7 +97,13 @@ describe('ShellComponent — navigation par rôle', () => {
         },
         {
           provide: NotificationService,
-          useValue: { unreadCount: jest.fn().mockReturnValue(of(3)) },
+          // NotificationService now exposes a signal-based unreadCount plus
+          // an async refreshUnread(). The shell reads the signal directly
+          // and calls refresh on init.
+          useValue: {
+            unreadCount: signal(3),
+            refreshUnread: jest.fn().mockResolvedValue(undefined),
+          },
         },
         {
           provide: SupabaseService,
@@ -86,6 +111,7 @@ describe('ShellComponent — navigation par rôle', () => {
             updatePassword: jest.fn().mockResolvedValue({ data: { user: {} }, error: null }),
             markPasswordSet: jest.fn(),
             hasPasswordSet: jest.fn().mockResolvedValue(false),
+            client: { auth: { updateUser: updateUserSpy } },
           },
         },
         {
@@ -203,9 +229,14 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(paths).not.toContain('/utilisateurs');
   });
 
-  it("editeur ne voit pas 'recommandations'", () => {
+  it("editeur voit 'recommandations' en lecture seule (elle doit pouvoir consulter avant d'appliquer)", () => {
     createComponent('editeur');
-    expect(component.visibleNavItems().map(i => i.path)).not.toContain('/recommandations');
+    expect(component.visibleNavItems().map(i => i.path)).toContain('/recommandations');
+  });
+
+  it("chef_equipe voit 'recommandations' en lecture seule", () => {
+    createComponent('chef_equipe');
+    expect(component.visibleNavItems().map(i => i.path)).toContain('/recommandations');
   });
 
   // ── chef_equipe_commerciale ───────────────────────────────────────────────
@@ -217,7 +248,8 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(paths).toContain('/compagnies');
     expect(paths).not.toContain('/evenements');
     expect(paths).not.toContain('/utilisateurs');
-    expect(paths).not.toContain('/recommandations');
+    // Viewing recommendations is open to every role since 2026-07-03.
+    expect(paths).toContain('/recommandations');
   });
 
   it("editeur ne voit pas 'compagnies'", () => {
@@ -270,7 +302,7 @@ describe('ShellComponent — navigation par rôle', () => {
   it('userName est défini à partir de profile.full_name quand disponible', async () => {
     createComponent('owner'); // default mock returns { full_name: 'Test User', ... }
     await component.ngOnInit();
-    expect(component.userName).toBe('Test User');
+    expect(component.userName()).toBe('Test User');
   });
 
   // ── profile setup modal ────────────────────────────────────────────────────
@@ -392,6 +424,96 @@ describe('ShellComponent — navigation par rôle', () => {
 
       // MOCK_WORKSPACES[0].name is "Mon Espace" by convention
       expect(component.activeWorkspaceName()).toBeTruthy();
+    });
+  });
+
+  // ── sysadmin first-run setup modal ─────────────────────────────────────────
+
+  describe('modal de configuration sysadmin (première connexion)', () => {
+    it("affiche le modal sysadmin quand l'utilisateur est system_admin et que user_metadata.full_name est vide", async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: {},
+      });
+      await component.ngOnInit();
+      expect(component.showSysadminSetup()).toBe(true);
+      // Le modal workspace-scoped ne doit PAS apparaître pour un sysadmin sans workspace
+      expect(component.showProfileSetup()).toBe(false);
+    });
+
+    it("n'affiche PAS le modal sysadmin si user_metadata.full_name est déjà renseigné", async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'Elvis Destin OLEMBE' },
+      });
+      await component.ngOnInit();
+      expect(component.showSysadminSetup()).toBe(false);
+      // Le nom doit être hydraté depuis user_metadata
+      expect(component.userName()).toBe('Elvis Destin OLEMBE');
+    });
+
+    it("saveSysadminSetup appelle auth.updateUser avec full_name et password", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: {} });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.sysadminName.set('Elvis Destin OLEMBE');
+      component.sysadminPassword.set('motdepasse123');
+
+      await component.saveSysadminSetup();
+
+      expect(supabase.client.auth.updateUser).toHaveBeenCalledWith({
+        data: { full_name: 'Elvis Destin OLEMBE' },
+        password: 'motdepasse123',
+      });
+      expect(supabase.markPasswordSet).toHaveBeenCalled();
+      expect(component.showSysadminSetup()).toBe(false);
+      expect(component.userName()).toBe('Elvis Destin OLEMBE');
+    });
+
+    it("saveSysadminSetup refuse un mot de passe trop court et garde le modal ouvert", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: {} });
+      const supabase = TestBed.inject(SupabaseService) as any;
+      await component.ngOnInit();
+      component.sysadminName.set('Alice');
+      component.sysadminPassword.set('court');
+
+      await component.saveSysadminSetup();
+
+      expect(supabase.client.auth.updateUser).not.toHaveBeenCalled();
+      expect(component.sysadminPasswordError()).toContain('8 caractères');
+      expect(component.showSysadminSetup()).toBe(true);
+    });
+
+    it("saveSysadminSetup expose une erreur si updateUser échoue", async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: {},
+        updateUserResult: { data: null, error: { message: 'API down' } },
+      });
+      await component.ngOnInit();
+      component.sysadminName.set('Alice');
+      component.sysadminPassword.set('motdepasse123');
+
+      await component.saveSysadminSetup();
+
+      expect(component.sysadminSaveError()).toContain('API down');
+      expect(component.showSysadminSetup()).toBe(true);
+    });
+
+    it("ne charge PAS le profil workspace-scoped pour un sysadmin (mais bien la liste des workspaces)", async () => {
+      // The sysadmin can also be a member of one or more workspaces (invited
+      // as manager, or impersonating). We load the summaries so the switcher
+      // is populated; we skip getMyProfile because sysadmin identity lives
+      // in auth.users.raw_user_meta_data, not in the workspace-scoped
+      // profiles table.
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'Existing' },
+      });
+      await component.ngOnInit();
+
+      expect(mockWorkspace.getWorkspaceSummaries).toHaveBeenCalled();
+      expect(mockWorkspace.getMyProfile).not.toHaveBeenCalled();
     });
   });
 
@@ -572,6 +694,134 @@ describe('ShellComponent — navigation par rôle', () => {
       component.workspaceMenuOpen.set(true);
       await component.switchWorkspace('ws-2');
       expect(component.workspaceMenuOpen()).toBe(false);
+    });
+  });
+
+  // ── platform admin mode (sysadmin in switcher) ────────────────────────────
+
+  describe('mode Administration plateforme', () => {
+    it("inPlatformMode est faux par défaut (URL = /dashboard, pas sysadmin)", async () => {
+      createComponent('editeur');
+      await component.ngOnInit();
+      expect(component.inPlatformMode()).toBe(false);
+    });
+
+    it("inPlatformMode est vrai quand sysadmin et URL commence par /admin", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/admin/utilisateurs');
+      expect(component.inPlatformMode()).toBe(true);
+    });
+
+    it("inPlatformMode est faux pour un sysadmin hors /admin", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/dashboard');
+      expect(component.inPlatformMode()).toBe(false);
+    });
+
+    it("workspaceName affiche 'Administration plateforme' en mode plateforme", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/admin');
+      expect(component.workspaceName()).toBe('Administration plateforme');
+      expect(component.workspaceInitials()).toBe('AP');
+    });
+
+    it("enterPlatformMode navigue vers /admin", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      mockRouter.navigateByUrl.mockClear();
+      await component.enterPlatformMode();
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/admin');
+    });
+
+    it("enterPlatformMode ne re-navigue pas si déjà sur /admin", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      mockRouter.url = '/admin/utilisateurs';
+      mockRouter.navigateByUrl.mockClear();
+      await component.enterPlatformMode();
+      expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    it("switchWorkspace depuis le mode plateforme route vers /dashboard", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/admin');
+      mockRouter.navigateByUrl.mockClear();
+      await component.switchWorkspace('ws-1');
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/dashboard');
+    });
+
+    // inPlatformMode is now purely URL-driven — systemAdminGuard blocks
+    // non-sysadmins from ever reaching /admin, so we trust the URL and
+    // avoid an isSystemAdmin race on first paint.
+    it("inPlatformMode ne dépend que de l'URL (le guard filtre les rôles)", async () => {
+      createComponent('owner');
+      await component.ngOnInit();
+      component.currentUrl.set('/admin');
+      expect(component.inPlatformMode()).toBe(true);
+      component.currentUrl.set('/dashboard');
+      expect(component.inPlatformMode()).toBe(false);
+    });
+
+    it("en mode plateforme, la sidebar montre UNIQUEMENT Plateforme + Compte (pas les sections workspace)", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/admin');
+      const sectionIds = component.visibleNavSections().map(s => s.id);
+      expect(sectionIds).toEqual(['plateforme', 'compte']);
+      // Aucun item workspace-scoped (dashboard, calendrier, evenements, etc.)
+      const paths = component.visibleNavItems().map(i => i.path);
+      expect(paths).not.toContain('/dashboard');
+      expect(paths).not.toContain('/calendrier');
+      expect(paths).not.toContain('/evenements');
+      // Les items Compte pointent sur les alias /admin/* pour rester
+      // en mode plateforme (sinon inPlatformMode retombe à false et le
+      // thème repasse en mode workspace).
+      expect(paths).toContain('/admin/profil');
+      expect(paths).toContain('/admin/parametres');
+      expect(paths).toContain('/admin/notifications');
+    });
+
+    it("en mode workspace, la sidebar montre les sections workspace (pas la section Plateforme)", async () => {
+      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      await component.ngOnInit();
+      component.currentUrl.set('/dashboard');
+      const sectionIds = component.visibleNavSections().map(s => s.id);
+      expect(sectionIds).not.toContain('plateforme');
+      expect(sectionIds).not.toContain('compte');
+    });
+  });
+
+  // ── workspace switcher: live-reload + color coding ─────────────────────────
+
+  describe('switcher live-reload et couleurs', () => {
+    it("workspaceColorFor renvoie une couleur HSL déterministe par id", () => {
+      createComponent('owner');
+      const c1 = component.workspaceColorFor('ws-abc');
+      const c2 = component.workspaceColorFor('ws-abc');
+      const c3 = component.workspaceColorFor('ws-xyz');
+      expect(c1).toMatch(/^hsl\(\d+, 62%, 52%\)$/);
+      expect(c1).toBe(c2);
+      expect(c1).not.toBe(c3);
+    });
+
+    it("recharge les workspaces quand notifyWorkspacesChanged est déclenché", async () => {
+      createComponent('owner');
+      await component.ngOnInit();
+      // Fresh mock so we count only post-init calls
+      mockWorkspace.getWorkspaceSummaries.mockClear();
+      mockWorkspaceContext.notifyWorkspacesChanged();
+      // The subscribe callback calls the async _reloadWorkspaceSummaries;
+      // let its firstValueFrom + set() settle before we assert.
+      await Promise.resolve();
+      await Promise.resolve();
+      // NB: ngOnInit runs twice in this test bed (once via fixture.detectChanges,
+      // once via the explicit await), so there are two subscribers — hence 2
+      // reloads per emit. In production there's only one.
+      expect(mockWorkspace.getWorkspaceSummaries).toHaveBeenCalled();
     });
   });
 

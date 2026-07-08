@@ -40,7 +40,7 @@
           </h2>
           <p style="margin-top:12px; font-family:var(--font-serif); font-size:14.5px; line-height:1.55; color:var(--fg-3);">
             Le calendrier {{ currentYear }} n'a pas encore d'événement assigné au {{ todayDayNum }} {{ todayMonthCap.toLowerCase() }}.
-            Choisissez-en un depuis la bibliothèque ou demandez à la Présidence de proposer une recommandation pour cette date.
+            Choisissez-en un depuis la bibliothèque ou demandez au Curateur de proposer une recommandation pour cette date.
           </p>
         </div>
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
@@ -128,24 +128,30 @@
   <!-- ── Two-column: activity + coverage ── -->
   <div class="dashboard-two-col" style="margin-bottom:20px;">
 
-    <!-- Activity feed -->
+    <!-- Activity feed — real audit_log entries via dashboard_operational_stats() -->
     <div class="card">
       <div class="card-header">
         <div>
-          <div class="card-title">Activité éditoriale récente</div>
-          <div class="card-subtitle">Dernières publications et modifications</div>
+          <div class="card-title">Activité récente</div>
+          <div class="card-subtitle">Dernières actions de l'équipe dans cet espace</div>
         </div>
-        <a routerLink="/evenements" class="btn btn-flat btn-sm">Tout voir →</a>
       </div>
       <div>
-        @for (a of activityFeed; track a.id) {
+        @if (activityFeed().length === 0) {
+          <div style="padding:32px 20px; text-align:center; color:var(--fg-3); font-style:italic; font-size:13px;">
+            Aucune activité enregistrée pour le moment.
+          </div>
+        }
+        @for (a of activityFeed(); track $index) {
           <div style="display:flex; gap:12px; padding:14px 20px; border-top:1px solid var(--border-1); align-items:flex-start;">
             <div class="avatar avatar-sm" style="margin-top:2px;">{{ a.initials }}</div>
             <div style="flex:1; min-width:0;">
               <div style="font-size:13.5px;">
                 <strong>{{ a.who }}</strong>
                 <span style="color:var(--fg-3);"> {{ a.action }} </span>
-                <span style="font-family:var(--font-serif); font-style:italic; color:var(--accent);">« {{ a.target }} »</span>
+                @if (a.target) {
+                  <span style="font-family:var(--font-serif); font-style:italic; color:var(--accent);">« {{ a.target }} »</span>
+                }
               </div>
               <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ a.meta }}</div>
             </div>
@@ -167,31 +173,49 @@
           </div>
         </div>
         <div class="card-body">
-          <div style="display:grid; grid-template-columns:repeat(12,1fr); gap:6px; align-items:flex-end; height:100px;">
-            @for (bar of coverageBars; track $index) {
-              <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                <div style="flex:1; width:100%; display:flex; align-items:flex-end;">
-                  <div [style.height]="bar.pct + '%'"
-                       [style.background]="bar.current ? 'var(--accent)' : 'var(--accent-2-soft)'"
-                       style="width:100%; border-radius:3px 3px 0 0; border:1px solid rgba(0,0,0,0.06); border-bottom:none;">
+          @if (coverageBars().length === 0) {
+            <div style="padding:20px; text-align:center; color:var(--fg-3); font-style:italic; font-size:13px;">
+              Aucune donnée de couverture.
+            </div>
+          } @else {
+            <div style="display:grid; grid-template-columns:repeat(12,1fr); gap:6px; align-items:flex-end; height:100px;">
+              @for (bar of coverageBars(); track $index) {
+                <div style="display:flex; flex-direction:column; align-items:center; gap:4px;"
+                     [title]="bar.pct + '%'">
+                  <div style="flex:1; width:100%; display:flex; align-items:flex-end;">
+                    <div [style.height]="bar.pct + '%'"
+                         [style.background]="bar.current ? 'var(--accent)' : 'var(--accent-2-soft)'"
+                         style="width:100%; border-radius:3px 3px 0 0; border:1px solid rgba(0,0,0,0.06); border-bottom:none;">
+                    </div>
                   </div>
+                  <div style="font-size:10px; color:var(--fg-3);">{{ bar.label }}</div>
                 </div>
-                <div style="font-size:10px; color:var(--fg-3);">{{ bar.label }}</div>
-              </div>
-            }
-          </div>
+              }
+            </div>
+          }
         </div>
       </div>
 
-      <!-- To-do before publication -->
+      <!-- To-do before publication — computed live from the DB -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">Avant publication {{ currentYear }}</div>
         </div>
         <div>
-          @for (todo of publicationTodos; track todo.text; let i = $index) {
-            <div style="display:flex; align-items:center; gap:12px; padding:12px 20px;"
-                 [style.border-top]="i > 0 ? '1px solid var(--border-1)' : 'none'">
+          @if (publicationTodos().length === 0) {
+            <div style="display:flex; align-items:center; gap:12px; padding:16px 20px;">
+              <div style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex:none; background:var(--success-soft); color:var(--success);">
+                ✓
+              </div>
+              <div style="font-size:13px; font-weight:500; color:var(--success);">
+                Tout est prêt — aucune action requise.
+              </div>
+            </div>
+          }
+          @for (todo of publicationTodos(); track todo.text; let i = $index) {
+            <a [routerLink]="todo.link"
+               style="display:flex; align-items:center; gap:12px; padding:12px 20px; text-decoration:none; color:inherit;"
+               [style.border-top]="i > 0 ? '1px solid var(--border-1)' : 'none'">
               <div [style.background]="todo.bg" [style.color]="todo.fg"
                    style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex:none;">
                 {{ todo.icon }}
@@ -201,59 +225,115 @@
                 <div style="font-size:11.5px; color:var(--fg-3);">{{ todo.meta }}</div>
               </div>
               <span style="color:var(--fg-3); font-size:18px;">›</span>
-            </div>
+            </a>
           }
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ── Top ad performers (live data) ── -->
-  <div class="card" style="margin-bottom:20px;">
-    <div class="card-header">
-      <div>
-        <div class="card-title">Top encarts</div>
-        <div class="card-subtitle">5 meilleures par impressions cumulées</div>
+  <!-- ── Risky days — content the mobile app will miss soon ── -->
+  @if (opStats() && opStats()!.empty_days !== null) {
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Jours à risque — 30 prochains jours</div>
+          <div class="card-subtitle">
+            Dates que l'application mobile affichera incomplètes ou vides
+          </div>
+        </div>
+        <a routerLink="/calendrier" class="btn btn-flat btn-sm">Compléter le calendrier →</a>
       </div>
-      <a routerLink="/metriques" class="btn btn-flat btn-sm">Voir toutes les statistiques →</a>
-    </div>
-    @if (topAdPerformers().length === 0) {
-      <div style="padding:32px; text-align:center; color:var(--fg-3); font-style:italic;">
-        Aucune impression enregistrée pour le moment.
-      </div>
-    } @else {
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Campagne</th>
-            <th>Annonceur</th>
-            <th style="text-align:right;">Impressions</th>
-            <th style="text-align:right;">Clics</th>
-            <th style="text-align:right;">CTR</th>
-            <th>Période</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (r of topAdPerformers(); track r.campaignId) {
-            <tr>
-              <td style="font-weight:500;">{{ r.name }}</td>
-              <td style="color:var(--fg-2);">{{ r.advertiser }}</td>
-              <td style="text-align:right; font-variant-numeric:tabular-nums;">{{ r.impressions | number }}</td>
-              <td style="text-align:right; font-variant-numeric:tabular-nums;">{{ r.clicks | number }}</td>
-              <td style="text-align:right; font-variant-numeric:tabular-nums; font-weight:600;">
-                @if (r.ctr !== null) {
-                  {{ r.ctr | percent:'1.2-2' }}
-                } @else {
-                  —
-                }
-              </td>
-              <td style="color:var(--fg-3); font-size:12.5px;">{{ r.period }}</td>
-            </tr>
+      @if (riskyDays().length === 0) {
+        <div style="display:flex; align-items:center; gap:12px; padding:18px 20px;">
+          <div style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex:none; background:var(--success-soft); color:var(--success);">
+            ✓
+          </div>
+          <div style="font-size:13px; font-weight:500; color:var(--success);">
+            Les 30 prochains jours sont entièrement couverts — deux événements par date.
+          </div>
+        </div>
+      } @else {
+        <div style="display:flex; flex-wrap:wrap; gap:10px; padding:16px 20px;">
+          @for (day of riskyDays(); track day.date) {
+            <a routerLink="/calendrier"
+               [title]="day.entries === 0
+                 ? 'Aucun événement assigné — la journée sera vide sur mobile'
+                 : 'Une seule des deux positions est remplie'"
+               style="display:flex; flex-direction:column; gap:4px; padding:10px 14px; border-radius:var(--r-md); text-decoration:none; min-width:118px;"
+               [style.background]="riskySeverity(day) === 'critical' ? 'var(--danger-soft)'
+                                 : riskySeverity(day) === 'warning' ? 'var(--warning-soft)'
+                                 : 'var(--info-soft)'"
+               [style.color]="riskySeverity(day) === 'critical' ? 'var(--danger)'
+                            : riskySeverity(day) === 'warning' ? 'var(--warning)'
+                            : 'var(--info)'">
+              <span style="font-family:var(--font-serif); font-size:15px; font-weight:600;">
+                {{ riskyDateLabel(day) }}
+              </span>
+              <span style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">
+                {{ day.entries === 0 ? 'vide' : '1 sur 2' }} · {{ riskyCountdown(day) }}
+              </span>
+            </a>
           }
-        </tbody>
-      </table>
-    }
-  </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ── Ad inventory — next 30 days, sold vs available per position ── -->
+  <!-- Campaign PERFORMANCE detail lives on /metriques; this block answers
+       the forward-looking commercial question: "what can I still sell?" -->
+  @if (inventory().length > 0) {
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Inventaire publicitaire — 30 prochains jours</div>
+          <div class="card-subtitle">
+            Jours couverts par une campagne validée et active, par position
+          </div>
+        </div>
+        <a routerLink="/campagnes" class="btn btn-flat btn-sm">Planifier une campagne →</a>
+      </div>
+      <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+        @for (pos of [{ key: 'h', label: 'Header', unsold: unsoldHeaderDays() }, { key: 'f', label: 'Footer', unsold: unsoldFooterDays() }]; track pos.key) {
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+              <span style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--fg-3);">
+                {{ pos.label }}
+              </span>
+              <span style="font-size:12px;"
+                    [style.color]="pos.unsold > 0 ? 'var(--warning)' : 'var(--success)'">
+                @if (pos.unsold > 0) {
+                  {{ pos.unsold }} jour{{ pos.unsold > 1 ? 's' : '' }} disponible{{ pos.unsold > 1 ? 's' : '' }}
+                } @else {
+                  complet
+                }
+              </span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(30, 1fr); gap:2px;">
+              @for (day of inventory(); track day.d) {
+                <div [title]="inventoryTitle(day, $any(pos.key))"
+                     [style.background]="(pos.key === 'h' ? day.h : day.f) ? 'var(--success)' : 'var(--bg-sunken)'"
+                     [style.border]="(pos.key === 'h' ? day.h : day.f) ? 'none' : '1px dashed var(--border-2)'"
+                     style="height:16px; border-radius:3px;">
+                </div>
+              }
+            </div>
+          </div>
+        }
+        <div style="display:flex; gap:16px; font-size:11.5px; color:var(--fg-3);">
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:var(--success); display:inline-block;"></span>
+            vendu
+          </span>
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:var(--bg-sunken); border:1px dashed var(--border-2); display:inline-block;"></span>
+            disponible à la vente
+          </span>
+        </div>
+      </div>
+    </div>
+  }
 
   <!-- ── Quick access ── -->
   <div class="quick-access-grid">

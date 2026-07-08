@@ -40,7 +40,7 @@
           font-weight: 600;
         "
       >
-        Propriétaires
+        Administrateurs
       </div>
       <div
         style="
@@ -121,7 +121,7 @@
           font-weight: 600;
         "
       >
-        Présidence
+        Curateur
       </div>
       <div
         style="
@@ -191,12 +191,12 @@
     </div>
     <select class="select" style="width: 170px; height: 36px; font-size: 13px">
       <option>Tous les rôles</option>
-      <option>Propriétaire</option>
+      <option>Administrateur</option>
       <option>Chef d'équipe</option>
       <option>Éditeur</option>
-      <option>Chargé comm.</option>
+      <option>Commercial</option>
       <option>Chef d'équipe comm.</option>
-      <option>Présidence</option>
+      <option>Curateur</option>
     </select>
     <div style="flex: 1"></div>
     <button class="btn btn-primary btn-sm" type="button" (click)="openInviteModal()">
@@ -266,7 +266,7 @@
                 </td>
                 <td>
                   @if (user.role === 'owner') {
-                    <span class="badge badge-accent">★ Propriétaire</span>
+                    <span class="badge badge-accent">★ Administrateur</span>
                   }
                   @if (user.role === 'chef_equipe') {
                     <span class="badge badge-info">Chef d'équipe</span>
@@ -275,10 +275,10 @@
                     <span class="badge">Éditeur</span>
                   }
                   @if (user.role === 'charge_communication') {
-                    <span class="badge badge-warning">Chargé comm.</span>
+                    <span class="badge badge-warning">Commercial</span>
                   }
                   @if (user.role === 'presidence') {
-                    <span class="badge badge-accent">Présidence</span>
+                    <span class="badge badge-accent">Curateur</span>
                   }
                   @if (user.role === 'chef_equipe_commerciale') {
                     <span class="badge badge-warning">Chef d'équipe comm.</span>
@@ -459,11 +459,11 @@
         <thead>
           <tr>
             <th>Action</th>
-            <th style="text-align: center">Propriétaire</th>
+            <th style="text-align: center">Administrateur</th>
             <th style="text-align: center">Chef d'équipe</th>
             <th style="text-align: center">Éditeur</th>
-            <th style="text-align: center">Chargé comm.</th>
-            <th style="text-align: center">Présidence</th>
+            <th style="text-align: center">Commercial</th>
+            <th style="text-align: center">Curateur</th>
             <th style="text-align: center">Chef d'éq. comm.</th>
           </tr>
         </thead>
@@ -509,11 +509,11 @@
             [value]="roleModalTargetRole()"
             (change)="roleModalTargetRole.set($any($event.target).value)"
           >
-            <option value="chef_equipe">Chef d'équipe</option>
-            <option value="editeur">Éditeur</option>
-            <option value="charge_communication">Chargé de communication</option>
-            <option value="chef_equipe_commerciale">Chef d'équipe commerciale</option>
-            <option value="presidence">Présidence</option>
+            <option value="chef_equipe" [selected]="roleModalTargetRole() === 'chef_equipe'">Chef d'équipe</option>
+            <option value="editeur" [selected]="roleModalTargetRole() === 'editeur'">Éditeur</option>
+            <option value="charge_communication" [selected]="roleModalTargetRole() === 'charge_communication'">Commercial</option>
+            <option value="chef_equipe_commerciale" [selected]="roleModalTargetRole() === 'chef_equipe_commerciale'">Chef d'équipe commerciale</option>
+            <option value="presidence" [selected]="roleModalTargetRole() === 'presidence'">Curateur</option>
           </select>
           <span class="field-hint">
             @if (roleModalTargetRole() === 'chef_equipe') {
@@ -526,7 +526,7 @@
               Campagnes publicitaires et tableaux de bord.
             }
             @if (roleModalTargetRole() === 'presidence') {
-              Recommandations éditoriales (Présidence) — décide les événements à proposer chaque jour.
+              Recommandations éditoriales (Curateur) — décide les événements à proposer chaque jour.
             }
             @if (roleModalTargetRole() === 'chef_equipe_commerciale') {
               Gestion des compagnies (annonceurs) et supervision des campagnes publicitaires.
@@ -731,10 +731,24 @@
               [value]="inviteRole()"
               (change)="inviteRole.set($any($event.target).value)"
             >
-              <option value="chef_equipe">Chef d'équipe</option>
-              <option value="editeur">Éditeur</option>
-              <option value="charge_communication">Chargé de communication</option>
+              <!-- system_admin is intentionally omitted (platform-level, seeded
+                   via bootstrap or promoted from /admin/utilisateurs).
+                   The "Administrateur" (owner) option is only surfaced for
+                   sysadmins impersonating a workspace — a regular workspace
+                   owner or chef d'équipe would get a 403 from invite-user EF
+                   because minting `owner` is a platform-management concern. -->
+              @if (isSysadmin()) {
+                <option value="owner" [selected]="inviteRole() === 'owner'">Administrateur</option>
+              }
+              <option value="chef_equipe" [selected]="inviteRole() === 'chef_equipe'">Chef d'équipe</option>
+              <option value="chef_equipe_commerciale" [selected]="inviteRole() === 'chef_equipe_commerciale'">Chef d'équipe commerciale</option>
+              <option value="editeur" [selected]="inviteRole() === 'editeur'">Éditeur</option>
+              <option value="charge_communication" [selected]="inviteRole() === 'charge_communication'">Commercial</option>
+              <option value="presidence" [selected]="inviteRole() === 'presidence'">Curateur</option>
             </select>
+            <span class="field-hint">
+              L'invitation sera envoyée par e-mail. Le rôle sera appliqué dès la première connexion.
+            </span>
           </div>
           @if (inviteStatus() === 'error') {
             <p class="login-error" style="margin-bottom: 12px">{{ inviteError() }}</p>

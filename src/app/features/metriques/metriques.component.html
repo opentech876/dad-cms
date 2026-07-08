@@ -72,8 +72,28 @@
         </div>
         <div class="kpi-card__body">
           <div class="kpi-card__value">{{ coveragePercent() }}%</div>
-          <div class="kpi-card__label">Couverture calendrier 2026</div>
+          <div class="kpi-card__label">Couverture calendrier {{ currentYear }}</div>
           <div class="kpi-card__sub">mois entièrement remplis</div>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-card__icon kpi-card__icon--coverage">
+          <tui-icon icon="@tui.list-checks" style="font-size:18px;" />
+        </div>
+        <div class="kpi-card__body">
+          @if (applyLatency(); as lat) {
+            <div class="kpi-card__value">{{ lat.median_hours | number:'1.0-1' }}&nbsp;h</div>
+            <div class="kpi-card__label">Délai d'application des recommandations</div>
+            <div class="kpi-card__sub">
+              médiane · {{ lat.applied_count }} appliquée{{ lat.applied_count > 1 ? 's' : '' }}
+              · moy. {{ lat.avg_hours | number:'1.0-1' }} h
+            </div>
+          } @else {
+            <div class="kpi-card__value" style="color:var(--fg-3);">—</div>
+            <div class="kpi-card__label">Délai d'application des recommandations</div>
+            <div class="kpi-card__sub">aucune recommandation appliquée pour l'instant</div>
+          }
         </div>
       </div>
 
@@ -131,30 +151,162 @@
       }
     </div>
 
-    <!-- ══ Row: Calendar coverage bar chart ══ -->
+    <!-- ══ Row: Ad-inventory fill rate per month (sold days per position) ══
+         The editorial coverage chart now lives on the dashboard (operational
+         view); this one answers the commercial question "how much of our ad
+         inventory is actually sold, month by month". -->
     <div class="card metriques-chart-card">
       <div class="metriques-chart-header">
         <div>
-          <div class="metriques-chart-title">Couverture calendrier 2026 par mois</div>
-          <div class="metriques-chart-sub">Pourcentage de jours avec au moins un événement</div>
+          <div class="metriques-chart-title">Inventaire publicitaire vendu — {{ currentYear }}</div>
+          <div class="metriques-chart-sub">
+            % de jours du mois couverts par une campagne validée et active, par position
+          </div>
+        </div>
+        <div style="display:flex; gap:14px; font-size:11.5px; color:var(--fg-3);">
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent); display:inline-block;"></span>
+            Header
+          </span>
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent-2); display:inline-block;"></span>
+            Footer
+          </span>
         </div>
       </div>
       <div class="metriques-bar-chart">
-        @for (bar of coverageBarData(); track bar.label) {
+        @for (bar of fillRateBarData(); track bar.label) {
           <div class="metriques-bar-col">
-            <div class="metriques-bar-track">
-              <div
-                class="metriques-bar-fill"
-                [class.metriques-bar-fill--full]="bar.percent >= 100"
-                [class.metriques-bar-fill--empty]="bar.percent === 0"
-                [style.height.%]="bar.percent">
+            <div class="metriques-bar-track" style="display:flex; gap:2px; align-items:flex-end;">
+              <div style="flex:1; height:100%; display:flex; align-items:flex-end;"
+                   [title]="'Header : ' + bar.headerPct + '%'">
+                <div style="width:100%; border-radius:2px 2px 0 0; background:var(--accent);"
+                     [style.height.%]="bar.headerPct"></div>
+              </div>
+              <div style="flex:1; height:100%; display:flex; align-items:flex-end;"
+                   [title]="'Footer : ' + bar.footerPct + '%'">
+                <div style="width:100%; border-radius:2px 2px 0 0; background:var(--accent-2);"
+                     [style.height.%]="bar.footerPct"></div>
               </div>
             </div>
-            <span class="metriques-bar-pct">{{ bar.percent }}%</span>
+            <span class="metriques-bar-pct">{{ bar.headerPct }} / {{ bar.footerPct }}</span>
             <span class="metriques-bar-label">{{ bar.label }}</span>
           </div>
         }
       </div>
+    </div>
+
+    <!-- ══ Row: Advertiser exposure (proof-of-performance, exportable) ══ -->
+    <div class="card metriques-chart-card">
+      <div class="metriques-chart-header">
+        <div>
+          <div class="metriques-chart-title">Exposition par annonceur</div>
+          <div class="metriques-chart-sub">
+            Synthèse de diffusion par client — exportable pour justifier la performance
+          </div>
+        </div>
+        @if (advertiserExposure().length > 0) {
+          <button class="btn btn-flat btn-sm" type="button" (click)="exportExposureCsv()">
+            <tui-icon icon="@tui.download" style="font-size:14px;" />
+            Exporter CSV
+          </button>
+        }
+      </div>
+      @if (advertiserExposure().length === 0) {
+        <div class="metriques-empty">Aucun annonceur avec campagne pour le moment</div>
+      } @else {
+        <table class="metriques-table">
+          <thead>
+            <tr>
+              <th>Annonceur</th>
+              <th style="text-align:right">Campagnes</th>
+              <th style="text-align:right" title="Jours passés où une campagne validée était diffusée">Jours diffusés</th>
+              <th style="text-align:right" title="Jours futurs déjà réservés (campagne validée et active)">Jours réservés</th>
+              <th style="text-align:right">Impressions</th>
+              <th style="text-align:right">Clics</th>
+              <th style="text-align:right">CTR</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of advertiserExposure(); track row.company_id) {
+              <tr>
+                <td style="font-weight:500;">{{ row.company_name }}</td>
+                <td style="text-align:right; font-variant-numeric:tabular-nums">{{ row.campaigns }}</td>
+                <td style="text-align:right; font-variant-numeric:tabular-nums">{{ row.days_aired }}</td>
+                <td style="text-align:right; font-variant-numeric:tabular-nums; color:var(--fg-3)">{{ row.days_booked }}</td>
+                <td style="text-align:right; font-weight:600; font-variant-numeric:tabular-nums">{{ row.impressions | number }}</td>
+                <td style="text-align:right; font-variant-numeric:tabular-nums">{{ row.clicks | number }}</td>
+                <td style="text-align:right; font-variant-numeric:tabular-nums; color:var(--fg-3)">
+                  @if (exposureCtr(row) !== null) {
+                    {{ exposureCtr(row)! | percent:'1.2-2' }}
+                  } @else {
+                    —
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+
+    <!-- ══ Row: Team velocity (last 8 ISO weeks) ══ -->
+    <div class="card metriques-chart-card">
+      <div class="metriques-chart-header">
+        <div>
+          <div class="metriques-chart-title">Vélocité de l'équipe — 8 dernières semaines</div>
+          <div class="metriques-chart-sub">
+            Créations par semaine : événements, affectations de calendrier, campagnes
+          </div>
+        </div>
+        @if (velocityTrend(); as trend) {
+          <span class="metriques-chart-peak"
+                [style.color]="trend.direction === 'up' ? 'var(--success)'
+                             : trend.direction === 'down' ? 'var(--danger)' : 'var(--fg-3)'">
+            @if (trend.deltaPct !== null) {
+              {{ trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '▬' }}
+              {{ trend.deltaPct > 0 ? '+' : '' }}{{ trend.deltaPct }}% vs semaine précédente
+            } @else {
+              ▲ nouvelle activité cette semaine
+            }
+          </span>
+        }
+      </div>
+      @if (teamVelocity().length === 0) {
+        <div class="metriques-empty">Aucune donnée</div>
+      } @else {
+        <div class="metriques-bar-chart">
+          @for (week of teamVelocity(); track week.week_start) {
+            <div class="metriques-bar-col"
+                 [title]="week.events + ' événement(s) · ' + week.entries + ' affectation(s) · ' + week.campaigns + ' campagne(s)'">
+              <div class="metriques-bar-track" style="display:flex; flex-direction:column-reverse;">
+                <div style="width:100%; background:var(--accent);"
+                     [style.height.%]="(week.events / velocityMax()) * 100"></div>
+                <div style="width:100%; background:var(--accent-2);"
+                     [style.height.%]="(week.entries / velocityMax()) * 100"></div>
+                <div style="width:100%; background:var(--info); border-radius:2px 2px 0 0;"
+                     [style.height.%]="(week.campaigns / velocityMax()) * 100"></div>
+              </div>
+              <span class="metriques-bar-pct">{{ week.total | number }}</span>
+              <span class="metriques-bar-label">{{ weekLabel(week.week_start) }}</span>
+            </div>
+          }
+        </div>
+        <div style="display:flex; gap:16px; font-size:11.5px; color:var(--fg-3); padding:4px 4px 0;">
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent); display:inline-block;"></span>
+            Événements
+          </span>
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent-2); display:inline-block;"></span>
+            Affectations
+          </span>
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:10px; height:10px; border-radius:2px; background:var(--info); display:inline-block;"></span>
+            Campagnes
+          </span>
+        </div>
+      }
     </div>
 
     <!-- ══ Row: Campaign taps + Device logs ══ -->

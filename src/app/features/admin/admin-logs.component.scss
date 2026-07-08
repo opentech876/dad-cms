@@ -1,0 +1,258 @@
+// ── Page shell ─────────────────────────────────────────────────
+
+.admin-logs-page {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+// ── Header ─────────────────────────────────────────────────────
+
+.admin-logs-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-logs-title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--fg-1);
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.admin-logs-sub {
+  color: var(--fg-3);
+  font-size: 13px;
+  margin: 0;
+  max-width: 640px;
+  line-height: 1.5;
+}
+
+.admin-logs-header-actions {
+  flex-shrink: 0;
+}
+
+// ── Filter chips ───────────────────────────────────────────────
+
+.admin-logs-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-logs-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--border-1);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  &--active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+}
+
+// ── State banners ──────────────────────────────────────────────
+
+.admin-logs-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  color: var(--fg-2);
+  background: var(--bg-elev);
+  border: 1px solid var(--border-1);
+
+  &--error {
+    color: var(--danger);
+    background: rgba(217, 21, 21, 0.06);
+    border-color: rgba(217, 21, 21, 0.2);
+  }
+}
+
+// ── Empty state ────────────────────────────────────────────────
+
+.admin-logs-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 20px;
+  text-align: center;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+}
+
+.admin-logs-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-2);
+  margin: 8px 0 0;
+}
+
+.admin-logs-empty-sub {
+  font-size: 12.5px;
+  color: var(--fg-3);
+  margin: 0;
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+// ── Timeline ───────────────────────────────────────────────────
+
+.admin-logs-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-logs-day-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.admin-logs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.admin-logs-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-1);
+  transition: background 0.1s;
+
+  &:last-child { border-bottom: none; }
+  &:hover      { background: var(--bg-sunken); }
+}
+
+.admin-logs-item-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+
+  &--created  { background: rgba(34, 197, 94, 0.12);  color: var(--success); }
+  &--updated  { background: var(--accent-soft);       color: var(--accent); }
+  &--deleted  { background: rgba(239, 68, 68, 0.12);  color: var(--danger); }
+  &--restored { background: rgba(234, 179, 8, 0.15);  color: var(--warning); }
+}
+
+.admin-logs-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-logs-item-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--fg-1);
+  line-height: 1.4;
+}
+
+.admin-logs-item-actor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--fg-1);
+}
+
+.admin-logs-item-actor-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-serif);
+}
+
+.admin-logs-item-verb {
+  color: var(--fg-2);
+}
+
+.admin-logs-item-target {
+  font-weight: 500;
+  color: var(--fg-1);
+  padding: 1px 8px;
+  background: var(--bg-sunken);
+  border-radius: 4px;
+  font-size: 12.5px;
+  border: 1px solid var(--border-1);
+}
+
+.admin-logs-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.admin-logs-item-meta-sep {
+  opacity: 0.5;
+}
+
+// ── Footer (load more / end) ───────────────────────────────────
+
+.admin-logs-footer {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
+}
+
+.admin-logs-footer-end {
+  font-size: 12px;
+  color: var(--fg-3);
+  font-style: italic;
+}

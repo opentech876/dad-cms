@@ -5,10 +5,16 @@
     <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
       <div>
         <h1 style="margin:0; font-family:var(--font-serif); font-size:24px; font-weight:600;">
-          Recommandations Présidence
+          Recommandations du Curateur
         </h1>
         <p style="margin:6px 0 0 0; font-size:13px; color:var(--fg-3);">
-          Choisissez l'événement à proposer pour chaque jour du calendrier sélectionné. L'équipe éditoriale appliquera ces choix.
+          @if (canManageRecommendations()) {
+            Proposez l'événement de chaque jour, enrichissez la bibliothèque avec vos ajouts et leurs illustrations.
+          } @else if (canApply()) {
+            Passez en revue les propositions du Curateur et choisissez celles à appliquer au calendrier.
+          } @else {
+            Consultez les événements que le Curateur propose pour le calendrier. L'application est réalisée par le chef d'équipe.
+          }
         </p>
       </div>
 
@@ -35,110 +41,26 @@
     </div>
   }
 
-  <!-- ── Months ── -->
-  @if (selectedCalendar()) {
-    @for (m of months; track m.index) {
-      <div class="card" style="margin-bottom:12px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; cursor:pointer; user-select:none;"
-             (click)="toggleMonth(m.index)">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <tui-icon [icon]="isExpanded(m.index) ? '@tui.chevron-down' : '@tui.chevron-right'"
-                      style="font-size:16px; color:var(--fg-3);" />
-            <span style="font-family:var(--font-serif); font-size:17px; font-weight:600;">
-              {{ m.name }} {{ selectedCalendar()!.year }}
-            </span>
-          </div>
-        </div>
-
-        @if (isExpanded(m.index)) {
-          <div style="padding:6px 16px 16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(70px, 1fr)); gap:6px;">
-            @for (d of m.days; track d.mmdd) {
-              <button
-                type="button"
-                class="day-cell"
-                [class.day-cell--full]="dayState(d.mmdd) === 'full'"
-                [class.day-cell--partial]="dayState(d.mmdd) === 'partial'"
-                (click)="openDayEditor(d.mmdd)"
-                [title]="d.mmdd">
-                <span class="day-cell__num">{{ d.day }}</span>
-                <span class="day-cell__dots">
-                  <span class="dot"
-                        [class.dot--filled]="hasRecommendation(d.mmdd, 1)"></span>
-                  <span class="dot"
-                        [class.dot--filled]="hasRecommendation(d.mmdd, 2)"></span>
-                </span>
-              </button>
-            }
-          </div>
-        }
-      </div>
-    }
+  <!-- ── Curator workspace (Proposer + Bibliothèque) ── -->
+  @if (canManageRecommendations() && selectedCalendar()) {
+    <app-curator-workspace
+      [calendarId]="selectedCalendarId()"
+      [calendarYear]="selectedCalendar()!.year"
+      [recommendations]="recommendations()"
+      [existingEntries]="existingEntries()"
+      (refreshNeeded)="selectCalendar(selectedCalendarId())" />
   }
+
+  <!-- ── Non-curator: pending / applied recommendations list ── -->
+  @if (!canManageRecommendations() && selectedCalendar()) {
+    <app-pending-list
+      [calendarId]="selectedCalendarId()"
+      [calendarYear]="selectedCalendar()!.year"
+      [recommendations]="recommendations()"
+      [existingEntries]="existingEntries()"
+      [canApply]="canApply()"
+      [loading]="loading()"
+      (refreshNeeded)="selectCalendar(selectedCalendarId())" />
+  }
+
 </div>
-
-<!-- ── Day editor modal ── -->
-@if (editorOpen()) {
-  <div class="modal-backdrop" (click)="closeDayEditor()">
-    <div class="modal" style="max-width:640px;" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h3 style="margin:0; font-size:16px;">
-          Recommandation — {{ editorDayLabel() }}
-        </h3>
-        <button class="btn btn-flat btn-sm" type="button" (click)="closeDayEditor()" aria-label="Fermer">
-          <tui-icon icon="@tui.x" style="font-size:14px;" />
-        </button>
-      </div>
-
-      <div class="modal-body">
-        @if (editorLoading()) {
-          <p style="font-style:italic; color:var(--fg-3);">Chargement de la bibliothèque…</p>
-        } @else if (editorLibrary().length === 0) {
-          <p style="font-style:italic; color:var(--fg-3);">
-            Aucun événement enregistré pour ce jour dans la bibliothèque.
-          </p>
-        } @else {
-          <!-- Position 1 — Événement National -->
-          <div class="field">
-            <label class="field-label">Événement National</label>
-            <select class="select"
-                    [value]="editorPos1() ?? ''"
-                    (change)="pick(1, $any($event.target).value || null)">
-              <option value="">— Aucun —</option>
-              @for (ev of editorLibrary(); track ev.id) {
-                <option [value]="ev.id">{{ ev.title }} ({{ ev.event_date | slice:0:4 }})</option>
-              }
-            </select>
-          </div>
-
-          <!-- Position 2 — Date Internationale -->
-          <div class="field" style="margin-top:14px;">
-            <label class="field-label">Date Internationale</label>
-            <select class="select"
-                    [value]="editorPos2() ?? ''"
-                    (change)="pick(2, $any($event.target).value || null)">
-              <option value="">— Aucun —</option>
-              @for (ev of editorLibrary(); track ev.id) {
-                <option [value]="ev.id">{{ ev.title }} ({{ ev.event_date | slice:0:4 }})</option>
-              }
-            </select>
-          </div>
-        }
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary btn-sm" type="button" (click)="closeDayEditor()">
-          Annuler
-        </button>
-        <button class="btn btn-primary btn-sm"
-                type="button"
-                [disabled]="editorSaving()"
-                (click)="saveDayEditor()">
-          @if (editorSaving()) {
-            <span class="spinner"></span>
-          }
-          Enregistrer la recommandation
-        </button>
-      </div>
-    </div>
-  </div>
-}

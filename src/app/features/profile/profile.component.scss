@@ -1,68 +1,49 @@
-.profile-pending-box {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  background: var(--info-soft, #eef4fb);
-  border: 1px solid rgba(33, 98, 158, 0.2);
-  border-radius: var(--r-md, 8px);
-  color: var(--info, #21629e);
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.profile-eye-btn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  color: var(--fg-3);
-  display: inline-flex;
-  align-items: center;
-  border-radius: 4px;
-  transition: color 120ms ease;
-
-  &:hover { color: var(--fg-1); }
-  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-}
+// ── Page shell ─────────────────────────────────────────────────
 
 .profile-page {
-  max-width: 680px;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 20px;
 }
 
-// ── Topbar ─────────────────────────────────────────────────────
+// Page header (title + sub) — matches admin-dashboard / other feature pages.
 
-.profile-topbar {
+.profile-page-header {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
 }
 
-.profile-topbar-title {
+.profile-page-title {
   font-family: var(--font-serif);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--fg-1);
-  flex: 1;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.profile-page-sub {
+  font-size: 13px;
+  color: var(--fg-3);
+  margin: 0;
 }
 
 // ── Hero card ──────────────────────────────────────────────────
 
-.profile-hero {
-  padding: 28px 28px 24px;
+.profile-hero-card {
   display: flex;
   align-items: center;
   gap: 24px;
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-  border-bottom: none;
+  padding: 24px 28px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
 }
 
 .profile-avatar-wrap {
@@ -137,6 +118,7 @@
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  flex: 1;
 }
 
 .profile-hero-name {
@@ -157,84 +139,86 @@
   margin: 0;
 }
 
-.profile-hero-badge {
-  margin-top: 6px;
+.profile-hero-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
 }
 
-// ── Sections ───────────────────────────────────────────────────
-// Reusing settings-section classes from global, but need edge
-// handling for the card stack (hero + sections = one visual block)
-
-.profile-section-stack {
+.profile-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--bg-sunken);
+  color: var(--fg-3);
+  font-size: 11.5px;
+  font-weight: 500;
   border: 1px solid var(--border-1);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  background: var(--bg-surface);
-  margin-bottom: 16px;
-
-  // Remove inner section borders since the stack already has one
-  .settings-section {
-    border: none;
-    border-radius: 0;
-    background: transparent;
-  }
-
-  .settings-section + .settings-section {
-    border-top: 1px solid var(--border-1);
-  }
-
-  &--hero {
-    // Hero card sits at the top with a subtle gradient bottom border
-    .profile-hero {
-      border-bottom: 1px solid var(--border-1);
-    }
-  }
 }
 
-// ── Form fields inside group ───────────────────────────────────
+// ── Form fields inside a section ───────────────────────────────
 
 .profile-fields {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  margin-bottom: 16px;
 }
 
-.profile-save-row {
+// Right-aligned action row inside a section body — replaces the old
+// separate profile-save-row footer bar.
+
+.profile-actions {
   display: flex;
   justify-content: flex-end;
-  padding: 14px 24px;
-  border-top: 1px solid var(--border-1);
-  background: var(--bg-surface-2);
+  gap: 8px;
+  margin-top: 16px;
 }
 
-// ── Account info rows ──────────────────────────────────────────
+// Inline error under form fields.
 
-.profile-info-row {
-  display: flex;
-  align-items: center;
-  padding: 14px 24px;
-  border-bottom: 1px solid var(--border-1);
-  gap: 12px;
-
-  &:last-child {
-    border-bottom: none;
-  }
+.profile-error {
+  color: var(--danger);
+  font-size: 12.5px;
+  margin: -4px 0 8px;
 }
 
-.profile-info-label {
-  width: 160px;
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 500;
+// ── Password field eye-toggle ──────────────────────────────────
+
+.profile-eye-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
   color: var(--fg-3);
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 120ms ease;
+
+  &:hover { color: var(--fg-1); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
-.profile-info-value {
+// ── Email-change pending confirmation banner ───────────────────
+
+.profile-pending-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--info-soft, #eef4fb);
+  border: 1px solid rgba(33, 98, 158, 0.2);
+  border-radius: var(--r-md, 8px);
+  color: var(--info, #21629e);
   font-size: 13px;
-  color: var(--fg-1);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.55;
 }

@@ -78,3 +78,6 @@ Thumbs.db
 /recovery-chunks.json
 /recovery-report.json
 /.recovery-tmp/
+
+# Architecture Decision Records — local design docs, never committed
+/docs/adr/

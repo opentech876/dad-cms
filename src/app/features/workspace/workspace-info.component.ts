@@ -8,6 +8,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { AdminService } from '../../core/admin/admin.service';
 import { ToastService } from '../../core/services/toast.service';
 import { formatDateLong } from '../../core/utils/date.utils';
+import { compressImage } from '../../core/utils/image.utils';
 
 @Component({
   selector: 'app-workspace-info',
@@ -100,7 +101,8 @@ export class WorkspaceInfoComponent implements OnInit {
     if (!id || !file) return;
 
     this.logoUploading.set(true);
-    const res = await firstValueFrom(this.wsService.uploadLogo(id, file));
+    const compressed = await compressImage(file);
+    const res = await firstValueFrom(this.wsService.uploadLogo(id, compressed));
     this.logoUploading.set(false);
 
     if (!res.success) {

@@ -1,0 +1,95 @@
+<div class="card" style="margin-bottom:12px;">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Recommandations en attente ({{ pendingRecs().length }})</div>
+      <div class="card-subtitle">Propositions du Curateur non encore appliquées au calendrier</div>
+    </div>
+    @if (canApply() && pendingRecs().length > 0) {
+      <button class="btn btn-primary btn-sm" type="button"
+              [disabled]="applyingAll()"
+              (click)="applyAllPending()">
+        @if (applyingAll()) { <span class="spinner"></span> }
+        <tui-icon icon="@tui.list-checks" style="font-size:14px;" />
+        Tout appliquer ({{ pendingRecs().length }})
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div style="padding:32px; text-align:center; color:var(--fg-3);">
+      <span class="spinner"></span> Chargement…
+    </div>
+  } @else if (pendingRecs().length === 0) {
+    <div style="display:flex; flex-direction:column; align-items:center; gap:8px; padding:40px 20px; color:var(--fg-3);">
+      <tui-icon icon="@tui.check-circle" style="font-size:28px; color:var(--success);" />
+      <p style="margin:0; font-size:13.5px; color:var(--fg-2); font-weight:500;">Aucune recommandation en attente.</p>
+      <p style="margin:0; font-size:12.5px;">Les nouvelles propositions du Curateur apparaîtront ici.</p>
+    </div>
+  } @else {
+    <ul class="reco-pending-list">
+      @for (rec of pendingRecs(); track rec.id) {
+        <li class="reco-pending-item">
+          @if (imageUrl(rec.event); as url) {
+            <img [src]="url" alt="" class="reco-pending-thumb" />
+          } @else {
+            <div class="reco-pending-thumb reco-pending-thumb--empty">
+              <tui-icon icon="@tui.image-off" style="font-size:14px;" />
+            </div>
+          }
+          <div class="reco-pending-body">
+            <div class="reco-pending-head">
+              <span class="reco-pending-date">{{ recDayLabel(rec) }}</span>
+              <span class="reco-pending-pos">{{ positionLabel(rec.position) }}</span>
+            </div>
+            <div class="reco-pending-title">{{ rec.event?.title ?? '—' }}</div>
+            @if (conflictTitle(rec); as conflict) {
+              <div class="reco-pending-conflict">
+                <tui-icon icon="@tui.triangle-alert" style="font-size:11px;" />
+                Remplacera « {{ conflict }} »
+              </div>
+            }
+          </div>
+          @if (canApply()) {
+            <button class="btn btn-flat btn-sm" type="button"
+                    style="flex-shrink:0;"
+                    [disabled]="applyingId() === rec.id || applyingAll()"
+                    (click)="applySingle(rec)">
+              @if (applyingId() === rec.id) { <span class="spinner"></span> }
+              <tui-icon icon="@tui.check" style="font-size:13px;" />
+              Appliquer
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>
+
+@if (appliedRecs().length > 0) {
+  <div class="card" style="margin-bottom:12px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; cursor:pointer; user-select:none;"
+         (click)="showApplied.set(!showApplied())">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <tui-icon [icon]="showApplied() ? '@tui.chevron-down' : '@tui.chevron-right'"
+                  style="font-size:16px; color:var(--fg-3);" />
+        <span style="font-size:14px; font-weight:600;">Déjà appliquées ({{ appliedRecs().length }})</span>
+      </div>
+    </div>
+    @if (showApplied()) {
+      <ul class="reco-pending-list">
+        @for (rec of appliedRecs(); track rec.id) {
+          <li class="reco-pending-item" style="opacity:0.75;">
+            <div class="reco-pending-body">
+              <div class="reco-pending-head">
+                <span class="reco-pending-date">{{ recDayLabel(rec) }}</span>
+                <span class="reco-pending-pos">{{ positionLabel(rec.position) }}</span>
+              </div>
+              <div class="reco-pending-title">{{ rec.event?.title ?? '—' }}</div>
+            </div>
+            <span class="badge badge-success" style="font-size:10.5px; flex-shrink:0;">Appliquée</span>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+}

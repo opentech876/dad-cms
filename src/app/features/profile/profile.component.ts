@@ -1,36 +1,29 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { filter, firstValueFrom } from 'rxjs';
 import { AppRole } from '../../models';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
-
-const ROLE_LABELS: Record<AppRole, string> = {
-  owner:                   'Propriétaire',
-  chef_equipe:             "Chef d'équipe",
-  editeur:                 'Éditeur',
-  charge_communication:    'Chargé de communication',
-  presidence:              'Présidence',
-  chef_equipe_commerciale: "Chef d'équipe commerciale",
-  system_admin:            "Administrateur plateforme",
-};
+import { compressImage } from '../../core/utils/image.utils';
+import { ROLE_LABELS, getInitials } from '../../core/utils/labels.utils';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [TuiIcon, FormsModule, RouterLink],
+  imports: [TuiIcon, FormsModule],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })
 export class ProfileComponent implements OnInit {
   private readonly auth             = inject(AuthService);
   private readonly workspaceService = inject(WorkspaceService);
+  private readonly workspaceContext = inject(WorkspaceContextService);
   private readonly supabase         = inject(SupabaseService);
-  private readonly router           = inject(Router);
   private readonly route            = inject(ActivatedRoute);
   private readonly toast            = inject(ToastService);
 
@@ -56,10 +49,7 @@ export class ProfileComponent implements OnInit {
 
   readonly initials = computed(() => {
     const name = this.fullName().trim();
-    if (name) {
-      const parts = name.split(/\s+/);
-      return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || name[0].toUpperCase();
-    }
+    if (name) return getInitials(name);
     return (this.userEmail()[0] ?? '?').toUpperCase();
   });
 
@@ -70,6 +60,15 @@ export class ProfileComponent implements OnInit {
   readonly displayName = computed(() =>
     this.fullName().trim() || this.userEmail(),
   );
+
+  /**
+   * True when the user is a `system_admin`. Drives the per-section
+   * conditional rendering: sysadmin identity is workspace-agnostic, so the
+   * phone + avatar surfaces are hidden (they'd persist via upsertProfile
+   * which needs a workspace), and name is sourced from / saved to
+   * auth.users.raw_user_meta_data.full_name instead.
+   */
+  readonly isSysadmin = computed(() => this.role() === 'system_admin');
 
   async ngOnInit(): Promise<void> {
     // If the system-admin guard sent us here because TOTP isn't enrolled yet,
@@ -88,11 +87,19 @@ export class ProfileComponent implements OnInit {
     const metaSecondary = (user as any)?.user_metadata?.secondary_email ?? '';
     this.secondaryEmail.set(metaSecondary);
 
-    const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
-    if (profile) {
-      this.fullName.set(profile.full_name ?? '');
-      this.phone.set(profile.phone ?? '');
-      this.avatarUrl.set(profile.avatar_url ?? null);
+    if (this.isSysadmin()) {
+      // Sysadmin name lives in user_metadata (platform-level identity), not
+      // in profiles (workspace-scoped). Hydrate from there and skip the
+      // workspace-scoped profile lookup entirely.
+      const metaFullName = (user as any)?.user_metadata?.full_name ?? '';
+      this.fullName.set(metaFullName);
+    } else {
+      const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
+      if (profile) {
+        this.fullName.set(profile.full_name ?? '');
+        this.phone.set(profile.phone ?? '');
+        this.avatarUrl.set(profile.avatar_url ?? null);
+      }
     }
 
     // Load MFA factors so the UI knows whether 2FA is already enabled.
@@ -103,17 +110,35 @@ export class ProfileComponent implements OnInit {
     if (this.saving()) return;
     this.saving.set(true);
     try {
-      const result = await firstValueFrom(
-        this.workspaceService.upsertProfile(
-          this.userId,
-          this.fullName().trim(),
-          this.phone().trim(),
-        ),
-      );
-      if (result.success) {
-        this.toast.success('Profil mis à jour avec succès.');
+      // Sysadmin saves name to auth.users.raw_user_meta_data.full_name (no
+      // workspace_id to anchor against). Everyone else writes to the
+      // workspace-scoped profiles row via upsertProfile.
+      if (this.isSysadmin()) {
+        const { error } = await this.supabase.client.auth.updateUser({
+          data: { full_name: this.fullName().trim() },
+        });
+        if (error) {
+          this.toast.error('Impossible de mettre à jour le profil : ' + error.message);
+        } else {
+          this.toast.success('Profil mis à jour avec succès.');
+          // Ping the shell so the sidebar name + initials refresh from the
+          // updated auth metadata without a full page reload.
+          this.workspaceContext.notifyProfileChanged();
+        }
       } else {
-        this.toast.error(result.error ?? 'Impossible de mettre à jour le profil. Veuillez réessayer.');
+        const result = await firstValueFrom(
+          this.workspaceService.upsertProfile(
+            this.userId,
+            this.fullName().trim(),
+            this.phone().trim(),
+          ),
+        );
+        if (result.success) {
+          this.toast.success('Profil mis à jour avec succès.');
+          this.workspaceContext.notifyProfileChanged();
+        } else {
+          this.toast.error(result.error ?? 'Impossible de mettre à jour le profil. Veuillez réessayer.');
+        }
       }
     } catch {
       this.toast.error('Impossible de mettre à jour le profil. Veuillez réessayer.');
@@ -137,7 +162,8 @@ export class ProfileComponent implements OnInit {
     if (!file || !this.userId) return;
     this.avatarUploading.set(true);
     try {
-      const res = await firstValueFrom(this.workspaceService.uploadAvatar(this.userId, file));
+      const compressed = await compressImage(file);
+      const res = await firstValueFrom(this.workspaceService.uploadAvatar(this.userId, compressed));
       if (!res.success) {
         this.toast.error(res.error ?? 'Erreur lors du téléversement.');
       } else {
@@ -147,14 +173,13 @@ export class ProfileComponent implements OnInit {
         if (prev) URL.revokeObjectURL(prev);
         this.avatarPreview.set(null);
         this.toast.success('Photo de profil mise à jour.');
+        // Refresh the sidebar avatar/initials — reads the new avatar_url
+        // from profiles on the next getMyProfile round-trip.
+        this.workspaceContext.notifyProfileChanged();
       }
     } finally {
       this.avatarUploading.set(false);
     }
-  }
-
-  goBack(): void {
-    this.router.navigate(['/dashboard']);
   }
 
   // ── Email change ─────────────────────────────────────────────────────────

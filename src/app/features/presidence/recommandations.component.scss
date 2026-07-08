@@ -59,3 +59,218 @@
     background: var(--accent);
   }
 }
+
+// ── Curator tabs ────────────────────────────────────────────────
+
+.reco-tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border-1);
+  padding-top: 14px;
+}
+
+.reco-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--border-1);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  &--active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+}
+
+// ── Bibliothèque toolbar ────────────────────────────────────────
+
+.reco-library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.reco-library-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 260px;
+  flex: 1;
+  max-width: 380px;
+}
+
+.reco-library-search-icon {
+  position: absolute;
+  left: 10px;
+  font-size: 14px;
+  color: var(--fg-3);
+  pointer-events: none;
+}
+
+.reco-library-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 32px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  color: var(--fg-1);
+  font-size: 13px;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  &::placeholder { color: var(--fg-3); }
+}
+
+.reco-filter-chip {
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--border-1);
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  &--active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+}
+
+// ── Pending recommendations list (non-curators) ────────────────
+
+.reco-pending-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.reco-pending-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-1);
+}
+
+.reco-pending-thumb {
+  width: 56px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-1);
+  flex-shrink: 0;
+
+  &--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-sunken);
+    color: var(--fg-3);
+  }
+}
+
+.reco-pending-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.reco-pending-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.reco-pending-date {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-1);
+}
+
+.reco-pending-pos {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.reco-pending-title {
+  font-size: 13px;
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reco-pending-conflict {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--warning);
+}
+
+// ── Create-event upload zone ────────────────────────────────────
+
+.reco-upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 96px;
+  padding: 12px;
+  border: 1.5px dashed var(--border-2);
+  border-radius: var(--r-md);
+  background: var(--bg-sunken);
+  cursor: pointer;
+  transition: border-color 0.12s;
+
+  &:hover {
+    border-color: var(--accent);
+  }
+}
+
+.reco-upload-preview {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: var(--r-sm);
+  object-fit: contain;
+}

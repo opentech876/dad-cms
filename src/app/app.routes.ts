@@ -43,14 +43,6 @@ export const routes: Routes = [
         (m) => m.EmailConfirmedComponent,
       ),
   },
-  {
-    path: 'verifier-2fa',
-    loadComponent: () =>
-      import('./features/auth/mfa-challenge/mfa-challenge.component').then(
-        (m) => m.MfaChallengeComponent,
-      ),
-  },
-
   // ── Workspace (auth requise, pas d'onboardingGuard — c'est la destination) ─
   {
     path: 'espaces',
@@ -118,8 +110,11 @@ export const routes: Routes = [
       },
       {
         path: 'recommandations',
-        canActivate: [roleGuard],
-        data: { requiredRoles: ['owner', 'presidence'] },
+        // Viewing is open to every authenticated role (product decision
+        // 2026-07-03): all members can see what the Curateur proposes.
+        // Writes stay curateur-only (RLS) and applying stays chef_equipe+
+        // (SECURITY DEFINER gate on both apply RPCs) — the component only
+        // renders the corresponding controls per role.
         loadComponent: () =>
           import('./features/presidence/recommandations.component').then((m) => m.RecommandationsComponent),
       },
@@ -137,6 +132,12 @@ export const routes: Routes = [
         path: 'admin',
         canActivate: [systemAdminGuard],
         loadComponent: () =>
+          import('./features/admin/admin-dashboard.component').then((m) => m.AdminDashboardComponent),
+      },
+      {
+        path: 'admin/espaces',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
           import('./features/admin/admin.component').then((m) => m.AdminComponent),
       },
       {
@@ -144,6 +145,33 @@ export const routes: Routes = [
         canActivate: [systemAdminGuard],
         loadComponent: () =>
           import('./features/admin/admin-users.component').then((m) => m.AdminUsersComponent),
+      },
+      {
+        path: 'admin/logs',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
+          import('./features/admin/admin-logs.component').then((m) => m.AdminLogsComponent),
+      },
+      // /admin/* aliases for the shared user pages, so the sysadmin's Compte
+      // sidebar links keep the URL under /admin and inPlatformMode stays
+      // true. Same components as the workspace-mode routes below.
+      {
+        path: 'admin/notifications',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
+          import('./features/notifications/notifications.component').then((m) => m.NotificationsComponent),
+      },
+      {
+        path: 'admin/profil',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
+          import('./features/profile/profile.component').then((m) => m.ProfileComponent),
+      },
+      {
+        path: 'admin/parametres',
+        canActivate: [systemAdminGuard],
+        loadComponent: () =>
+          import('./features/settings/settings.component').then((m) => m.SettingsComponent),
       },
       {
         path: 'notifications',

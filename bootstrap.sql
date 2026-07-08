@@ -23,10 +23,19 @@
 
 DO $$
 DECLARE
-  operator_email text := 'CHANGE_ME@example.com';   -- ← EDIT THIS before running
+  operator_email text := 'opentech876@gmail.com';   -- operator (system_admin) seed address
   v_email        text;
   v_user_id      uuid;
 BEGIN
+  -- ── Concurrency guard ─────────────────────────────────────────────────────
+  -- Serialize any concurrent bootstrap runs across the whole DB. Without this,
+  -- two operators racing this script under READ COMMITTED could BOTH pass the
+  -- "system_admin already exists" check and end up creating two sysadmins.
+  -- The lock is transaction-scoped (auto-released on COMMIT / ROLLBACK) and
+  -- the magic number is just an arbitrary DAD-bootstrap marker — any other
+  -- session running this same script will block here until the holder ends.
+  PERFORM pg_advisory_xact_lock(4914518780321333249);  -- arbitrary "DAD bootstrap" id
+
   -- ── Guard 0: email must be edited ─────────────────────────────────────────
   IF operator_email IS NULL OR operator_email = 'CHANGE_ME@example.com' THEN
     RAISE EXCEPTION 'Bootstrap aborted: edit operator_email before running this script.';
@@ -47,9 +56,18 @@ BEGIN
 
     -- Confirmed e-mail user with no password. OTP / magic-link is the only
     -- sign-in path until the operator sets a password in the profile modal.
+    --
+    -- Token columns set to '' explicitly: they're nullable in Postgres but
+    -- GoTrue's Go layer refuses to scan NULLs into string fields, so a fresh
+    -- seed with NULLs makes every subsequent /otp and /token request 500 with
+    -- "converting NULL to string is unsupported".
     INSERT INTO auth.users (
       instance_id, id, aud, role, email, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+      raw_app_meta_data, raw_user_meta_data,
+      confirmation_token, recovery_token,
+      email_change, email_change_token_new, email_change_token_current,
+      reauthentication_token, phone_change, phone_change_token,
+      created_at, updated_at
     ) VALUES (
       '00000000-0000-0000-0000-000000000000',
       v_user_id,
@@ -59,24 +77,46 @@ BEGIN
       now(),
       '{"provider":"email","providers":["email"]}'::jsonb,
       '{}'::jsonb,                       -- no `role` key: handle_new_user assigns nothing
+      '', '',                            -- confirmation_token, recovery_token
+      '', '', '',                        -- email_change*, email_change_token_new/_current
+      '', '', '',                        -- reauthentication_token, phone_change, phone_change_token
       now(),
       now()
     )
     ON CONFLICT (id) DO NOTHING;
-
-    -- Identity row so GoTrue recognises the email provider for OTP sign-in.
-    INSERT INTO auth.identities (
-      id, user_id, provider_id, identity_data, provider,
-      last_sign_in_at, created_at, updated_at
-    ) VALUES (
-      gen_random_uuid(),
-      v_user_id,
-      v_user_id::text,
-      jsonb_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true),
-      'email',
-      now(), now(), now()
-    );
   END IF;
+
+  -- Repair pass: if a previous run inserted the auth.users row before this
+  -- patch existed (or any other path left NULLs in these columns), backfill
+  -- to '' so GoTrue can scan the row without crashing.
+  UPDATE auth.users
+  SET confirmation_token         = COALESCE(confirmation_token,         ''),
+      recovery_token             = COALESCE(recovery_token,             ''),
+      email_change_token_new     = COALESCE(email_change_token_new,     ''),
+      email_change_token_current = COALESCE(email_change_token_current, ''),
+      email_change               = COALESCE(email_change,               ''),
+      reauthentication_token     = COALESCE(reauthentication_token,     ''),
+      phone_change               = COALESCE(phone_change,               ''),
+      phone_change_token         = COALESCE(phone_change_token,         '')
+  WHERE id = v_user_id;
+
+  -- ── Identity row (outside the IF so a partial previous run is repaired). ──
+  -- Without an auth.identities row for the email provider, GoTrue rejects
+  -- signInWithOtp on the address. If the previous run failed AFTER inserting
+  -- auth.users but BEFORE the identity, re-running used to silently skip
+  -- this — now we always upsert. The unique key is (provider_id, provider).
+  INSERT INTO auth.identities (
+    id, user_id, provider_id, identity_data, provider,
+    last_sign_in_at, created_at, updated_at
+  ) VALUES (
+    gen_random_uuid(),
+    v_user_id,
+    v_user_id::text,
+    jsonb_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true),
+    'email',
+    now(), now(), now()
+  )
+  ON CONFLICT (provider_id, provider) DO NOTHING;
 
   -- ── Assign system_admin (global, no expiry). Upsert keeps re-runs safe. ────
   INSERT INTO public.user_roles (user_id, role, expires_at)
