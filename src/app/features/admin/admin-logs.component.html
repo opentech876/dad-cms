@@ -61,7 +61,7 @@
       @for (group of entriesByDay(); track group.day) {
         <div class="admin-logs-day">
           <div class="admin-logs-day-label">
-            {{ group.day | date:'EEEE d MMMM yyyy':'':'fr' }}
+            {{ group.day | date:DATE_FMT.weekday:'':'fr' }}
           </div>
           <ol class="admin-logs-list">
             @for (entry of group.items; track entry.id) {
@@ -83,7 +83,7 @@
                   </div>
                   <div class="admin-logs-item-meta">
                     <tui-icon icon="@tui.clock" style="font-size:11px;" />
-                    {{ entry.changed_at | date:'HH:mm':'':'fr' }}
+                    {{ entry.changed_at | date:DATE_FMT.time:'':'fr' }}
                     @if (entry.actor_email && entry.actor_name) {
                       <span class="admin-logs-item-meta-sep">·</span>
                       <span>{{ entry.actor_email }}</span>

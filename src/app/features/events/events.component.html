@@ -282,10 +282,10 @@
                 "
               >
                 @if (editorCreatedAt()) {
-                  <span>Ajouté le {{ editorCreatedAt() | date:'longDate':'':'fr' }}</span>
+                  <span>Ajouté le {{ editorCreatedAt() | date:DATE_FMT.long:'':'fr' }}</span>
                 }
                 @if (editorUpdatedAt()) {
-                  <span>Mis à jour le {{ editorUpdatedAt() | date:'longDate':'':'fr' }}</span>
+                  <span>Mis à jour le {{ editorUpdatedAt() | date:DATE_FMT.long:'':'fr' }}</span>
                 }
               </div>
             }

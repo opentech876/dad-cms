@@ -20,6 +20,28 @@ export const MONTHS_FR_LONG_CAP = MONTHS_FR_LONG.map(
   m => m.charAt(0).toUpperCase() + m.slice(1),
 );
 
+export const DAYS_FR_LONG = [
+  'dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi',
+];
+
+/**
+ * Canonical Angular `DatePipe` format strings (fr locale) — the single source
+ * of truth for every `| date:…:'fr'` usage in templates. Import `DATE_FMT` and
+ * bind e.g. `| date:DATE_FMT.long:'':'fr'` instead of scattering literal
+ * format strings across templates. Chosen to render identically to
+ * `formatDateLong` / `formatDateShort` / `formatDateTime` below (full month
+ * names, 4-digit year, "14h30" time style).
+ */
+export const DATE_FMT = {
+  long: 'd MMMM y',                              // 15 août 2026
+  short: 'dd/MM/y',                              // 15/08/2026
+  time: "HH'h'mm",                               // 14h30
+  datetime: "dd/MM/y HH'h'mm",                   // 15/08/2026 14h30
+  longDatetime: "d MMMM y 'à' HH'h'mm",          // 15 août 2026 à 14h30
+  weekday: 'EEEE d MMMM y',                      // samedi 15 août 2026
+  weekdayDatetime: "EEEE d MMMM y 'à' HH'h'mm",  // samedi 15 août 2026 à 14h30
+} as const;
+
 /** "15 août 2026" — use for hero blocks, detail cards, event titles. */
 export function formatDateLong(iso: string | null | undefined): string {
   if (!iso) return '';
@@ -66,6 +88,25 @@ export function formatRelativeFr(iso: string | null | undefined, now: Date = new
   if (diffDay === 1) return 'hier';
   if (diffDay < 7) return `il y a ${diffDay} j`;
   return formatDateShort(iso);
+}
+
+/**
+ * "lundi 13 juillet 2026" — weekday + long date. Accepts a YYYY-MM-DD string
+ * (parsed as a local date, so the weekday is timezone-stable) or a `Date`
+ * (used as-is, for "today" in the local zone).
+ */
+export function formatWeekdayLong(input: string | Date | null | undefined): string {
+  if (!input) return '';
+  let date: Date;
+  if (typeof input === 'string') {
+    const [y, m, d] = input.slice(0, 10).split('-').map(n => parseInt(n, 10));
+    if (!y || !m || !d) return '';
+    date = new Date(y, m - 1, d);
+  } else {
+    date = input;
+  }
+  if (isNaN(date.getTime())) return '';
+  return `${DAYS_FR_LONG[date.getDay()]} ${date.getDate()} ${MONTHS_FR_LONG[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 /** "15 août" — long form without year, for in-year contexts. */

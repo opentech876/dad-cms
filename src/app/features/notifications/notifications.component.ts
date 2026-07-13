@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { Notification, NotificationActor, NotificationCategory } from '../../models';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { getInitials } from '../../core/utils/labels.utils';
+import { DATE_FMT } from '../../core/utils/date.utils';
 
 type NotifFilter = 'all' | 'unread' | NotificationCategory;
 
@@ -19,6 +20,8 @@ const PAGE_SIZE = 20;
   styleUrl: './notifications.component.scss',
 })
 export class NotificationsComponent implements OnInit {
+  /** Canonical date-pipe formats (fr) — see date.utils DATE_FMT. */
+  protected readonly DATE_FMT = DATE_FMT;
   private notifService = inject(NotificationService);
   private router       = inject(Router);
 

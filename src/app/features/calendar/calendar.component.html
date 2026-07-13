@@ -896,7 +896,7 @@
                   </div>
                   <div style="font-size:11.5px; color:var(--fg-3);">
                     {{ item.year }} · {{ item.entriesCount }} entrée(s) ·
-                    supprimé le {{ item.deletedAt | date:'d MMM yyyy à HH:mm':'':'fr' }}
+                    supprimé le {{ item.deletedAt | date:DATE_FMT.longDatetime:'':'fr' }}
                     @if (item.deleterName || item.deleterEmail) {
                       par {{ item.deleterName ?? item.deleterEmail }}
                     }

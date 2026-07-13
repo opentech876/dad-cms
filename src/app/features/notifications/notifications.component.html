@@ -76,7 +76,7 @@
             <p class="notif-item-text">{{ notif.body }}</p>
             <div class="notif-item-meta">
               <tui-icon icon="@tui.clock" style="font-size:11px; color:var(--fg-3);" />
-              {{ notif.created_at | date:'d MMM yyyy, HH:mm' : undefined : 'fr' }}
+              {{ notif.created_at | date:DATE_FMT.longDatetime:'':'fr' }}
             </div>
           </div>
 
@@ -170,7 +170,7 @@
           <div class="notif-detail-row">
             <div class="notif-detail-label">Horodatage</div>
             <div class="notif-detail-value">
-              {{ notif.created_at | date:'EEEE d MMMM yyyy, HH:mm':'':'fr' }}
+              {{ notif.created_at | date:DATE_FMT.weekdayDatetime:'':'fr' }}
             </div>
           </div>
 
@@ -179,7 +179,7 @@
             <div class="notif-detail-row">
               <div class="notif-detail-label">Lu</div>
               <div class="notif-detail-value" style="color:var(--fg-3);">
-                {{ notif.read_at | date:'d MMM yyyy, HH:mm':'':'fr' }}
+                {{ notif.read_at | date:DATE_FMT.longDatetime:'':'fr' }}
               </div>
             </div>
           }

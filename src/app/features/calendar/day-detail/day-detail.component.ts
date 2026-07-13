@@ -9,7 +9,7 @@ import { CalendarEntryService, CalendarEntryWithEvent } from '../../../core/cale
 import { CampaignService } from '../../../core/campaigns/campaign.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AdCampaign, Event, EventPosition } from '../../../models';
-import { formatDateLong } from '../../../core/utils/date.utils';
+import { formatDateLong, DATE_FMT } from '../../../core/utils/date.utils';
 import { APPLY_TIER } from '../../../core/utils/labels.utils';
 import { toSignal } from '@angular/core/rxjs-interop';
 
@@ -20,6 +20,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
   templateUrl: './day-detail.component.html',
 })
 export class DayDetailComponent implements OnInit {
+  /** Canonical date-pipe formats (fr) — see date.utils DATE_FMT. */
+  protected readonly DATE_FMT = DATE_FMT;
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly eventService = inject(EventService);

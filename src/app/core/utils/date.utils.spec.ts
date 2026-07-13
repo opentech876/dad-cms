@@ -1,14 +1,20 @@
+import { formatDate, registerLocaleData } from '@angular/common';
+import localeFr from '@angular/common/locales/fr';
 import {
   MONTHS_FR_LONG,
   MONTHS_FR_SHORT,
+  DATE_FMT,
   formatDateLong,
   formatDateShort,
   formatDateTime,
   formatRelativeFr,
   formatDayMonthLong,
+  formatWeekdayLong,
   normalizeSearchable,
   dateSearchHaystack,
 } from './date.utils';
+
+registerLocaleData(localeFr);
 
 describe('date.utils', () => {
   describe('MONTHS_FR_LONG', () => {
@@ -122,6 +128,58 @@ describe('date.utils', () => {
     it('gère null et undefined', () => {
       expect(normalizeSearchable(null)).toBe('');
       expect(normalizeSearchable(undefined)).toBe('');
+    });
+  });
+
+  describe('DATE_FMT (formats canoniques du pipe Angular, locale fr)', () => {
+    // Rendered through Angular's own formatDate so the test proves each
+    // canonical format string produces the intended French output.
+    // 2026-08-15 is a Saturday; timezone forced to UTC for deterministic time.
+    const ISO = '2026-08-15T14:30:00Z';
+    const render = (fmt: string) => formatDate(ISO, fmt, 'fr', '+0000');
+
+    it('long → "15 août 2026"', () => {
+      expect(render(DATE_FMT.long)).toBe('15 août 2026');
+    });
+
+    it('short → "15/08/2026"', () => {
+      expect(render(DATE_FMT.short)).toBe('15/08/2026');
+    });
+
+    it('time → "14h30"', () => {
+      expect(render(DATE_FMT.time)).toBe('14h30');
+    });
+
+    it('datetime → "15/08/2026 14h30"', () => {
+      expect(render(DATE_FMT.datetime)).toBe('15/08/2026 14h30');
+    });
+
+    it('longDatetime → "15 août 2026 à 14h30"', () => {
+      expect(render(DATE_FMT.longDatetime)).toBe('15 août 2026 à 14h30');
+    });
+
+    it('weekday → "samedi 15 août 2026"', () => {
+      expect(render(DATE_FMT.weekday)).toBe('samedi 15 août 2026');
+    });
+
+    it('weekdayDatetime → "samedi 15 août 2026 à 14h30"', () => {
+      expect(render(DATE_FMT.weekdayDatetime)).toBe('samedi 15 août 2026 à 14h30');
+    });
+  });
+
+  describe('formatWeekdayLong', () => {
+    it('formate une date-string en "jour j mois aaaa"', () => {
+      // 2026-07-13 est un lundi (construction locale, insensible au fuseau)
+      expect(formatWeekdayLong('2026-07-13')).toBe('lundi 13 juillet 2026');
+    });
+
+    it('accepte un objet Date', () => {
+      expect(formatWeekdayLong(new Date(2026, 6, 13))).toBe('lundi 13 juillet 2026');
+    });
+
+    it('renvoie une chaîne vide pour null/undefined', () => {
+      expect(formatWeekdayLong(null)).toBe('');
+      expect(formatWeekdayLong(undefined)).toBe('');
     });
   });
 

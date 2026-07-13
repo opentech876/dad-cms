@@ -7,7 +7,7 @@ import { MetriquesService } from '../../core/metriques/metriques.service';
 import { DashboardOperationalStats, InsightsService, RiskyDay } from '../../core/insights/insights.service';
 import { DashboardService, FeaturedEvent, KpiStats } from '../../core/dashboard/dashboard.service';
 import { getInitials } from '../../core/utils/labels.utils';
-import { MONTHS_FR_LONG, MONTHS_FR_LONG_CAP, formatRelativeFr } from '../../core/utils/date.utils';
+import { MONTHS_FR_LONG, MONTHS_FR_LONG_CAP, formatRelativeFr, formatWeekdayLong } from '../../core/utils/date.utils';
 import { MonthCoverage } from '../../models';
 
 /** One row of the real activity feed, ready for display. */
@@ -73,12 +73,7 @@ export class DashboardComponent implements OnInit {
   readonly opStats = signal<DashboardOperationalStats | null>(null);
 
   readonly currentYear = new Date().getFullYear();
-  readonly todayLabel = new Date().toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  readonly todayLabel = formatWeekdayLong(new Date());
   // Used by the hero's empty-state right-side preview.
   readonly todayDayNum   = String(new Date().getDate()).padStart(2, '0');
   readonly todayMonthCap = MONTHS_FR_LONG_CAP[new Date().getMonth()];

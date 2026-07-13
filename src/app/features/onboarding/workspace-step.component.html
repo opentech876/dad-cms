@@ -51,7 +51,7 @@
               <span class="step__workspace-meta">
                 {{ ws.member_count }}&nbsp;membre{{ ws.member_count !== 1 ? 's' : '' }}
                 @if (ws.last_accessed_at) {
-                  &nbsp;·&nbsp;Dernière connexion le {{ ws.last_accessed_at | date: 'd MMM yyyy' : '' : 'fr' }}
+                  &nbsp;·&nbsp;Dernière connexion le {{ ws.last_accessed_at | date:DATE_FMT.long:'':'fr' }}
                 }
               </span>
             </div>
