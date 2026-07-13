@@ -7,6 +7,7 @@ import { AppRole, WorkspaceSummary } from '../../models';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { OnboardingService } from '../../core/onboarding/onboarding.service';
+import { DATE_FMT } from '../../core/utils/date.utils';
 
 @Component({
   selector: 'app-workspace-step',
@@ -16,6 +17,8 @@ import { OnboardingService } from '../../core/onboarding/onboarding.service';
   styleUrl: './workspace-step.component.scss',
 })
 export class WorkspaceStepComponent implements OnInit {
+  /** Canonical date-pipe formats (fr) — see date.utils DATE_FMT. */
+  protected readonly DATE_FMT = DATE_FMT;
   private router = inject(Router);
   private supabase = inject(SupabaseService);
   private workspaceService = inject(WorkspaceService);

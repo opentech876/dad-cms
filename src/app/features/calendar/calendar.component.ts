@@ -12,7 +12,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { RecommendationService } from '../../core/presidency/recommendation.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { AdCampaign, Event as HistoricalEvent, EventPosition } from '../../models';
-import { MONTHS_FR_LONG as MONTHS_FR, MONTHS_FR_LONG_CAP as MONTHS_FR_CAP } from '../../core/utils/date.utils';
+import { MONTHS_FR_LONG as MONTHS_FR, MONTHS_FR_LONG_CAP as MONTHS_FR_CAP, DATE_FMT } from '../../core/utils/date.utils';
 import { APPLY_TIER } from '../../core/utils/labels.utils';
 
 type CalendarView = 'year' | 'month' | 'list';
@@ -104,6 +104,8 @@ function isoDate(year: number, month: number, day: number): string {
   styleUrl: './calendar.component.scss',
 })
 export class CalendarComponent implements OnInit {
+  /** Canonical date-pipe formats (fr) — see date.utils DATE_FMT. */
+  protected readonly DATE_FMT = DATE_FMT;
   private readonly router = inject(Router);
   private readonly calendarService = inject(CalendarService);
   private readonly calendarEntryService = inject(CalendarEntryService);

@@ -17,6 +17,7 @@ import {
   formatDayMonthLong,
   normalizeSearchable,
   dateSearchHaystack,
+  DATE_FMT,
 } from '../../core/utils/date.utils';
 
 export type EventSort = 'date_asc' | 'date_desc' | 'title_asc' | 'title_desc';
@@ -78,6 +79,8 @@ function colLetter(idx: number): string {
   styleUrl: './events.component.scss',
 })
 export class EventsComponent implements OnInit {
+  /** Canonical date-pipe formats (fr) — see date.utils DATE_FMT. */
+  protected readonly DATE_FMT = DATE_FMT;
   readonly eventService                = inject(EventService);
   private readonly calendarService     = inject(CalendarService);
   private readonly calendarEntryService = inject(CalendarEntryService);

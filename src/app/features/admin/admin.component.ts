@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { AdminService, AdminWorkspace } from '../../core/admin/admin.service';
 import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
 import { RefreshRouteReuseStrategy } from '../../core/router/refresh-route-reuse.strategy';
+import { DATE_FMT } from '../../core/utils/date.utils';
 
 @Component({
   selector: 'app-admin',
@@ -15,6 +16,8 @@ import { RefreshRouteReuseStrategy } from '../../core/router/refresh-route-reuse
   styleUrl: './admin.component.scss',
 })
 export class AdminComponent implements OnInit {
+  /** Canonical date-pipe formats (fr) — see date.utils DATE_FMT. */
+  protected readonly DATE_FMT = DATE_FMT;
   private admin       = inject(AdminService);
   private context     = inject(WorkspaceContextService);
   private router      = inject(Router);

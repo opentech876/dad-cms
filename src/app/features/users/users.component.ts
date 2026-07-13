@@ -8,6 +8,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { ToastService } from '../../core/services/toast.service';
 import { ROLE_LABELS } from '../../core/utils/labels.utils';
+import { DATE_FMT } from '../../core/utils/date.utils';
 
 interface UserRow {
   userId: string;
@@ -31,6 +32,8 @@ interface UserRow {
   styleUrl: './users.component.scss',
 })
 export class UsersComponent implements OnInit {
+  /** Canonical date-pipe formats (fr) — see date.utils DATE_FMT. */
+  protected readonly DATE_FMT = DATE_FMT;
   private workspaceService = inject(WorkspaceService);
   private authService      = inject(AuthService);
   private toast            = inject(ToastService);

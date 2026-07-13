@@ -95,7 +95,7 @@
                     @if (w.deleted_at) { · supprimé }
                   </span>
                 </div>
-                <span class="admin-list-item-date">{{ w.created_at | date:'shortDate':'':'fr' }}</span>
+                <span class="admin-list-item-date">{{ w.created_at | date:DATE_FMT.short:'':'fr' }}</span>
               </li>
             }
           </ul>
@@ -120,7 +120,7 @@
                     @if (inv.invited_role) { Rôle : {{ inv.invited_role }} }
                   </span>
                 </div>
-                <span class="admin-list-item-date">{{ inv.created_at | date:'shortDate':'':'fr' }}</span>
+                <span class="admin-list-item-date">{{ inv.created_at | date:DATE_FMT.short:'':'fr' }}</span>
               </li>
             }
           </ul>

@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { AdminDashboardStats, AdminService } from '../../core/admin/admin.service';
+import { DATE_FMT } from '../../core/utils/date.utils';
 
 /**
  * Platform-level dashboard. Landing surface of /admin for system_admin.
@@ -19,6 +20,8 @@ import { AdminDashboardStats, AdminService } from '../../core/admin/admin.servic
   styleUrl: './admin-dashboard.component.scss',
 })
 export class AdminDashboardComponent implements OnInit {
+  /** Canonical date-pipe formats (fr) — see date.utils DATE_FMT. */
+  protected readonly DATE_FMT = DATE_FMT;
   private admin = inject(AdminService);
 
   readonly loading = signal(true);

@@ -24,7 +24,7 @@
           <div class="event-card event-card--selected">
             <div>
               <div style="font-family:var(--font-serif); font-style:italic; font-weight:600;">{{ event1()!.title }}</div>
-              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ event1()!.event_date | date:'longDate':'':'fr' }}</div>
+              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ event1()!.event_date | date:DATE_FMT.long:'':'fr' }}</div>
             </div>
             @if (canEditAssignments()) {
               <button class="btn btn-flat btn-sm" style="color:var(--danger);" type="button" (click)="assign(null, 1)">
@@ -48,7 +48,7 @@
           <div class="event-card event-card--selected">
             <div>
               <div style="font-family:var(--font-serif); font-style:italic; font-weight:600;">{{ event2()!.title }}</div>
-              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ event2()!.event_date | date:'longDate':'':'fr' }}</div>
+              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ event2()!.event_date | date:DATE_FMT.long:'':'fr' }}</div>
             </div>
             @if (canEditAssignments()) {
               <button class="btn btn-flat btn-sm" style="color:var(--danger);" type="button" (click)="assign(null, 2)">
@@ -109,11 +109,11 @@
             <div style="flex:1;">
               <div style="font-family:var(--font-serif); font-style:italic;">{{ evt.title }}</div>
               <div style="font-size:12px; color:var(--fg-3); margin-top:2px; display:flex; gap:8px;">
-                <span>{{ evt.event_date | date:'longDate':'':'fr' }}</span>
+                <span>{{ evt.event_date | date:DATE_FMT.long:'':'fr' }}</span>
                 @if (evt.status === 'published') {
                   <span class="badge badge-success badge-dot" style="font-size:10px;">Publié</span>
                 } @else {
-                  <span class="badge badge-warning badge-dot" style="font-size:10px;">Brouillon</span>
+                  <span class="badge badge-warning badge-dot" style="font-size:10px;">Réserve</span>
                 }
               </div>
               @if (evt.description) {

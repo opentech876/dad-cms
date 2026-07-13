@@ -185,7 +185,7 @@
                   </td>
                   <td class="admin-users-date-cell">
                     @if (user.last_sign_in_at) {
-                      {{ user.last_sign_in_at | date:'d MMM yyyy, HH:mm':'':'fr' }}
+                      {{ user.last_sign_in_at | date:DATE_FMT.longDatetime:'':'fr' }}
                     } @else {
                       <span class="admin-users-never" title="Cet utilisateur ne s'est jamais connecté">
                         Jamais
@@ -194,7 +194,7 @@
                   </td>
                   <td class="admin-users-date-cell">
                     @if (user.created_at) {
-                      {{ user.created_at | date:'d MMM yyyy':'':'fr' }}
+                      {{ user.created_at | date:DATE_FMT.long:'':'fr' }}
                     } @else {
                       —
                     }
