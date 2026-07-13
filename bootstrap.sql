@@ -23,7 +23,7 @@
 
 DO $$
 DECLARE
-  operator_email text := 'opentech876@gmail.com';   -- operator (system_admin) seed address
+  operator_email text := 'REPLACE_WITH_OPERATOR_EMAIL';   -- ⚠ set to the operator's real address before running (see header)
   v_email        text;
   v_user_id      uuid;
 BEGIN
