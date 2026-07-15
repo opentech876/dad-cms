@@ -42,7 +42,10 @@
   font-size: 13px;
   font-weight: 500;
   color: var(--fg-2);
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  transition:
+    border-color 0.12s,
+    color 0.12s,
+    background 0.12s;
   user-select: none;
 
   &:hover {
@@ -69,7 +72,9 @@
   border-radius: var(--r-md);
   background: var(--bg-sunken);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
   text-align: center;
 
   &:hover {
@@ -90,17 +95,9 @@
   color: var(--fg-3);
   font-size: 11px;
 
-  &--header,
   &--footer {
     width: 100%;
     height: 80px;
-  }
-
-  &--header {
-    background: linear-gradient(135deg, var(--accent-soft), var(--bg-sunken));
-  }
-
-  &--footer {
     background: linear-gradient(135deg, var(--bg-sunken), var(--accent-soft));
   }
 }
@@ -114,7 +111,7 @@
   border: 2px solid var(--border-1);
   background: var(--bg-page);
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 
   &__inner {
     display: flex;
@@ -133,12 +130,6 @@
     font-size: 8px;
     font-weight: 700;
 
-    &--header {
-      height: 42px;
-      background: linear-gradient(90deg, var(--accent-soft), var(--bg-sunken));
-      border-bottom: 1px solid var(--border-1);
-    }
-
     &--footer {
       height: 42px;
       background: linear-gradient(90deg, var(--bg-sunken), var(--accent-soft));
@@ -150,11 +141,7 @@
     flex: 1;
     margin: 8px;
     border-radius: 4px;
-    background: repeating-linear-gradient(
-      0deg,
-      var(--border-1) 0 1px,
-      transparent 1px 14px
-    );
+    background: repeating-linear-gradient(0deg, var(--border-1) 0 1px, transparent 1px 14px);
     opacity: 0.45;
   }
 }
@@ -169,7 +156,9 @@
   border-top: 1px solid var(--border-1);
   font-size: 13px;
 
-  &--first { border-top: none; }
+  &--first {
+    border-top: none;
+  }
 }
 
 .campaign-validation-dot {
@@ -181,8 +170,20 @@
   justify-content: center;
   flex-shrink: 0;
 
-  &--ok      { background: var(--success-soft); color: var(--success); }
-  &--warn    { background: var(--warning-soft); color: var(--warning); }
-  &--pending { background: var(--bg-sunken);    color: var(--fg-3); }
-  &--error   { background: var(--danger-soft);  color: var(--danger); }
+  &--ok {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+  &--warn {
+    background: var(--warning-soft);
+    color: var(--warning);
+  }
+  &--pending {
+    background: var(--bg-sunken);
+    color: var(--fg-3);
+  }
+  &--error {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
 }

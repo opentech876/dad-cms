@@ -1,14 +1,18 @@
-<div class="shell"
-     [class.shell--collapsed]="collapsed() && !isMobile()"
-     [class.shell--mobile]="isMobile()"
-     [class.shell--mobile-open]="mobileOpen()"
-     [attr.data-platform-mode]="inPlatformMode() ? 'true' : null">
+<div
+  class="shell"
+  [class.shell--collapsed]="collapsed() && !isMobile()"
+  [class.shell--mobile]="isMobile()"
+  [class.shell--mobile-open]="mobileOpen()"
+  [attr.data-platform-mode]="inPlatformMode() ? 'true' : null"
+>
   @if (isMobile() && mobileOpen()) {
     <div class="shell-mobile-backdrop" (click)="closeMobileSidebar()"></div>
   }
   <!-- ───── Sidebar ───── -->
-  <aside class="sidebar scroll-pretty"
-         [style.width.px]="!collapsed() && !isMobile() ? sidebarWidth() : null">
+  <aside
+    class="sidebar scroll-pretty"
+    [style.width.px]="!collapsed() && !isMobile() ? sidebarWidth() : null"
+  >
     <!-- Logo block -->
     <div class="sidebar-logo">
       <svg class="sidebar-logomark" width="32" height="32" viewBox="0 0 40 40" fill="none">
@@ -61,21 +65,31 @@
 
     <!-- Workspace switcher -->
     @if (!collapsed()) {
-      <div class="sidebar-workspace" style="position:relative;">
-        <button class="sidebar-workspace-btn"
-                type="button"
-                [attr.aria-expanded]="workspaceMenuOpen()"
-                (click)="toggleWorkspaceMenu()">
-          <div class="sidebar-workspace-icon"
-               [style.background]="inPlatformMode()
-                 ? 'linear-gradient(135deg, #1d4ed8, #3b82f6)'
-                 : (currentWorkspaceColor() ?? 'var(--sidebar-accent)')"
-               [style.color]="'#fff'">
+      <div class="sidebar-workspace" style="position: relative">
+        <button
+          class="sidebar-workspace-btn"
+          type="button"
+          [attr.aria-expanded]="workspaceMenuOpen()"
+          (click)="toggleWorkspaceMenu()"
+        >
+          <div
+            class="sidebar-workspace-icon"
+            [style.background]="
+              inPlatformMode()
+                ? 'linear-gradient(135deg, #1d4ed8, #3b82f6)'
+                : (currentWorkspaceColor() ?? 'var(--sidebar-accent)')
+            "
+            [style.color]="'#fff'"
+          >
             {{ workspaceInitials() }}
           </div>
           <div class="sidebar-workspace-info">
-            <span class="sidebar-workspace-name" [title]="workspaceName()">{{ workspaceName() }}</span>
-            <span class="sidebar-workspace-sub" [title]="workspaceMemberLabel()">{{ workspaceMemberLabel() }}</span>
+            <span class="sidebar-workspace-name" [title]="workspaceName()">{{
+              workspaceName()
+            }}</span>
+            <span class="sidebar-workspace-sub" [title]="workspaceMemberLabel()">{{
+              workspaceMemberLabel()
+            }}</span>
           </div>
           <tui-icon
             [icon]="workspaceMenuOpen() ? '@tui.chevron-up' : '@tui.chevron-down'"
@@ -85,72 +99,157 @@
 
         @if (workspaceMenuOpen()) {
           <!-- Backdrop catches outside clicks. -->
-          <div style="position:fixed; inset:0; z-index:90;" (click)="closeWorkspaceMenu()"></div>
-          <div role="menu"
-               style="position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:100;
-                      background:var(--bg-elev); border:1px solid var(--border-1);
-                      border-radius:var(--r-md); box-shadow:var(--shadow-md);
-                      padding:6px; max-height:280px; overflow:auto;">
+          <div style="position: fixed; inset: 0; z-index: 90" (click)="closeWorkspaceMenu()"></div>
+          <div
+            role="menu"
+            style="
+              position: absolute;
+              left: 0;
+              right: 0;
+              top: calc(100% + 6px);
+              z-index: 100;
+              background: var(--bg-elev);
+              border: 1px solid var(--border-1);
+              border-radius: var(--r-md);
+              box-shadow: var(--shadow-md);
+              padding: 6px;
+              max-height: 280px;
+              overflow: auto;
+            "
+          >
             <!-- Sysadmin-only entry: switches into platform admin mode -->
             @if (isSystemAdmin() && !inPlatformMode()) {
-              <button role="menuitem"
-                      type="button"
-                      title="Administration plateforme · Cross-workspace"
-                      (click)="enterPlatformMode()"
-                      style="display:flex; align-items:center; gap:10px; width:100%;
-                             padding:8px 10px; border:none; background:transparent;
-                             cursor:pointer; border-radius:var(--r-sm); text-align:left;
-                             color:var(--fg-1); font-size:13px;
-                             border-bottom:1px solid var(--border-1); margin-bottom:4px;"
-                      onmouseover="this.style.background='var(--bg-sunken)'"
-                      onmouseout="this.style.background='transparent'">
-                <div class="sidebar-workspace-icon"
-                     style="width:28px; height:28px; font-size:11px;
-                            background:linear-gradient(135deg, #1d4ed8, #3b82f6); color:white;">
+              <button
+                role="menuitem"
+                type="button"
+                title="Administration plateforme · Cross-workspace"
+                (click)="enterPlatformMode()"
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  width: 100%;
+                  padding: 8px 10px;
+                  border: none;
+                  background: transparent;
+                  cursor: pointer;
+                  border-radius: var(--r-sm);
+                  text-align: left;
+                  color: var(--fg-1);
+                  font-size: 13px;
+                  border-bottom: 1px solid var(--border-1);
+                  margin-bottom: 4px;
+                "
+                onmouseover="this.style.background = 'var(--bg-sunken)'"
+                onmouseout="this.style.background = 'transparent'"
+              >
+                <div
+                  class="sidebar-workspace-icon"
+                  style="
+                    width: 28px;
+                    height: 28px;
+                    font-size: 11px;
+                    background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+                    color: white;
+                  "
+                >
                   AP
                 </div>
-                <div style="display:flex; flex-direction:column; min-width:0; flex:1; overflow:hidden;">
-                  <span style="font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Administration plateforme</span>
-                  <span style="font-size:11px; color:var(--fg-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cross-workspace</span>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    min-width: 0;
+                    flex: 1;
+                    overflow: hidden;
+                  "
+                >
+                  <span
+                    style="
+                      font-weight: 500;
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                    "
+                    >Administration plateforme</span
+                  >
+                  <span
+                    style="
+                      font-size: 11px;
+                      color: var(--fg-3);
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                    "
+                    >Cross-workspace</span
+                  >
                 </div>
-                <tui-icon icon="@tui.shield" style="font-size:14px; color:var(--fg-3); flex-shrink:0;" />
+                <tui-icon
+                  icon="@tui.shield"
+                  style="font-size: 14px; color: var(--fg-3); flex-shrink: 0"
+                />
               </button>
             }
 
             @if (otherWorkspaces().length === 0 && !isSystemAdmin()) {
-              <div style="padding:10px 12px; font-size:12px; color:var(--fg-3); font-style:italic;">
+              <div
+                style="padding: 10px 12px; font-size: 12px; color: var(--fg-3); font-style: italic"
+              >
                 Vous n'appartenez qu'à cet espace.
               </div>
             }
             @if (otherWorkspaces().length === 0 && isSystemAdmin() && inPlatformMode()) {
-              <div style="padding:10px 12px; font-size:12px; color:var(--fg-3); font-style:italic;">
+              <div
+                style="padding: 10px 12px; font-size: 12px; color: var(--fg-3); font-style: italic"
+              >
                 Aucun espace de travail dans lequel basculer.
               </div>
             }
             @for (w of otherWorkspaces(); track w.id) {
-              <button role="menuitem"
-                      type="button"
-                      [title]="w.name"
-                      (click)="switchWorkspace(w.id)"
-                      style="display:flex; align-items:center; gap:10px; width:100%;
-                             padding:8px 10px; border:none; background:transparent;
-                             cursor:pointer; border-radius:var(--r-sm); text-align:left;
-                             color:var(--fg-1); font-size:13px;"
-                      onmouseover="this.style.background='var(--bg-sunken)'"
-                      onmouseout="this.style.background='transparent'">
-                <div class="sidebar-workspace-icon"
-                     [style.width.px]="28"
-                     [style.height.px]="28"
-                     [style.font-size.px]="11"
-                     [style.background]="workspaceColorFor(w.id)"
-                     [style.color]="'#fff'">
+              <button
+                role="menuitem"
+                type="button"
+                [title]="w.name"
+                (click)="switchWorkspace(w.id)"
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  width: 100%;
+                  padding: 8px 10px;
+                  border: none;
+                  background: transparent;
+                  cursor: pointer;
+                  border-radius: var(--r-sm);
+                  text-align: left;
+                  color: var(--fg-1);
+                  font-size: 13px;
+                "
+                onmouseover="this.style.background = 'var(--bg-sunken)'"
+                onmouseout="this.style.background = 'transparent'"
+              >
+                <div
+                  class="sidebar-workspace-icon"
+                  [style.width.px]="28"
+                  [style.height.px]="28"
+                  [style.font-size.px]="11"
+                  [style.background]="workspaceColorFor(w.id)"
+                  [style.color]="'#fff'"
+                >
                   {{ workspaceInitialsFor(w.name) }}
                 </div>
-                <div style="display:flex; flex-direction:column; min-width:0; flex:1;">
-                  <span style="font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                <div style="display: flex; flex-direction: column; min-width: 0; flex: 1">
+                  <span
+                    style="
+                      font-weight: 500;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                    "
+                  >
                     {{ w.name }}
                   </span>
-                  <span style="font-size:11px; color:var(--fg-3);">
+                  <span style="font-size: 11px; color: var(--fg-3)">
                     {{ workspaceMemberLabelFor(w.member_count) }}
                   </span>
                 </div>
@@ -180,7 +279,15 @@
               @if (!collapsed()) {
                 <span class="sidebar-nav-label">{{ item.label }}</span>
                 @if (item.id === 'notifications' && notifUnread() > 0) {
-                  <span class="sidebar-nav-badge">{{ notifUnread() > 9 ? '9+' : notifUnread() }}</span>
+                  <span class="sidebar-nav-badge">{{
+                    notifUnread() > 9 ? '9+' : notifUnread()
+                  }}</span>
+                } @else if (item.id === 'recommandations' && pendingRecs() > 0) {
+                  <span
+                    class="sidebar-nav-badge"
+                    [title]="pendingRecs() + ' recommandation(s) du Curateur à traiter'"
+                    >{{ pendingRecs() > 9 ? '9+' : pendingRecs() }}</span
+                  >
                 } @else if (item.badge) {
                   <span class="sidebar-nav-badge">{{ item.badge }}</span>
                 }
@@ -193,19 +300,30 @@
 
     <!-- User card -->
     <div class="sidebar-footer">
-      <div class="sidebar-user-avatar" style="cursor:pointer;" (click)="navigateToProfile()" title="Voir mon profil">
+      <div
+        class="sidebar-user-avatar"
+        style="cursor: pointer"
+        (click)="navigateToProfile()"
+        title="Voir mon profil"
+      >
         @if (userAvatarUrl(); as url) {
-          <img [src]="url" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />
+          <img
+            [src]="url"
+            alt="Avatar"
+            style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%"
+          />
         } @else {
           {{ userInitials() }}
         }
       </div>
       @if (!collapsed()) {
-        <div class="sidebar-user-info" style="cursor:pointer;" (click)="navigateToProfile()">
+        <div class="sidebar-user-info" style="cursor: pointer" (click)="navigateToProfile()">
           <span class="sidebar-user-name">{{ userName() }}</span>
           <span class="sidebar-user-email">{{ userEmail() }}</span>
           @if (currentRoleLabel()) {
-            <span class="sidebar-user-role" [title]="currentRoleLabel()">{{ currentRoleLabel() }}</span>
+            <span class="sidebar-user-role" [title]="currentRoleLabel()">{{
+              currentRoleLabel()
+            }}</span>
           }
         </div>
         <button class="sidebar-toggle-btn" (click)="toggleCollapsed()" title="Réduire la barre">
@@ -266,7 +384,7 @@
         }
       </div>
       <div class="topbar-actions">
-        <div class="input-group topbar-search" style="position:relative;">
+        <div class="input-group topbar-search" style="position: relative">
           <span class="input-icon">
             <tui-icon icon="@tui.search" style="font-size: 16px" />
           </span>
@@ -281,14 +399,24 @@
             (keydown.escape)="closeSearchDropdown()"
           />
           @if (searchTerm()) {
-            <button type="button"
-                    class="topbar-search-clear"
-                    (click)="onSearchInput(''); closeSearchDropdown()"
-                    aria-label="Effacer la recherche">
-              <tui-icon icon="@tui.x" style="font-size:13px;" />
+            <button
+              type="button"
+              class="topbar-search-clear"
+              (click)="onSearchInput(''); closeSearchDropdown()"
+              aria-label="Effacer la recherche"
+            >
+              <tui-icon icon="@tui.x" style="font-size: 13px" />
             </button>
           } @else {
-            <span style="position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex;">
+            <span
+              style="
+                position: absolute;
+                right: 8px;
+                top: 50%;
+                transform: translateY(-50%);
+                display: flex;
+              "
+            >
               <span class="kbd">⌘K</span>
             </span>
           }
@@ -308,7 +436,9 @@
                       <tui-icon icon="@tui.book-open" class="topbar-search-item-icon" />
                       <div class="topbar-search-item-text">
                         <span class="topbar-search-item-label">{{ r.label }}</span>
-                        @if (r.subtitle) {<span class="topbar-search-item-sub">{{ r.subtitle }}</span>}
+                        @if (r.subtitle) {
+                          <span class="topbar-search-item-sub">{{ r.subtitle }}</span>
+                        }
                       </div>
                     </button>
                   }
@@ -320,7 +450,9 @@
                       <tui-icon icon="@tui.megaphone" class="topbar-search-item-icon" />
                       <div class="topbar-search-item-text">
                         <span class="topbar-search-item-label">{{ r.label }}</span>
-                        @if (r.subtitle) {<span class="topbar-search-item-sub">{{ r.subtitle }}</span>}
+                        @if (r.subtitle) {
+                          <span class="topbar-search-item-sub">{{ r.subtitle }}</span>
+                        }
                       </div>
                     </button>
                   }
@@ -332,7 +464,9 @@
                       <tui-icon icon="@tui.building" class="topbar-search-item-icon" />
                       <div class="topbar-search-item-text">
                         <span class="topbar-search-item-label">{{ r.label }}</span>
-                        @if (r.subtitle) {<span class="topbar-search-item-sub">{{ r.subtitle }}</span>}
+                        @if (r.subtitle) {
+                          <span class="topbar-search-item-sub">{{ r.subtitle }}</span>
+                        }
                       </div>
                     </button>
                   }
@@ -344,7 +478,9 @@
                       <tui-icon icon="@tui.calendar" class="topbar-search-item-icon" />
                       <div class="topbar-search-item-text">
                         <span class="topbar-search-item-label">{{ r.label }}</span>
-                        @if (r.subtitle) {<span class="topbar-search-item-sub">{{ r.subtitle }}</span>}
+                        @if (r.subtitle) {
+                          <span class="topbar-search-item-sub">{{ r.subtitle }}</span>
+                        }
                       </div>
                     </button>
                   }
@@ -356,8 +492,11 @@
             </div>
           }
         </div>
-        <a class="btn btn-flat btn-icon btn-sm topbar-notif-btn" title="Notifications"
-           routerLink="/notifications">
+        <a
+          class="btn btn-flat btn-icon btn-sm topbar-notif-btn"
+          title="Notifications"
+          routerLink="/notifications"
+        >
           <tui-icon icon="@tui.bell" style="font-size: 18px" />
           @if (notifUnread() > 0) {
             <span class="topbar-notif-badge">{{ notifUnread() > 9 ? '9+' : notifUnread() }}</span>
@@ -373,13 +512,20 @@
     <div class="shell-content scroll-pretty">
       @if (showPasswordBanner()) {
         <div class="password-banner" role="alert">
-          <tui-icon icon="@tui.shield-alert" style="font-size:16px; flex-shrink:0;" />
+          <tui-icon icon="@tui.shield-alert" style="font-size: 16px; flex-shrink: 0" />
           <span>
             Votre compte n'a pas encore de mot de passe. Définissez-en un depuis
             <a routerLink="/profil" class="password-banner-link">votre profil</a>
             pour vous connecter sans code par e-mail.
           </span>
-          <button type="button" class="password-banner-close" (click)="dismissPasswordBanner()" aria-label="Fermer">×</button>
+          <button
+            type="button"
+            class="password-banner-close"
+            (click)="dismissPasswordBanner()"
+            aria-label="Fermer"
+          >
+            ×
+          </button>
         </div>
       }
       <router-outlet />
@@ -392,9 +538,19 @@
   <div class="toast-stack" role="region" aria-live="polite" aria-label="Notifications">
     @for (toast of toastService.toasts(); track toast.id) {
       <div class="toast toast--{{ toast.type }}" role="alert">
-        <tui-icon [icon]="toastIcon(toast.type)" style="font-size:16px; flex-shrink:0; margin-top:1px;" />
+        <tui-icon
+          [icon]="toastIcon(toast.type)"
+          style="font-size: 16px; flex-shrink: 0; margin-top: 1px"
+        />
         <span class="toast-message">{{ toast.message }}</span>
-        <button class="toast-close" type="button" (click)="toastService.dismiss(toast.id)" aria-label="Fermer">×</button>
+        <button
+          class="toast-close"
+          type="button"
+          (click)="toastService.dismiss(toast.id)"
+          aria-label="Fermer"
+        >
+          ×
+        </button>
       </div>
     }
   </div>
@@ -404,57 +560,83 @@
      set in user_metadata yet. Workspace-agnostic, writes to auth.users
      directly (no profiles table). -->
 @if (showSysadminSetup()) {
-  <div class="modal-backdrop" style="z-index:300;">
+  <div class="modal-backdrop" style="z-index: 300">
     <div class="modal" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <span class="modal-title">Bienvenue, Administrateur</span>
       </div>
       <div class="modal-body">
-        <p style="font-size:13px; color:var(--fg-3); margin-bottom:16px;">
-          Pour terminer la configuration de votre compte, renseignez votre nom et
-          choisissez un mot de passe. Vous pourrez activer la double authentification
-          ensuite depuis votre profil — elle sera exigée à l'entrée dans l'administration.
+        <p style="font-size: 13px; color: var(--fg-3); margin-bottom: 16px">
+          Pour terminer la configuration de votre compte, renseignez votre nom et choisissez un mot
+          de passe. Vous pourrez activer la double authentification ensuite depuis votre profil —
+          elle sera exigée à l'entrée dans l'administration.
         </p>
-        <div class="field" style="margin-bottom:14px;">
+        <div class="field" style="margin-bottom: 14px">
           <label class="field-label">Nom complet *</label>
-          <input class="input" type="text" placeholder="Prénom Nom"
-                 [value]="sysadminName()" (input)="sysadminName.set($any($event.target).value)"
-                 autocomplete="name" />
+          <input
+            class="input"
+            type="text"
+            placeholder="Prénom Nom"
+            [value]="sysadminName()"
+            (input)="sysadminName.set($any($event.target).value)"
+            autocomplete="name"
+          />
         </div>
-        <div class="field" style="margin-bottom:20px;">
+        <div class="field" style="margin-bottom: 20px">
           <label class="field-label">Mot de passe *</label>
-          <div style="position:relative;">
-            <input class="input" [type]="showSysadminPassword() ? 'text' : 'password'"
-                   placeholder="8 caractères minimum"
-                   [value]="sysadminPassword()" (input)="sysadminPassword.set($any($event.target).value)"
-                   autocomplete="new-password" minlength="8"
-                   style="padding-right:42px;" />
-            <button type="button" class="shell-eye-btn"
-                    (click)="toggleShowSysadminPassword()"
-                    [attr.aria-label]="showSysadminPassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
-                    tabindex="-1">
-              <tui-icon [icon]="showSysadminPassword() ? '@tui.eye-off' : '@tui.eye'" style="font-size:15px;" />
+          <div style="position: relative">
+            <input
+              class="input"
+              [type]="showSysadminPassword() ? 'text' : 'password'"
+              placeholder="8 caractères minimum"
+              [value]="sysadminPassword()"
+              (input)="sysadminPassword.set($any($event.target).value)"
+              autocomplete="new-password"
+              minlength="8"
+              style="padding-right: 42px"
+            />
+            <button
+              type="button"
+              class="shell-eye-btn"
+              (click)="toggleShowSysadminPassword()"
+              [attr.aria-label]="
+                showSysadminPassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
+              "
+              tabindex="-1"
+            >
+              <tui-icon
+                [icon]="showSysadminPassword() ? '@tui.eye-off' : '@tui.eye'"
+                style="font-size: 15px"
+              />
             </button>
           </div>
           <span class="field-hint">
             Définir un mot de passe vous évite de recevoir un code par e-mail à chaque connexion.
           </span>
           @if (sysadminPasswordError()) {
-            <span style="color: var(--danger); font-size: 12px; margin-top: 4px; display: block;">
+            <span style="color: var(--danger); font-size: 12px; margin-top: 4px; display: block">
               {{ sysadminPasswordError() }}
             </span>
           }
         </div>
         @if (sysadminSaveError()) {
-          <p style="color: var(--danger); font-size: 13px; margin: 0 0 12px;">
+          <p style="color: var(--danger); font-size: 13px; margin: 0 0 12px">
             {{ sysadminSaveError() }}
           </p>
         }
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary btn-sm" type="button" (click)="saveSysadminSetup()"
-                [disabled]="!sysadminName().trim() || sysadminPassword().length < 8 || sysadminSaveLoading()">
-          @if (sysadminSaveLoading()) { <span class="spinner"></span> }
+        <button
+          class="btn btn-primary btn-sm"
+          type="button"
+          (click)="saveSysadminSetup()"
+          [disabled]="
+            !sysadminName().trim() || sysadminPassword().length < 8 || sysadminSaveLoading()
+          "
+        >
+          @if (sysadminSaveLoading()) {
+            <span class="spinner"></span>
+          }
           Enregistrer
         </button>
       </div>
@@ -464,7 +646,7 @@
 
 <!-- Profile setup modal — shown when invited user has no full_name yet -->
 @if (showProfileSetup()) {
-  <div class="modal-backdrop" style="z-index:300;">
+  <div class="modal-backdrop" style="z-index: 300">
     <div class="modal" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <span class="modal-title">
@@ -476,26 +658,36 @@
         </span>
       </div>
       <div class="modal-body">
-        <p style="font-size:13px; color:var(--fg-3); margin-bottom:16px;">
+        <p style="font-size: 13px; color: var(--fg-3); margin-bottom: 16px">
           @if (hasPasswordNotSet()) {
             Pour finaliser votre inscription, renseignez votre nom et choisissez un mot de passe.
           } @else {
             Veuillez renseigner votre nom avant de continuer.
           }
         </p>
-        <div class="field" style="margin-bottom:14px;">
+        <div class="field" style="margin-bottom: 14px">
           <label class="field-label">Nom complet *</label>
-          <input class="input" type="text" placeholder="Prénom Nom"
-                 [value]="profileFullName()" (input)="profileFullName.set($any($event.target).value)"
-                 autocomplete="name" />
+          <input
+            class="input"
+            type="text"
+            placeholder="Prénom Nom"
+            [value]="profileFullName()"
+            (input)="profileFullName.set($any($event.target).value)"
+            autocomplete="name"
+          />
         </div>
-        <div class="field" style="margin-bottom:14px;">
+        <div class="field" style="margin-bottom: 14px">
           <label class="field-label">Téléphone (optionnel)</label>
-          <input class="input" type="tel" placeholder="+242 06 000 00 00"
-                 [value]="profilePhone()" (input)="profilePhone.set($any($event.target).value)"
-                 autocomplete="tel" />
+          <input
+            class="input"
+            type="tel"
+            placeholder="+242 06 000 00 00"
+            [value]="profilePhone()"
+            (input)="profilePhone.set($any($event.target).value)"
+            autocomplete="tel"
+          />
         </div>
-        <div class="field" style="margin-bottom:20px;">
+        <div class="field" style="margin-bottom: 20px">
           <label class="field-label">
             @if (hasPasswordNotSet()) {
               Mot de passe *
@@ -503,42 +695,62 @@
               Mot de passe (recommandé)
             }
           </label>
-          <div style="position:relative;">
-            <input class="input" [type]="showProfilePassword() ? 'text' : 'password'"
-                   placeholder="8 caractères minimum"
-                   [value]="profilePassword()" (input)="profilePassword.set($any($event.target).value)"
-                   autocomplete="new-password" minlength="8"
-                   style="padding-right:42px;" />
-            <button type="button" class="shell-eye-btn"
-                    (click)="toggleShowProfilePassword()"
-                    [attr.aria-label]="showProfilePassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
-                    tabindex="-1">
-              <tui-icon [icon]="showProfilePassword() ? '@tui.eye-off' : '@tui.eye'" style="font-size:15px;" />
+          <div style="position: relative">
+            <input
+              class="input"
+              [type]="showProfilePassword() ? 'text' : 'password'"
+              placeholder="8 caractères minimum"
+              [value]="profilePassword()"
+              (input)="profilePassword.set($any($event.target).value)"
+              autocomplete="new-password"
+              minlength="8"
+              style="padding-right: 42px"
+            />
+            <button
+              type="button"
+              class="shell-eye-btn"
+              (click)="toggleShowProfilePassword()"
+              [attr.aria-label]="
+                showProfilePassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
+              "
+              tabindex="-1"
+            >
+              <tui-icon
+                [icon]="showProfilePassword() ? '@tui.eye-off' : '@tui.eye'"
+                style="font-size: 15px"
+              />
             </button>
           </div>
           <span class="field-hint">
             @if (hasPasswordNotSet()) {
-              Le mot de passe vous permettra de vous reconnecter sans recevoir de code par e-mail. Vous pourrez le changer depuis votre profil.
+              Le mot de passe vous permettra de vous reconnecter sans recevoir de code par e-mail.
+              Vous pourrez le changer depuis votre profil.
             } @else {
               Définir un mot de passe vous évite de recevoir un code par e-mail à chaque connexion.
             }
           </span>
           @if (profilePasswordError()) {
-            <span style="color: var(--danger); font-size: 12px; margin-top: 4px; display: block;">
+            <span style="color: var(--danger); font-size: 12px; margin-top: 4px; display: block">
               {{ profilePasswordError() }}
             </span>
           }
         </div>
         @if (profileSaveError()) {
-          <p style="color: var(--danger); font-size: 13px; margin: 0 0 12px;">
+          <p style="color: var(--danger); font-size: 13px; margin: 0 0 12px">
             {{ profileSaveError() }}
           </p>
         }
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary btn-sm" type="button" (click)="saveProfile()"
-                [disabled]="!profileFullName().trim() || profileSaveLoading()">
-          @if (profileSaveLoading()) { <span class="spinner"></span> }
+        <button
+          class="btn btn-primary btn-sm"
+          type="button"
+          (click)="saveProfile()"
+          [disabled]="!profileFullName().trim() || profileSaveLoading()"
+        >
+          @if (profileSaveLoading()) {
+            <span class="spinner"></span>
+          }
           Enregistrer
         </button>
       </div>

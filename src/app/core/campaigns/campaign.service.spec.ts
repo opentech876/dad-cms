@@ -17,7 +17,7 @@ describe('CampaignService', () => {
     {
       id: 'c1', name: 'MTN Congo', company_id: 'co-mtn',
       company: { id: 'co-mtn', name: 'MTN Congo', type: 'telecom', business_domain: 'Téléphonie mobile' },
-      position: 'header',
+      position: 'footer',
       start_date: '2026-01-01', end_date: '2026-06-30',
       active: true, image_path: '', link_url: null, workspace_id: 'ws-1',
       created_by: null, deleted_at: null,
@@ -201,7 +201,7 @@ describe('CampaignService', () => {
     const dto = {
       name: 'Test', company_id: 'co-mtn',
       start_date: '2026-01-01', end_date: '2026-06-30',
-      position: 'header' as const,
+      position: 'footer' as const,
     };
 
     it('inclut created_by dans le payload insert', async () => {
@@ -328,8 +328,8 @@ describe('CampaignService', () => {
 
   describe('findOverlappingCampaigns()', () => {
     const otherCampaigns = [
-      { id: 'c2', name: 'MTN', company_id: 'co-mtn', company: { id: 'co-mtn', name: 'MTN Congo' }, start_date: '2026-08-10', end_date: '2026-08-20', position: 'header', active: true, deleted_at: null, workspace_id: 'ws-1' },
-      { id: 'c3', name: 'SG',  company_id: 'co-sg',  company: { id: 'co-sg',  name: 'SG Congo' },  start_date: '2026-09-01', end_date: '2026-09-30', position: 'header', active: true, deleted_at: null, workspace_id: 'ws-1' },
+      { id: 'c2', name: 'MTN', company_id: 'co-mtn', company: { id: 'co-mtn', name: 'MTN Congo' }, start_date: '2026-08-10', end_date: '2026-08-20', position: 'footer', active: true, deleted_at: null, workspace_id: 'ws-1' },
+      { id: 'c3', name: 'SG',  company_id: 'co-sg',  company: { id: 'co-sg',  name: 'SG Congo' },  start_date: '2026-09-01', end_date: '2026-09-30', position: 'footer', active: true, deleted_at: null, workspace_id: 'ws-1' },
     ];
 
     function buildOverlapClient(rows: any[]) {

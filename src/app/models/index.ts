@@ -1,14 +1,38 @@
-export type AppRole = 'owner' | 'chef_equipe' | 'editeur' | 'charge_communication' | 'presidence' | 'chef_equipe_commerciale' | 'system_admin';
+export type AppRole =
+  | 'owner'
+  | 'chef_equipe'
+  | 'editeur'
+  | 'charge_communication'
+  | 'presidence'
+  | 'chef_equipe_commerciale'
+  | 'system_admin';
 
 export type CompanyType =
-  | 'telecom' | 'banque' | 'energie' | 'distribution'
-  | 'services' | 'gouvernement' | 'ong' | 'medias' | 'sante' | 'autre';
+  | 'telecom'
+  | 'banque'
+  | 'energie'
+  | 'distribution'
+  | 'services'
+  | 'gouvernement'
+  | 'ong'
+  | 'medias'
+  | 'sante'
+  | 'autre';
 export type EventPosition = 1 | 2;
-export type AdPosition = 'header' | 'footer';
+/** Business rule: one ad at a time, footer slot only. The DB column still
+ *  exists for mobile compatibility but every row is 'footer'. */
+export type AdPosition = 'footer';
 export type CalendarStatus = 'draft' | 'published' | 'archived';
 export type EventStatus = 'draft' | 'published';
 export type EventOrigin = 'editorial' | 'curateur';
-export type ManageUserAction = 'update_role' | 'block' | 'unblock' | 'remove' | 'set_password' | 'resend_invitation' | 'revoke_invitation';
+export type ManageUserAction =
+  | 'update_role'
+  | 'block'
+  | 'unblock'
+  | 'remove'
+  | 'set_password'
+  | 'resend_invitation'
+  | 'revoke_invitation';
 
 export interface UserListEntry {
   id: string;
@@ -81,7 +105,7 @@ export interface Calendar {
 /** A historical event in the content library — not tied to any calendar. */
 export interface Event {
   id: string;
-  event_date: string;        // YYYY-MM-DD — the actual historical date
+  event_date: string; // YYYY-MM-DD — the actual historical date
   title: string;
   description: string | null;
   image_path: string | null;
@@ -106,8 +130,8 @@ export interface Event {
 export interface CalendarEntry {
   id: string;
   calendar_id: string;
-  mmdd: string;              // 'MM-DD', e.g. '08-15'
-  position: EventPosition;   // 1 = main, 2 = secondary
+  mmdd: string; // 'MM-DD', e.g. '08-15'
+  position: EventPosition; // 1 = main, 2 = secondary
   event_id: string;
   workspace_id: string;
   created_by: string | null;
@@ -174,13 +198,16 @@ export interface AdCampaign {
 
 /** Discrete validation state of an AdCampaign, used by the UI to render badges + actions. */
 export type CampaignValidationState =
-  | 'pending'    // no key flipped yet
-  | 'paid'       // paid but not manager-confirmed
-  | 'confirmed'  // manager-confirmed but not paid
+  | 'pending' // no key flipped yet
+  | 'paid' // paid but not manager-confirmed
+  | 'confirmed' // manager-confirmed but not paid
   | 'validated'; // both done
 
-export function campaignValidationState(c: Pick<AdCampaign, 'paid_at' | 'manager_confirmed_at'>): CampaignValidationState {
-  const paid = !!c.paid_at, confirmed = !!c.manager_confirmed_at;
+export function campaignValidationState(
+  c: Pick<AdCampaign, 'paid_at' | 'manager_confirmed_at'>,
+): CampaignValidationState {
+  const paid = !!c.paid_at,
+    confirmed = !!c.manager_confirmed_at;
   if (paid && confirmed) return 'validated';
   if (paid) return 'paid';
   if (confirmed) return 'confirmed';
@@ -198,8 +225,8 @@ export interface ContentVersion {
 export interface CreateCampaignDto {
   name: string;
   company_id: string;
-  start_date: string;   // YYYY-MM-DD
-  end_date: string;     // YYYY-MM-DD
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
   position: AdPosition;
   link_url?: string;
   image_path?: string;
@@ -208,7 +235,7 @@ export interface CreateCampaignDto {
 
 /** DTO for creating a new event in the library. */
 export interface CreateEventDto {
-  event_date: string;        // YYYY-MM-DD
+  event_date: string; // YYYY-MM-DD
   title: string;
   description?: string;
   image_path?: string;
@@ -249,17 +276,17 @@ export interface Notification {
   // tenant. actor_id may be null for system-generated notifications.
   workspace_id: string | null;
   actor_id: string | null;
-  action: string | null;      // 'INSERT' | 'UPDATE' | 'DELETE' (raw pg trigger op)
-  table_name: string | null;  // 'events' | 'calendars' | 'ad_campaigns' | ...
+  action: string | null; // 'INSERT' | 'UPDATE' | 'DELETE' (raw pg trigger op)
+  table_name: string | null; // 'events' | 'calendars' | 'ad_campaigns' | ...
   record_id: string | null;
-  link_path: string | null;   // route to open when the user clicks "Voir"
+  link_path: string | null; // route to open when the user clicks "Voir"
 }
 
 /** Actor profile fetched on-demand for the notification detail modal.
  *  Kept small — the notifications list stays lean, full profile only
  *  loads when the user opens a specific row. */
 export interface NotificationActor {
-  full_name:  string | null;
+  full_name: string | null;
   avatar_url: string | null;
 }
 

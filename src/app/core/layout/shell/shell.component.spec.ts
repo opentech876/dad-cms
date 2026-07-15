@@ -1,13 +1,14 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
-import { BehaviorSubject, EMPTY, of, Subject } from 'rxjs';
-import { Router } from '@angular/router';
+import { BehaviorSubject, of, Subject } from 'rxjs';
+import { NavigationEnd, Router } from '@angular/router';
 import { ShellComponent } from './shell.component';
 import { AuthService } from '../../auth/auth.service';
 import { WorkspaceService } from '../../workspace/workspace.service';
 import { AppRole, WorkspaceSummary } from '../../../models';
 import { WorkspaceContextService } from '../../workspace/workspace-context.service';
 import { NotificationService } from '../../notifications/notification.service';
+import { RecommendationService } from '../../presidency/recommendation.service';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { SearchService, SearchResults } from '../../search/search.service';
 import { RefreshRouteReuseStrategy } from '../../router/refresh-route-reuse.strategy';
@@ -17,9 +18,15 @@ describe('ShellComponent — navigation par rôle', () => {
   let component: ShellComponent;
   let fixture: ComponentFixture<ShellComponent>;
   let roleSubject: BehaviorSubject<AppRole | null>;
-  let mockWorkspace: { getMyProfile: jest.Mock; upsertProfile: jest.Mock; getWorkspaceSummaries: jest.Mock };
+  let mockWorkspace: {
+    getMyProfile: jest.Mock;
+    upsertProfile: jest.Mock;
+    getWorkspaceSummaries: jest.Mock;
+  };
   let mockRouter: { events: any; navigate: jest.Mock; navigateByUrl: jest.Mock; url: string };
+  let routerEvents$: Subject<unknown>;
   let mockRouteReuse: { triggerRefresh: jest.Mock };
+  let mockRecs: { countAllPending: jest.Mock };
   let mockWorkspaceContext: {
     activeWorkspaceId: jest.Mock;
     setActiveWorkspace: jest.Mock;
@@ -30,7 +37,13 @@ describe('ShellComponent — navigation par rôle', () => {
   };
 
   const MOCK_WORKSPACES: WorkspaceSummary[] = [
-    { id: 'ws-1', name: 'DIOUGA-DIOP Media', logo_url: null, member_count: 5, last_accessed_at: null },
+    {
+      id: 'ws-1',
+      name: 'DIOUGA-DIOP Media',
+      logo_url: null,
+      member_count: 5,
+      last_accessed_at: null,
+    },
   ];
 
   function createComponent(
@@ -40,22 +53,26 @@ describe('ShellComponent — navigation par rôle', () => {
     opts?: { isSysadmin?: boolean; userMetadata?: Record<string, unknown>; updateUserResult?: any },
   ): void {
     roleSubject = new BehaviorSubject<AppRole | null>(role);
+    routerEvents$ = new Subject<unknown>();
     mockRouter = {
-      events: EMPTY,
+      events: routerEvents$.asObservable(),
       navigate: jest.fn(),
       navigateByUrl: jest.fn().mockResolvedValue(true),
       url: '/dashboard',
     };
     mockRouteReuse = { triggerRefresh: jest.fn() };
+    mockRecs = { countAllPending: jest.fn().mockReturnValue(of(0)) };
     mockWorkspace = {
-      getMyProfile: jest.fn().mockReturnValue(
-        of(profileOverride ?? { full_name: 'Test User', phone: null, avatar_url: null }),
-      ),
+      getMyProfile: jest
+        .fn()
+        .mockReturnValue(
+          of(profileOverride ?? { full_name: 'Test User', phone: null, avatar_url: null }),
+        ),
       upsertProfile: jest.fn().mockReturnValue(of({ success: true })),
       getWorkspaceSummaries: jest.fn().mockReturnValue(of(workspacesOverride ?? MOCK_WORKSPACES)),
     };
     const workspacesChanged$ = new Subject<void>();
-    const profileChanged$    = new Subject<void>();
+    const profileChanged$ = new Subject<void>();
     mockWorkspaceContext = {
       activeWorkspaceId: jest.fn().mockReturnValue('ws-1'),
       setActiveWorkspace: jest.fn(),
@@ -64,7 +81,9 @@ describe('ShellComponent — navigation par rôle', () => {
       profileChanged$,
       notifyProfileChanged: jest.fn(() => profileChanged$.next()),
     };
-    const updateUserSpy = jest.fn().mockResolvedValue(opts?.updateUserResult ?? { data: { user: {} }, error: null });
+    const updateUserSpy = jest
+      .fn()
+      .mockResolvedValue(opts?.updateUserResult ?? { data: { user: {} }, error: null });
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -74,11 +93,13 @@ describe('ShellComponent — navigation par rôle', () => {
           provide: AuthService,
           useValue: {
             currentRole$: roleSubject.asObservable(),
-            getCurrentUser: jest.fn().mockReturnValue(of({
-              id: 'mock-user-id',
-              email: 'test@example.com',
-              user_metadata: opts?.userMetadata ?? {},
-            })),
+            getCurrentUser: jest.fn().mockReturnValue(
+              of({
+                id: 'mock-user-id',
+                email: 'test@example.com',
+                user_metadata: opts?.userMetadata ?? {},
+              }),
+            ),
             signOut: jest.fn().mockReturnValue(of(null)),
             isSystemAdmin: jest.fn().mockReturnValue(of(opts?.isSysadmin ?? false)),
           },
@@ -117,12 +138,20 @@ describe('ShellComponent — navigation par rôle', () => {
         {
           provide: SearchService,
           useValue: {
-            search: jest.fn().mockReturnValue(of({ events: [], campaigns: [], companies: [], calendars: [] } as SearchResults)),
+            search: jest
+              .fn()
+              .mockReturnValue(
+                of({ events: [], campaigns: [], companies: [], calendars: [] } as SearchResults),
+              ),
           },
         },
         {
           provide: RefreshRouteReuseStrategy,
           useValue: mockRouteReuse,
+        },
+        {
+          provide: RecommendationService,
+          useValue: mockRecs,
         },
       ],
       schemas: [NO_ERRORS_SCHEMA],
@@ -140,7 +169,7 @@ describe('ShellComponent — navigation par rôle', () => {
 
   it('affiche tous les nav items pour le rôle owner (recommandations + compagnies inclus)', () => {
     createComponent('owner');
-    const paths = component.visibleNavItems().map(i => i.path);
+    const paths = component.visibleNavItems().map((i) => i.path);
     expect(paths).toContain('/recommandations');
     expect(paths).toContain('/compagnies');
     // Owner sees every section; quick sanity check
@@ -190,7 +219,7 @@ describe('ShellComponent — navigation par rôle', () => {
 
   it("éditeur voit 'espace-de-travail' et 'parametres' mais pas 'metriques'", () => {
     createComponent('editeur');
-    const paths = component.visibleNavItems().map(i => i.path);
+    const paths = component.visibleNavItems().map((i) => i.path);
     expect(paths).toContain('/espace-de-travail');
     expect(paths).toContain('/parametres');
     expect(paths).not.toContain('/metriques');
@@ -222,7 +251,7 @@ describe('ShellComponent — navigation par rôle', () => {
 
   it("presidence voit 'recommandations' mais pas evenements/campagnes/utilisateurs", () => {
     createComponent('presidence');
-    const paths = component.visibleNavItems().map(i => i.path);
+    const paths = component.visibleNavItems().map((i) => i.path);
     expect(paths).toContain('/recommandations');
     expect(paths).not.toContain('/evenements');
     expect(paths).not.toContain('/campagnes');
@@ -231,19 +260,19 @@ describe('ShellComponent — navigation par rôle', () => {
 
   it("editeur voit 'recommandations' en lecture seule (elle doit pouvoir consulter avant d'appliquer)", () => {
     createComponent('editeur');
-    expect(component.visibleNavItems().map(i => i.path)).toContain('/recommandations');
+    expect(component.visibleNavItems().map((i) => i.path)).toContain('/recommandations');
   });
 
   it("chef_equipe voit 'recommandations' en lecture seule", () => {
     createComponent('chef_equipe');
-    expect(component.visibleNavItems().map(i => i.path)).toContain('/recommandations');
+    expect(component.visibleNavItems().map((i) => i.path)).toContain('/recommandations');
   });
 
   // ── chef_equipe_commerciale ───────────────────────────────────────────────
 
   it("chef_equipe_commerciale voit 'campagnes' et 'compagnies'", () => {
     createComponent('chef_equipe_commerciale');
-    const paths = component.visibleNavItems().map(i => i.path);
+    const paths = component.visibleNavItems().map((i) => i.path);
     expect(paths).toContain('/campagnes');
     expect(paths).toContain('/compagnies');
     expect(paths).not.toContain('/evenements');
@@ -254,7 +283,7 @@ describe('ShellComponent — navigation par rôle', () => {
 
   it("editeur ne voit pas 'compagnies'", () => {
     createComponent('editeur');
-    expect(component.visibleNavItems().map(i => i.path)).not.toContain('/compagnies');
+    expect(component.visibleNavItems().map((i) => i.path)).not.toContain('/compagnies');
   });
 
   // ── réactivité ─────────────────────────────────────────────────────────────
@@ -267,12 +296,12 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(component.visibleNavItems().map((i) => i.path)).toContain('/campagnes');
   });
 
-  it('retourne des navItems vides quand aucun rôle n\'est assigné', () => {
+  it("retourne des navItems vides quand aucun rôle n'est assigné", () => {
     createComponent(null);
     expect(component.visibleNavItems()).toEqual([]);
   });
 
-  it('retourne des sections vides quand aucun rôle n\'est assigné', () => {
+  it("retourne des sections vides quand aucun rôle n'est assigné", () => {
     createComponent(null);
     expect(component.visibleNavSections()).toEqual([]);
   });
@@ -332,7 +361,11 @@ describe('ShellComponent — navigation par rôle', () => {
 
       await component.saveProfile();
 
-      expect(mockWorkspace.upsertProfile).toHaveBeenCalledWith('mock-user-id', 'Alice Martin', '+242060000000');
+      expect(mockWorkspace.upsertProfile).toHaveBeenCalledWith(
+        'mock-user-id',
+        'Alice Martin',
+        '+242060000000',
+      );
     });
 
     it('saveProfile ferme la modal après enregistrement', async () => {
@@ -361,7 +394,7 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(supabase.updatePassword).not.toHaveBeenCalled();
     });
 
-    it('saveProfile refuse d\'enregistrer sans mot de passe quand aucun n\'est encore défini (cas invité première connexion)', async () => {
+    it("saveProfile refuse d'enregistrer sans mot de passe quand aucun n'est encore défini (cas invité première connexion)", async () => {
       // hasPasswordSet default = false in beforeEach
       createComponent('editeur', { full_name: null, phone: null, avatar_url: null });
       const supabase = TestBed.inject(SupabaseService) as any;
@@ -452,7 +485,7 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(component.userName()).toBe('Elvis Destin OLEMBE');
     });
 
-    it("saveSysadminSetup appelle auth.updateUser avec full_name et password", async () => {
+    it('saveSysadminSetup appelle auth.updateUser avec full_name et password', async () => {
       createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: {} });
       const supabase = TestBed.inject(SupabaseService) as any;
       await component.ngOnInit();
@@ -470,7 +503,7 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(component.userName()).toBe('Elvis Destin OLEMBE');
     });
 
-    it("saveSysadminSetup refuse un mot de passe trop court et garde le modal ouvert", async () => {
+    it('saveSysadminSetup refuse un mot de passe trop court et garde le modal ouvert', async () => {
       createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: {} });
       const supabase = TestBed.inject(SupabaseService) as any;
       await component.ngOnInit();
@@ -484,7 +517,7 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(component.showSysadminSetup()).toBe(true);
     });
 
-    it("saveSysadminSetup expose une erreur si updateUser échoue", async () => {
+    it('saveSysadminSetup expose une erreur si updateUser échoue', async () => {
       createComponent(null, undefined, undefined, {
         isSysadmin: true,
         userMetadata: {},
@@ -500,7 +533,7 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(component.showSysadminSetup()).toBe(true);
     });
 
-    it("ne charge PAS le profil workspace-scoped pour un sysadmin (mais bien la liste des workspaces)", async () => {
+    it('ne charge PAS le profil workspace-scoped pour un sysadmin (mais bien la liste des workspaces)', async () => {
       // The sysadmin can also be a member of one or more workspaces (invited
       // as manager, or impersonating). We load the summaries so the switcher
       // is populated; we skip getMyProfile because sysadmin identity lives
@@ -589,7 +622,9 @@ describe('ShellComponent — navigation par rôle', () => {
       createComponent('owner');
       component.searchTerm.set('indep');
       component.submitSearch();
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/recherche'], { queryParams: { q: 'indep' } });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/recherche'], {
+        queryParams: { q: 'indep' },
+      });
     });
 
     it('submitSearch ne navigue pas quand le terme est vide', () => {
@@ -602,16 +637,24 @@ describe('ShellComponent — navigation par rôle', () => {
     it('goToResult navigue vers la page correspondant au type', () => {
       createComponent('owner');
       component.goToResult({ type: 'event', id: 'e1', label: 'Test' });
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/evenements'], { queryParams: { q: 'Test' } });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/evenements'], {
+        queryParams: { q: 'Test' },
+      });
 
       component.goToResult({ type: 'campaign', id: 'c1', label: 'Test' });
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/campagnes'], { queryParams: { q: 'Test' } });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/campagnes'], {
+        queryParams: { q: 'Test' },
+      });
 
       component.goToResult({ type: 'company', id: 'co1', label: 'Test' });
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/compagnies'], { queryParams: { q: 'Test' } });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/compagnies'], {
+        queryParams: { q: 'Test' },
+      });
 
       component.goToResult({ type: 'calendar', id: 'ca1', label: 'Test' });
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/calendrier'], { queryParams: { q: 'Test' } });
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/calendrier'], {
+        queryParams: { q: 'Test' },
+      });
     });
 
     it('goToResult ferme la dropdown et efface le terme', () => {
@@ -627,14 +670,14 @@ describe('ShellComponent — navigation par rôle', () => {
   // ── sidebar resize + mobile drawer ────────────────────────────────────────
 
   describe('sidebar resize + mobile drawer', () => {
-    it("sidebarWidth a une valeur par défaut dans la plage 200-360", () => {
+    it('sidebarWidth a une valeur par défaut dans la plage 200-360', () => {
       createComponent('owner');
       const w = component.sidebarWidth();
       expect(w).toBeGreaterThanOrEqual(200);
       expect(w).toBeLessThanOrEqual(360);
     });
 
-    it("openMobileSidebar passe mobileOpen à true et closeMobileSidebar le ferme", () => {
+    it('openMobileSidebar passe mobileOpen à true et closeMobileSidebar le ferme', () => {
       createComponent('owner');
       component.openMobileSidebar();
       expect(component.mobileOpen()).toBe(true);
@@ -642,7 +685,7 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(component.mobileOpen()).toBe(false);
     });
 
-    it("onWindowResize met à jour isMobile selon innerWidth", () => {
+    it('onWindowResize met à jour isMobile selon innerWidth', () => {
       createComponent('owner');
       (window as any).innerWidth = 500;
       component.onWindowResize();
@@ -652,7 +695,7 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(component.isMobile()).toBe(false);
     });
 
-    it("onWindowResize ferme la drawer mobile en repassant en desktop", () => {
+    it('onWindowResize ferme la drawer mobile en repassant en desktop', () => {
       createComponent('owner');
       component.mobileOpen.set(true);
       (window as any).innerWidth = 1280;
@@ -700,44 +743,59 @@ describe('ShellComponent — navigation par rôle', () => {
   // ── platform admin mode (sysadmin in switcher) ────────────────────────────
 
   describe('mode Administration plateforme', () => {
-    it("inPlatformMode est faux par défaut (URL = /dashboard, pas sysadmin)", async () => {
+    it('inPlatformMode est faux par défaut (URL = /dashboard, pas sysadmin)', async () => {
       createComponent('editeur');
       await component.ngOnInit();
       expect(component.inPlatformMode()).toBe(false);
     });
 
-    it("inPlatformMode est vrai quand sysadmin et URL commence par /admin", async () => {
-      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+    it('inPlatformMode est vrai quand sysadmin et URL commence par /admin', async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'A' },
+      });
       await component.ngOnInit();
       component.currentUrl.set('/admin/utilisateurs');
       expect(component.inPlatformMode()).toBe(true);
     });
 
-    it("inPlatformMode est faux pour un sysadmin hors /admin", async () => {
-      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+    it('inPlatformMode est faux pour un sysadmin hors /admin', async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'A' },
+      });
       await component.ngOnInit();
       component.currentUrl.set('/dashboard');
       expect(component.inPlatformMode()).toBe(false);
     });
 
     it("workspaceName affiche 'Administration plateforme' en mode plateforme", async () => {
-      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'A' },
+      });
       await component.ngOnInit();
       component.currentUrl.set('/admin');
       expect(component.workspaceName()).toBe('Administration plateforme');
       expect(component.workspaceInitials()).toBe('AP');
     });
 
-    it("enterPlatformMode navigue vers /admin", async () => {
-      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+    it('enterPlatformMode navigue vers /admin', async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'A' },
+      });
       await component.ngOnInit();
       mockRouter.navigateByUrl.mockClear();
       await component.enterPlatformMode();
       expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/admin');
     });
 
-    it("enterPlatformMode ne re-navigue pas si déjà sur /admin", async () => {
-      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+    it('enterPlatformMode ne re-navigue pas si déjà sur /admin', async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'A' },
+      });
       await component.ngOnInit();
       mockRouter.url = '/admin/utilisateurs';
       mockRouter.navigateByUrl.mockClear();
@@ -745,8 +803,11 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
     });
 
-    it("switchWorkspace depuis le mode plateforme route vers /dashboard", async () => {
-      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+    it('switchWorkspace depuis le mode plateforme route vers /dashboard', async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'A' },
+      });
       await component.ngOnInit();
       component.currentUrl.set('/admin');
       mockRouter.navigateByUrl.mockClear();
@@ -766,14 +827,17 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(component.inPlatformMode()).toBe(false);
     });
 
-    it("en mode plateforme, la sidebar montre UNIQUEMENT Plateforme + Compte (pas les sections workspace)", async () => {
-      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+    it('en mode plateforme, la sidebar montre UNIQUEMENT Plateforme + Compte (pas les sections workspace)', async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'A' },
+      });
       await component.ngOnInit();
       component.currentUrl.set('/admin');
-      const sectionIds = component.visibleNavSections().map(s => s.id);
+      const sectionIds = component.visibleNavSections().map((s) => s.id);
       expect(sectionIds).toEqual(['plateforme', 'compte']);
       // Aucun item workspace-scoped (dashboard, calendrier, evenements, etc.)
-      const paths = component.visibleNavItems().map(i => i.path);
+      const paths = component.visibleNavItems().map((i) => i.path);
       expect(paths).not.toContain('/dashboard');
       expect(paths).not.toContain('/calendrier');
       expect(paths).not.toContain('/evenements');
@@ -785,11 +849,14 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(paths).toContain('/admin/notifications');
     });
 
-    it("en mode workspace, la sidebar montre les sections workspace (pas la section Plateforme)", async () => {
-      createComponent(null, undefined, undefined, { isSysadmin: true, userMetadata: { full_name: 'A' } });
+    it('en mode workspace, la sidebar montre les sections workspace (pas la section Plateforme)', async () => {
+      createComponent(null, undefined, undefined, {
+        isSysadmin: true,
+        userMetadata: { full_name: 'A' },
+      });
       await component.ngOnInit();
       component.currentUrl.set('/dashboard');
-      const sectionIds = component.visibleNavSections().map(s => s.id);
+      const sectionIds = component.visibleNavSections().map((s) => s.id);
       expect(sectionIds).not.toContain('plateforme');
       expect(sectionIds).not.toContain('compte');
     });
@@ -798,7 +865,7 @@ describe('ShellComponent — navigation par rôle', () => {
   // ── workspace switcher: live-reload + color coding ─────────────────────────
 
   describe('switcher live-reload et couleurs', () => {
-    it("workspaceColorFor renvoie une couleur HSL déterministe par id", () => {
+    it('workspaceColorFor renvoie une couleur HSL déterministe par id', () => {
       createComponent('owner');
       const c1 = component.workspaceColorFor('ws-abc');
       const c2 = component.workspaceColorFor('ws-abc');
@@ -808,7 +875,7 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(c1).not.toBe(c3);
     });
 
-    it("recharge les workspaces quand notifyWorkspacesChanged est déclenché", async () => {
+    it('recharge les workspaces quand notifyWorkspacesChanged est déclenché', async () => {
       createComponent('owner');
       await component.ngOnInit();
       // Fresh mock so we count only post-init calls
@@ -837,5 +904,44 @@ describe('ShellComponent — navigation par rôle', () => {
     createComponent('owner', undefined, []);
     await component.ngOnInit();
     expect(mockWorkspaceContext.setActiveWorkspace).not.toHaveBeenCalled();
+  });
+
+  // ── badge recommandations en attente ──────────────────────────────────────
+
+  describe('badge recommandations en attente', () => {
+    it('charge le compteur de recommandations pending au démarrage', async () => {
+      createComponent('owner');
+      mockRecs.countAllPending.mockReturnValue(of(4));
+
+      await component.ngOnInit();
+
+      expect(component.pendingRecs()).toBe(4);
+    });
+
+    it('rafraîchit le compteur à chaque navigation — le badge disparaît une fois traité', async () => {
+      createComponent('owner');
+      mockRecs.countAllPending.mockReturnValue(of(4));
+      await component.ngOnInit();
+      expect(component.pendingRecs()).toBe(4);
+
+      // Applying the recommendations elsewhere brings the count to zero;
+      // the next navigation must clear the badge.
+      mockRecs.countAllPending.mockReturnValue(of(0));
+      routerEvents$.next(new NavigationEnd(1, '/recommandations', '/recommandations'));
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+      expect(component.pendingRecs()).toBe(0);
+    });
+
+    it("reste à zéro (badge masqué) en cas d'échec du comptage", async () => {
+      createComponent('owner');
+      mockRecs.countAllPending.mockImplementation(() => {
+        throw new Error('down');
+      });
+
+      await component.ngOnInit();
+
+      expect(component.pendingRecs()).toBe(0);
+    });
   });
 });

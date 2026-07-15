@@ -9,7 +9,7 @@ import { Event as HistoricalEvent } from '../../models';
 export interface PresidencyRecommendation {
   id: string;
   calendar_id: string;
-  mmdd: string;            // 'MM-DD'
+  mmdd: string; // 'MM-DD'
   position: 1 | 2;
   event_id: string;
   workspace_id: string;
@@ -72,6 +72,17 @@ export class RecommendationService {
     ).pipe(map(({ count, error }: any) => (error ? 0 : (count ?? 0))));
   }
 
+  /** Workspace-wide pending count (RLS-scoped), across all calendars.
+   *  Drives the sidebar badge that disappears once everything is applied. */
+  countAllPending(): Observable<number> {
+    return from(
+      this.supabase.client
+        .from('presidency_recommendations')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending'),
+    ).pipe(map(({ count, error }: any) => (error ? 0 : (count ?? 0))));
+  }
+
   /** Upsert a recommendation for one (calendar, mmdd, position) slot. */
   upsertSlot(
     calendarId: string,
@@ -82,20 +93,18 @@ export class RecommendationService {
     const wsId = this.workspaceContext.activeWorkspaceId();
     return from(
       this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
-        this.supabase.client
-          .from('presidency_recommendations')
-          .upsert(
-            {
-              calendar_id: calendarId,
-              mmdd,
-              position,
-              event_id: eventId,
-              workspace_id: wsId,
-              status: 'pending',
-              created_by: user?.id ?? null,
-            },
-            { onConflict: 'calendar_id,mmdd,position' },
-          ),
+        this.supabase.client.from('presidency_recommendations').upsert(
+          {
+            calendar_id: calendarId,
+            mmdd,
+            position,
+            event_id: eventId,
+            workspace_id: wsId,
+            status: 'pending',
+            created_by: user?.id ?? null,
+          },
+          { onConflict: 'calendar_id,mmdd,position' },
+        ),
       ),
     ).pipe(
       map(({ error }: any) =>
@@ -137,7 +146,7 @@ export class RecommendationService {
     for (const rec of recommendations) {
       if (rec.status !== 'pending') continue;
       const existing = existingEntries.find(
-        e => e.mmdd === rec.mmdd && e.position === rec.position,
+        (e) => e.mmdd === rec.mmdd && e.position === rec.position,
       );
       if (existing && existing.event_id !== rec.event_id) {
         conflicts.push({

@@ -2,7 +2,15 @@ import { Component, computed, HostListener, inject, OnInit, signal } from '@angu
 import { RouterLink, RouterLinkActive, RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { filter, firstValueFrom, Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
+import {
+  filter,
+  firstValueFrom,
+  Subject,
+  debounceTime,
+  distinctUntilChanged,
+  switchMap,
+  of,
+} from 'rxjs';
 import { AppRole, WorkspaceSummary } from '../../../models';
 import { AuthService } from '../../auth/auth.service';
 import { WorkspaceService } from '../../workspace/workspace.service';
@@ -10,6 +18,7 @@ import { WorkspaceContextService } from '../../workspace/workspace-context.servi
 import { ToastService, ToastType } from '../../services/toast.service';
 import { ThemeService } from '../../services/theme.service';
 import { NotificationService } from '../../notifications/notification.service';
+import { RecommendationService } from '../../presidency/recommendation.service';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { SearchService, SearchResult, SearchResults } from '../../search/search.service';
 import { RefreshRouteReuseStrategy } from '../../router/refresh-route-reuse.strategy';
@@ -43,6 +52,7 @@ export class ShellComponent implements OnInit {
   private workspaceContext = inject(WorkspaceContextService);
   private themeService = inject(ThemeService);
   private notifService = inject(NotificationService);
+  private recommendationService = inject(RecommendationService);
   private supabase = inject(SupabaseService);
   private searchService = inject(SearchService);
   private routeReuse = inject(RefreshRouteReuseStrategy);
@@ -56,6 +66,11 @@ export class ShellComponent implements OnInit {
   // updates this signal and the bell badge disappears automatically.
   readonly notifUnread = this.notifService.unreadCount;
 
+  // Recommendation notification: count of pending Curateur recommendations,
+  // shown as a badge on the "Recommandations" nav item. Refreshed on every
+  // navigation so it disappears as soon as they are applied in the app.
+  readonly pendingRecs = signal(0);
+
   /** Human-readable French label for the current role, shown as a chip
    *  under the user email in the sidebar footer. Empty string when the
    *  role isn't loaded yet — the template hides the chip in that case. */
@@ -68,9 +83,9 @@ export class ShellComponent implements OnInit {
   toastIcon(type: ToastType): string {
     const map: Record<ToastType, string> = {
       success: '@tui.check-circle',
-      error:   '@tui.circle-x',
+      error: '@tui.circle-x',
       warning: '@tui.triangle-alert',
-      info:    '@tui.info',
+      info: '@tui.info',
     };
     return map[type];
   }
@@ -81,16 +96,16 @@ export class ShellComponent implements OnInit {
   // (which pings workspaceContext.profileChanged$) makes the sidebar
   // re-render without a page refresh. Templates read these as function
   // calls: {{ userName() }} etc.
-  readonly userEmail    = signal('');
+  readonly userEmail = signal('');
   readonly userInitials = signal('AA');
-  readonly userName     = signal('Utilisateur');
+  readonly userName = signal('Utilisateur');
   readonly userAvatarUrl = signal<string | null>(null);
 
   readonly workspaces = signal<WorkspaceSummary[]>([]);
   /** Active workspace is the one stored in WorkspaceContextService (localStorage-backed). */
   readonly currentWorkspace = computed(() => {
     const id = this.workspaceContext.activeWorkspaceId();
-    return this.workspaces().find(w => w.id === id) ?? this.workspaces()[0] ?? null;
+    return this.workspaces().find((w) => w.id === id) ?? this.workspaces()[0] ?? null;
   });
   /**
    * Deterministic color for the active workspace, derived from its UUID hash
@@ -154,13 +169,15 @@ export class ShellComponent implements OnInit {
     // In platform mode the "active" entry is the synthetic platform one, so
     // every real workspace counts as an "other" entry the user can switch to.
     if (this.inPlatformMode()) return this.workspaces();
-    return this.workspaces().filter(w => w.id !== this.currentWorkspace()?.id);
+    return this.workspaces().filter((w) => w.id !== this.currentWorkspace()?.id);
   });
 
   toggleWorkspaceMenu(): void {
-    this.workspaceMenuOpen.update(v => !v);
+    this.workspaceMenuOpen.update((v) => !v);
   }
-  closeWorkspaceMenu(): void { this.workspaceMenuOpen.set(false); }
+  closeWorkspaceMenu(): void {
+    this.workspaceMenuOpen.set(false);
+  }
 
   /** Returns 2-letter uppercase initials for a workspace name. */
   workspaceInitialsFor(name: string): string {
@@ -187,7 +204,10 @@ export class ShellComponent implements OnInit {
    * to do with it.
    */
   async switchWorkspace(id: string): Promise<void> {
-    if (id === this.currentWorkspace()?.id && !this.inPlatformMode()) { this.closeWorkspaceMenu(); return; }
+    if (id === this.currentWorkspace()?.id && !this.inPlatformMode()) {
+      this.closeWorkspaceMenu();
+      return;
+    }
     this.workspaceContext.setActiveWorkspace(id);
     this.closeWorkspaceMenu();
     const target = this.inPlatformMode() ? '/dashboard' : this.router.url;
@@ -207,7 +227,7 @@ export class ShellComponent implements OnInit {
       this.workspaces.set(summaries);
       if (summaries.length > 0) {
         const stored = localStorage.getItem('dad-workspace-id');
-        const active = summaries.find(w => w.id === stored) ?? summaries[0];
+        const active = summaries.find((w) => w.id === stored) ?? summaries[0];
         this.workspaceContext.setActiveWorkspace(active.id);
         this.activeWorkspaceName.set(active.name);
       }
@@ -297,8 +317,12 @@ export class ShellComponent implements OnInit {
     return Number.isFinite(stored) && stored >= 200 && stored <= 360 ? stored : 260;
   }
 
-  openMobileSidebar(): void  { this.mobileOpen.set(true); }
-  closeMobileSidebar(): void { this.mobileOpen.set(false); }
+  openMobileSidebar(): void {
+    this.mobileOpen.set(true);
+  }
+  closeMobileSidebar(): void {
+    this.mobileOpen.set(false);
+  }
 
   /** Handle drag from the right-edge resize handle. */
   startResize(ev: PointerEvent): void {
@@ -315,11 +339,13 @@ export class ShellComponent implements OnInit {
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup',   onUp);
-      try { localStorage.setItem('dad-sidebar-width', String(this.sidebarWidth())); } catch {}
+      window.removeEventListener('pointerup', onUp);
+      try {
+        localStorage.setItem('dad-sidebar-width', String(this.sidebarWidth()));
+      } catch {}
     };
     window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup',   onUp);
+    window.addEventListener('pointerup', onUp);
   }
 
   @HostListener('window:resize')
@@ -337,7 +363,9 @@ export class ShellComponent implements OnInit {
   readonly profilePasswordError = signal('');
   readonly profileSaveError = signal('');
   readonly showProfilePassword = signal(false);
-  toggleShowProfilePassword(): void { this.showProfilePassword.update(v => !v); }
+  toggleShowProfilePassword(): void {
+    this.showProfilePassword.update((v) => !v);
+  }
 
   // ── Sysadmin first-run setup modal ───────────────────────────────────────
   // Separate from the workspace-scoped profile-setup modal because the
@@ -345,28 +373,39 @@ export class ShellComponent implements OnInit {
   // fail with "Aucun espace de travail actif". This modal writes the name
   // straight to auth.users.raw_user_meta_data.full_name (a true platform
   // identity field, not workspace-scoped).
-  readonly showSysadminSetup       = signal(false);
-  readonly sysadminName            = signal('');
-  readonly sysadminPassword        = signal('');
-  readonly sysadminSaveLoading     = signal(false);
-  readonly sysadminPasswordError   = signal('');
-  readonly sysadminSaveError       = signal('');
-  readonly showSysadminPassword    = signal(false);
-  toggleShowSysadminPassword(): void { this.showSysadminPassword.update(v => !v); }
+  readonly showSysadminSetup = signal(false);
+  readonly sysadminName = signal('');
+  readonly sysadminPassword = signal('');
+  readonly sysadminSaveLoading = signal(false);
+  readonly sysadminPasswordError = signal('');
+  readonly sysadminSaveError = signal('');
+  readonly showSysadminPassword = signal(false);
+  toggleShowSysadminPassword(): void {
+    this.showSysadminPassword.update((v) => !v);
+  }
 
   /** Name of the active workspace — shown in the invitation welcome modal. */
   readonly activeWorkspaceName = signal('');
 
   readonly hasPasswordNotSet = signal(false);
   readonly passwordBannerDismissed = signal(false);
-  readonly showPasswordBanner = computed(() => this.hasPasswordNotSet() && !this.passwordBannerDismissed());
-  dismissPasswordBanner(): void { this.passwordBannerDismissed.set(true); }
+  readonly showPasswordBanner = computed(
+    () => this.hasPasswordNotSet() && !this.passwordBannerDismissed(),
+  );
+  dismissPasswordBanner(): void {
+    this.passwordBannerDismissed.set(true);
+  }
 
   // ── Topbar search ────────────────────────────────────────────────────────
-  readonly searchTerm     = signal('');
-  readonly searchOpen     = signal(false);
-  readonly searchLoading  = signal(false);
-  readonly searchResults  = signal<SearchResults>({ events: [], campaigns: [], companies: [], calendars: [] });
+  readonly searchTerm = signal('');
+  readonly searchOpen = signal(false);
+  readonly searchLoading = signal(false);
+  readonly searchResults = signal<SearchResults>({
+    events: [],
+    campaigns: [],
+    companies: [],
+    calendars: [],
+  });
   readonly searchTotalCount = computed(() => {
     const r = this.searchResults();
     return r.events.length + r.campaigns.length + r.companies.length + r.calendars.length;
@@ -380,7 +419,9 @@ export class ShellComponent implements OnInit {
     this.searchInput$.next(value);
   }
 
-  closeSearchDropdown(): void { this.searchOpen.set(false); }
+  closeSearchDropdown(): void {
+    this.searchOpen.set(false);
+  }
 
   submitSearch(): void {
     const term = this.searchTerm().trim();
@@ -391,9 +432,9 @@ export class ShellComponent implements OnInit {
 
   goToResult(r: SearchResult): void {
     const routes: Record<SearchResult['type'], string> = {
-      event:    '/evenements',
+      event: '/evenements',
       campaign: '/campagnes',
-      company:  '/compagnies',
+      company: '/compagnies',
       calendar: '/calendrier',
     };
     this.searchOpen.set(false);
@@ -406,41 +447,107 @@ export class ShellComponent implements OnInit {
       id: 'pilotage',
       label: 'Pilotage',
       items: [
-        { id: 'dashboard',     label: 'Tableau de bord', icon: '@tui.layout-dashboard', path: '/dashboard', roles: [] },
-        { id: 'metriques',     label: 'Métriques',       icon: '@tui.bar-chart-2',      path: '/metriques', roles: ['owner', 'chef_equipe', 'charge_communication'] },
+        {
+          id: 'dashboard',
+          label: 'Tableau de bord',
+          icon: '@tui.layout-dashboard',
+          path: '/dashboard',
+          roles: [],
+        },
+        {
+          id: 'metriques',
+          label: 'Métriques',
+          icon: '@tui.bar-chart-2',
+          path: '/metriques',
+          roles: ['owner', 'chef_equipe', 'charge_communication'],
+        },
       ],
     },
     {
       id: 'editorial',
       label: 'Éditorial',
       items: [
-        { id: 'calendrier',      label: 'Calendrier éditorial',       icon: '@tui.calendar',    path: '/calendrier',      roles: [] },
-        { id: 'recommandations', label: 'Recommandations',            icon: '@tui.list-checks', path: '/recommandations', roles: [] },
-        { id: 'evenements',      label: "Bibliothèque d'événements",  icon: '@tui.book-open',   path: '/evenements',      roles: ['owner', 'chef_equipe', 'editeur'] },
+        {
+          id: 'calendrier',
+          label: 'Calendrier éditorial',
+          icon: '@tui.calendar',
+          path: '/calendrier',
+          roles: [],
+        },
+        {
+          id: 'recommandations',
+          label: 'Recommandations',
+          icon: '@tui.list-checks',
+          path: '/recommandations',
+          roles: [],
+        },
+        {
+          id: 'evenements',
+          label: "Bibliothèque d'événements",
+          icon: '@tui.book-open',
+          path: '/evenements',
+          roles: ['owner', 'chef_equipe', 'editeur'],
+        },
       ],
     },
     {
       id: 'regie',
       label: 'Régie publicitaire',
       items: [
-        { id: 'campagnes',  label: 'Encarts publicitaires', icon: '@tui.megaphone', path: '/campagnes',  roles: ['owner', 'chef_equipe', 'charge_communication', 'chef_equipe_commerciale'] },
-        { id: 'compagnies', label: 'Annonceurs',            icon: '@tui.building',  path: '/compagnies', roles: ['owner', 'chef_equipe_commerciale', 'charge_communication'] },
+        {
+          id: 'campagnes',
+          label: 'Encarts publicitaires',
+          icon: '@tui.megaphone',
+          path: '/campagnes',
+          roles: ['owner', 'chef_equipe', 'charge_communication', 'chef_equipe_commerciale'],
+        },
+        {
+          id: 'compagnies',
+          label: 'Annonceurs',
+          icon: '@tui.building',
+          path: '/compagnies',
+          roles: ['owner', 'chef_equipe_commerciale', 'charge_communication'],
+        },
       ],
     },
     {
       id: 'equipe',
       label: 'Équipe & alertes',
       items: [
-        { id: 'utilisateurs',  label: 'Utilisateurs',  icon: '@tui.users', path: '/utilisateurs',  roles: ['owner'] },
-        { id: 'notifications', label: 'Notifications', icon: '@tui.bell',  path: '/notifications', roles: [] },
+        {
+          id: 'utilisateurs',
+          label: 'Utilisateurs',
+          icon: '@tui.users',
+          path: '/utilisateurs',
+          roles: ['owner'],
+        },
+        {
+          id: 'notifications',
+          label: 'Notifications',
+          icon: '@tui.bell',
+          path: '/notifications',
+          roles: [],
+        },
       ],
     },
     {
       id: 'administration',
       label: 'Administration',
       items: [
-        { id: 'workspace',  label: 'Espace de travail', icon: '@tui.building', path: '/espace-de-travail', roles: [] },
-        { id: 'parametres', label: 'Customisation',      icon: '@tui.settings', path: '/parametres',        roles: [] },
+        {
+          id: 'workspace',
+          label: 'Espace de travail',
+          icon: '@tui.building',
+          path: '/espace-de-travail',
+          roles: [],
+        },
+        {
+          id: 'parametres',
+          label: 'Customisation',
+          icon: '@tui.settings',
+          path: '/parametres',
+          roles: [],
+        },
       ],
     },
   ];
@@ -453,10 +560,34 @@ export class ShellComponent implements OnInit {
     id: 'plateforme',
     label: 'Plateforme',
     items: [
-      { id: 'admin-dashboard',    label: 'Tableau de bord plateforme', icon: '@tui.layout-dashboard', path: '/admin',              roles: [] },
-      { id: 'admin-espaces',      label: 'Espaces de travail',         icon: '@tui.building',         path: '/admin/espaces',      roles: [] },
-      { id: 'admin-utilisateurs', label: 'Tous les utilisateurs',      icon: '@tui.users',            path: '/admin/utilisateurs', roles: [] },
-      { id: 'admin-logs',         label: "Journal d'activité",         icon: '@tui.scroll-text',      path: '/admin/logs',         roles: [] },
+      {
+        id: 'admin-dashboard',
+        label: 'Tableau de bord plateforme',
+        icon: '@tui.layout-dashboard',
+        path: '/admin',
+        roles: [],
+      },
+      {
+        id: 'admin-espaces',
+        label: 'Espaces de travail',
+        icon: '@tui.building',
+        path: '/admin/espaces',
+        roles: [],
+      },
+      {
+        id: 'admin-utilisateurs',
+        label: 'Tous les utilisateurs',
+        icon: '@tui.users',
+        path: '/admin/utilisateurs',
+        roles: [],
+      },
+      {
+        id: 'admin-logs',
+        label: "Journal d'activité",
+        icon: '@tui.scroll-text',
+        path: '/admin/logs',
+        roles: [],
+      },
     ],
   };
 
@@ -469,9 +600,27 @@ export class ShellComponent implements OnInit {
     id: 'compte',
     label: 'Compte',
     items: [
-      { id: 'admin-notifications', label: 'Notifications', icon: '@tui.bell',     path: '/admin/notifications', roles: [] },
-      { id: 'admin-profil',        label: 'Mon profil',    icon: '@tui.user',     path: '/admin/profil',        roles: [] },
-      { id: 'admin-parametres',    label: 'Customisation', icon: '@tui.settings', path: '/admin/parametres',    roles: [] },
+      {
+        id: 'admin-notifications',
+        label: 'Notifications',
+        icon: '@tui.bell',
+        path: '/admin/notifications',
+        roles: [],
+      },
+      {
+        id: 'admin-profil',
+        label: 'Mon profil',
+        icon: '@tui.user',
+        path: '/admin/profil',
+        roles: [],
+      },
+      {
+        id: 'admin-parametres',
+        label: 'Customisation',
+        icon: '@tui.settings',
+        path: '/admin/parametres',
+        roles: [],
+      },
     ],
   };
 
@@ -492,38 +641,40 @@ export class ShellComponent implements OnInit {
     const role = this.currentRole();
     if (!role && !this.isSystemAdmin()) return [];
     return this.navSections
-      .map(s => ({
+      .map((s) => ({
         ...s,
-        items: s.items.filter((i: NavItem) => i.roles.length === 0 || (role ? i.roles.includes(role) : false)),
+        items: s.items.filter(
+          (i: NavItem) => i.roles.length === 0 || (role ? i.roles.includes(role) : false),
+        ),
       }))
-      .filter(s => s.items.length > 0);
+      .filter((s) => s.items.length > 0);
   });
 
   /** Flat list of all role-visible nav items, in section order. Useful for cross-checks. */
   readonly visibleNavItems = computed<NavItem[]>(() =>
-    this.visibleNavSections().flatMap(s => s.items),
+    this.visibleNavSections().flatMap((s) => s.items),
   );
 
   private readonly routeTitles: Record<string, string> = {
-    dashboard:           'Tableau de bord',
-    calendrier:          'Calendrier éditorial',
-    recommandations:     'Recommandations du Curateur',
-    evenements:          'Bibliothèque d\'événements historiques',
-    campagnes:           'Encarts publicitaires',
-    compagnies:          'Annonceurs',
-    utilisateurs:        'Utilisateurs',
-    metriques:           'Métriques',
-    notifications:       'Notifications',
-    profil:              'Mon profil',
-    parametres:          'Customisation',
+    dashboard: 'Tableau de bord',
+    calendrier: 'Calendrier éditorial',
+    recommandations: 'Recommandations du Curateur',
+    evenements: "Bibliothèque d'événements historiques",
+    campagnes: 'Encarts publicitaires',
+    compagnies: 'Annonceurs',
+    utilisateurs: 'Utilisateurs',
+    metriques: 'Métriques',
+    notifications: 'Notifications',
+    profil: 'Mon profil',
+    parametres: 'Customisation',
     'espace-de-travail': 'Espace de travail',
-    admin:                   'Administration plateforme · Tableau de bord',
-    'admin/espaces':         'Administration plateforme · Espaces',
-    'admin/utilisateurs':    'Administration plateforme · Utilisateurs',
-    'admin/logs':            "Administration plateforme · Journal d'activité",
-    'admin/notifications':   'Administration plateforme · Notifications',
-    'admin/profil':          'Administration plateforme · Mon profil',
-    'admin/parametres':      'Administration plateforme · Customisation',
+    admin: 'Administration plateforme · Tableau de bord',
+    'admin/espaces': 'Administration plateforme · Espaces',
+    'admin/utilisateurs': 'Administration plateforme · Utilisateurs',
+    'admin/logs': "Administration plateforme · Journal d'activité",
+    'admin/notifications': 'Administration plateforme · Notifications',
+    'admin/profil': 'Administration plateforme · Mon profil',
+    'admin/parametres': 'Administration plateforme · Customisation',
   };
 
   async ngOnInit(): Promise<void> {
@@ -538,29 +689,34 @@ export class ShellComponent implements OnInit {
     // color/name instead of the platform "AP" icon.
     this.applyTitleFromUrl(this.router.url);
     this.currentUrl.set(this.router.url);
-    this.router.events.pipe(
-      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-    ).subscribe(e => {
-      this.applyTitleFromUrl(e.urlAfterRedirects);
-      this.currentUrl.set(e.urlAfterRedirects);
-    });
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe((e) => {
+        this.applyTitleFromUrl(e.urlAfterRedirects);
+        this.currentUrl.set(e.urlAfterRedirects);
+        // Keep the recommendations badge honest: re-count on every navigation
+        // so applying recommendations clears it without a page reload.
+        void this.refreshPendingRecs();
+      });
 
     // Debounced topbar search — fires SearchService after 300ms of idle typing.
-    this.searchInput$.pipe(
-      debounceTime(300),
-      distinctUntilChanged(),
-      switchMap(term => {
-        if (!term.trim()) {
-          this.searchLoading.set(false);
-          return of({ events: [], campaigns: [], companies: [], calendars: [] } as SearchResults);
-        }
-        this.searchLoading.set(true);
-        return this.searchService.search(term);
-      }),
-    ).subscribe(results => {
-      this.searchResults.set(results);
-      this.searchLoading.set(false);
-    });
+    this.searchInput$
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        switchMap((term) => {
+          if (!term.trim()) {
+            this.searchLoading.set(false);
+            return of({ events: [], campaigns: [], companies: [], calendars: [] } as SearchResults);
+          }
+          this.searchLoading.set(true);
+          return this.searchService.search(term);
+        }),
+      )
+      .subscribe((results) => {
+        this.searchResults.set(results);
+        this.searchLoading.set(false);
+      });
 
     const user = await firstValueFrom(this.auth.getCurrentUser().pipe(filter(Boolean)));
     this.userId = user.id ?? '';
@@ -588,12 +744,14 @@ export class ShellComponent implements OnInit {
 
     // Live-reload the switcher whenever a workspace is created / renamed /
     // soft-deleted from anywhere in the app (currently /admin/espaces).
-    this.workspaceContext.workspacesChanged$
-      .subscribe(() => { void this._reloadWorkspaceSummaries(); });
+    this.workspaceContext.workspacesChanged$.subscribe(() => {
+      void this._reloadWorkspaceSummaries();
+    });
 
     // Prime the notification-unread signal from the server. The service
     // swallows failures internally so this is fire-and-forget.
     void this.notifService.refreshUnread();
+    await this.refreshPendingRecs();
 
     const pwdSet = await this.supabase.hasPasswordSet();
     this.hasPasswordNotSet.set(!pwdSet);
@@ -619,7 +777,7 @@ export class ShellComponent implements OnInit {
 
     const fullName = this.sysadminName().trim();
     const { error } = await this.supabase.client.auth.updateUser({
-      data:     { full_name: fullName },
+      data: { full_name: fullName },
       password: pwd,
     });
 
@@ -636,6 +794,16 @@ export class ShellComponent implements OnInit {
     this.userInitials.set(((np[0]?.[0] ?? '') + (np[1]?.[0] ?? '')).toUpperCase() || 'AA');
     this.sysadminSaveLoading.set(false);
     this.showSysadminSetup.set(false);
+  }
+
+  /** Re-count pending Curateur recommendations; keeps the last known value
+   *  on failure so a transient error doesn't flicker the badge. */
+  private async refreshPendingRecs(): Promise<void> {
+    try {
+      this.pendingRecs.set(await firstValueFrom(this.recommendationService.countAllPending()));
+    } catch {
+      // Keep previous count.
+    }
   }
 
   private applyTitleFromUrl(url: string | undefined | null): void {
@@ -658,7 +826,9 @@ export class ShellComponent implements OnInit {
     // rate-limited to 2 emails/hr. Optional for existing users who already
     // have a password but somehow re-hit the setup modal.
     if (this.hasPasswordNotSet() && !pwd) {
-      this.profilePasswordError.set('Veuillez définir un mot de passe pour finaliser votre inscription.');
+      this.profilePasswordError.set(
+        'Veuillez définir un mot de passe pour finaliser votre inscription.',
+      );
       return;
     }
     if (pwd && pwd.length < 8) {
@@ -669,10 +839,16 @@ export class ShellComponent implements OnInit {
     this.profileSaveError.set('');
     this.profileSaveLoading.set(true);
     const profileRes = await firstValueFrom(
-      this.workspaceService.upsertProfile(this.userId, this.profileFullName().trim(), this.profilePhone().trim()),
+      this.workspaceService.upsertProfile(
+        this.userId,
+        this.profileFullName().trim(),
+        this.profilePhone().trim(),
+      ),
     );
     if (!profileRes.success) {
-      this.profileSaveError.set('Erreur lors de l\'enregistrement : ' + (profileRes.error ?? 'inconnue'));
+      this.profileSaveError.set(
+        "Erreur lors de l'enregistrement : " + (profileRes.error ?? 'inconnue'),
+      );
       this.profileSaveLoading.set(false);
       return;
     }
@@ -695,7 +871,7 @@ export class ShellComponent implements OnInit {
   }
 
   toggleCollapsed(): void {
-    this.collapsed.update(v => !v);
+    this.collapsed.update((v) => !v);
   }
 
   logout(): void {

@@ -29,7 +29,7 @@ const MOCK_LIBRARY_EVENTS: Event[] = [
 
 const MOCK_CAMPAIGNS: AdCampaign[] = [
   {
-    id: 'camp-1', name: 'MTN Congo', advertiser: 'MTN', position: 'header',
+    id: 'camp-1', name: 'MTN Congo', advertiser: 'MTN', position: 'footer',
     start_date: '2026-08-01', end_date: '2026-08-31',
     active: true, image_path: '', link_url: null, workspace_id: 'ws-1',
     created_by: 'u1', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',

@@ -225,7 +225,7 @@
             font-weight: 600;
           "
         >
-          Événements sur mobile
+          Éphémérides publiées
         </div>
         <div
           style="
@@ -240,7 +240,7 @@
           {{ contentStats().mobileEvents | number }}
         </div>
         <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
-          diffusés par le calendrier {{ currentYear }}
+          événements visibles dans l'application en {{ currentYear }}
         </div>
       </div>
       <div class="card" style="padding: 20px">
@@ -253,7 +253,7 @@
             font-weight: 600;
           "
         >
-          Jours couverts — {{ currentYear }}
+          Jours avec une éphéméride
         </div>
         <div
           style="
@@ -269,7 +269,7 @@
           {{ contentStats().filledDays }}
         </div>
         <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
-          {{ yearCoveragePct() }} % de l'année a une éphéméride
+          {{ yearCoveragePct() }} % de l'année {{ currentYear }} est couverte
         </div>
       </div>
       <a
@@ -286,7 +286,7 @@
             font-weight: 600;
           "
         >
-          Publicité en diffusion
+          Publicité en cours
         </div>
         @if (currentAd(); as ad) {
           <div
@@ -320,7 +320,7 @@
             —
           </div>
           <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
-            aucune bannière ne diffuse aujourd'hui
+            aucune publicité dans l'application aujourd'hui
           </div>
         }
       </a>
@@ -338,7 +338,7 @@
             font-weight: 600;
           "
         >
-          Jours vendus — {{ currentYear }}
+          Jours de publicité vendus
         </div>
         <div
           style="
@@ -354,7 +354,7 @@
           {{ soldDaysYear() }}
         </div>
         <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
-          jours de publicité vendus aux annonceurs →
+          sur l'ensemble de l'année {{ currentYear }} →
         </div>
       </a>
     </div>
@@ -420,8 +420,8 @@
     <div class="card">
       <div class="card-header">
         <div>
-          <div class="card-title">Jours vendus par mois — {{ currentYear }}</div>
-          <div class="card-subtitle">Jours couverts par une campagne validée</div>
+          <div class="card-title">Jours de publicité vendus par mois — {{ currentYear }}</div>
+          <div class="card-subtitle">Jours réservés par les annonceurs chaque mois</div>
         </div>
       </div>
       <div class="card-body">

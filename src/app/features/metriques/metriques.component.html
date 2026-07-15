@@ -1,30 +1,15 @@
 <div class="metriques-page">
-
   @if (loading()) {
     <div class="metriques-loading">
       <span class="spinner"></span>
       Chargement des métriques…
     </div>
   } @else {
-
-    @if (clickTrackingPending()) {
-      <div class="metriques-info-banner" role="status">
-        <tui-icon icon="@tui.info" style="font-size:16px; flex-shrink:0;" />
-        <span>
-          <strong>Suivi des clics en attente de l'application mobile.</strong>
-          Les impressions sont enregistrées, mais aucun clic n'est encore remonté&nbsp;: l'app mobile n'a pas
-          encore livré le suivi via <code>record_ad_campaign_click()</code>. CTR&nbsp;= —
-          tant que la mise à jour mobile n'est pas déployée.
-        </span>
-      </div>
-    }
-
     <!-- ══ KPI cards ══ -->
     <div class="kpi-grid">
-
       <div class="kpi-card">
         <div class="kpi-card__icon kpi-card__icon--devices">
-          <tui-icon icon="@tui.smartphone" style="font-size:18px;" />
+          <tui-icon icon="@tui.smartphone" style="font-size: 18px" />
         </div>
         <div class="kpi-card__body">
           <div class="kpi-card__value">{{ deviceStats().total | number }}</div>
@@ -36,67 +21,20 @@
       </div>
 
       <div class="kpi-card">
-        <div class="kpi-card__icon kpi-card__icon--notif">
-          <tui-icon icon="@tui.bell" style="font-size:18px;" />
-        </div>
-        <div class="kpi-card__body">
-          @if (notifOpenRate() !== null) {
-            <div class="kpi-card__value">{{ notifOpenRate()! | percent:'1.0-0' }}</div>
-          } @else {
-            <div class="kpi-card__value" style="color:var(--fg-3);">—</div>
-          }
-          <div class="kpi-card__label">Taux d'ouverture notifications</div>
-          <div class="kpi-card__sub">réponses / reçues</div>
-        </div>
-      </div>
-
-      <div class="kpi-card">
         <div class="kpi-card__icon kpi-card__icon--taps">
-          <tui-icon icon="@tui.mouse-pointer-click" style="font-size:18px;" />
+          <tui-icon icon="@tui.mouse-pointer-click" style="font-size: 18px" />
         </div>
         <div class="kpi-card__body">
           <div class="kpi-card__value">{{ totalImpressions() | number }}</div>
-          <div class="kpi-card__label">Impressions bannières</div>
+          <div class="kpi-card__label">Affichages des bannières</div>
           <div class="kpi-card__sub">
             {{ totalClicks() | number }} clic{{ totalClicks() > 1 ? 's' : '' }}
             @if (globalCtr() !== null) {
-              · CTR {{ globalCtr() | percent:'1.2-2' }}
+              · CTR {{ globalCtr() | percent: '1.2-2' }}
             }
           </div>
         </div>
       </div>
-
-      <div class="kpi-card">
-        <div class="kpi-card__icon kpi-card__icon--coverage">
-          <tui-icon icon="@tui.calendar-check" style="font-size:18px;" />
-        </div>
-        <div class="kpi-card__body">
-          <div class="kpi-card__value">{{ coveragePercent() }}%</div>
-          <div class="kpi-card__label">Couverture calendrier {{ currentYear }}</div>
-          <div class="kpi-card__sub">mois entièrement remplis</div>
-        </div>
-      </div>
-
-      <div class="kpi-card">
-        <div class="kpi-card__icon kpi-card__icon--coverage">
-          <tui-icon icon="@tui.list-checks" style="font-size:18px;" />
-        </div>
-        <div class="kpi-card__body">
-          @if (applyLatency(); as lat) {
-            <div class="kpi-card__value">{{ lat.median_hours | number:'1.0-1' }}&nbsp;h</div>
-            <div class="kpi-card__label">Délai d'application des recommandations</div>
-            <div class="kpi-card__sub">
-              médiane · {{ lat.applied_count }} appliquée{{ lat.applied_count > 1 ? 's' : '' }}
-              · moy. {{ lat.avg_hours | number:'1.0-1' }} h
-            </div>
-          } @else {
-            <div class="kpi-card__value" style="color:var(--fg-3);">—</div>
-            <div class="kpi-card__label">Délai d'application des recommandations</div>
-            <div class="kpi-card__sub">aucune recommandation appliquée pour l'instant</div>
-          }
-        </div>
-      </div>
-
     </div>
 
     <!-- ══ Row: CMS activity chart ══ -->
@@ -104,7 +42,9 @@
       <div class="metriques-chart-header">
         <div>
           <div class="metriques-chart-title">Activité CMS — 30 derniers jours</div>
-          <div class="metriques-chart-sub">Opérations dans le journal d'audit (INSERT / UPDATE / DELETE)</div>
+          <div class="metriques-chart-sub">
+            Opérations dans le journal d'audit (INSERT / UPDATE / DELETE)
+          </div>
         </div>
         @if (activityPoints().max > 0) {
           <span class="metriques-chart-peak">
@@ -120,14 +60,11 @@
           <svg viewBox="0 0 560 88" preserveAspectRatio="none" class="metriques-area-chart">
             <defs>
               <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.25" />
+                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.25" />
                 <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.03" />
               </linearGradient>
             </defs>
-            <polygon
-              [attr.points]="activityPoints().area"
-              fill="url(#actGrad)"
-            />
+            <polygon [attr.points]="activityPoints().area" fill="url(#actGrad)" />
             <polyline
               [attr.points]="activityPoints().polyline"
               fill="none"
@@ -137,59 +74,47 @@
               stroke-linecap="round"
             />
             @for (pt of activityPoints().points; track pt.d.date) {
-              <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="3"
-                      fill="var(--accent)" />
+              <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="3" fill="var(--accent)" />
             }
           </svg>
           <!-- X-axis labels -->
           <div class="metriques-x-axis">
             @for (pt of activityPoints().points; track pt.d.date) {
-              <span class="metriques-x-label">{{ pt.d.date | slice:5 }}</span>
+              <span class="metriques-x-label">{{ pt.d.date | slice: 5 }}</span>
             }
           </div>
         </div>
       }
     </div>
 
-    <!-- ══ Row: Ad-inventory fill rate per month (sold days per position) ══
-         The editorial coverage chart now lives on the dashboard (operational
-         view); this one answers the commercial question "how much of our ad
-         inventory is actually sold, month by month". -->
+    <!-- ══ Row: Ad days sold per month ══
+         One banner per day (footer-only business rule), so a month's sales
+         = days covered by a validated + active campaign. Year filter +
+         cumulative view arrive with the chart redesign. -->
     <div class="card metriques-chart-card">
       <div class="metriques-chart-header">
         <div>
-          <div class="metriques-chart-title">Inventaire publicitaire vendu — {{ currentYear }}</div>
-          <div class="metriques-chart-sub">
-            % de jours du mois couverts par une campagne validée et active, par position
+          <div class="metriques-chart-title">
+            Jours de publicité vendus par mois — {{ currentYear }}
           </div>
-        </div>
-        <div style="display:flex; gap:14px; font-size:11.5px; color:var(--fg-3);">
-          <span style="display:inline-flex; align-items:center; gap:5px;">
-            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent); display:inline-block;"></span>
-            Header
-          </span>
-          <span style="display:inline-flex; align-items:center; gap:5px;">
-            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent-2); display:inline-block;"></span>
-            Footer
-          </span>
+          <div class="metriques-chart-sub">
+            Jours du mois réservés par un annonceur (campagne validée) — une seule bannière par jour
+          </div>
         </div>
       </div>
       <div class="metriques-bar-chart">
-        @for (bar of fillRateBarData(); track bar.label) {
-          <div class="metriques-bar-col">
-            <div class="metriques-bar-track" style="display:flex; gap:2px; align-items:flex-end;">
-              <div style="flex:1; height:100%; display:flex; align-items:flex-end;"
-                   [title]="'Header : ' + bar.headerPct + '%'">
-                <div style="width:100%; border-radius:2px 2px 0 0; background:var(--accent);"
-                     [style.height.%]="bar.headerPct"></div>
-              </div>
-              <div style="flex:1; height:100%; display:flex; align-items:flex-end;"
-                   [title]="'Footer : ' + bar.footerPct + '%'">
-                <div style="width:100%; border-radius:2px 2px 0 0; background:var(--accent-2);"
-                     [style.height.%]="bar.footerPct"></div>
-              </div>
+        @for (bar of soldDaysBarData(); track bar.label) {
+          <div
+            class="metriques-bar-col"
+            [title]="bar.soldDays + ' jour(s) vendu(s) — ' + bar.pct + '% du mois'"
+          >
+            <div class="metriques-bar-track" style="display: flex; align-items: flex-end">
+              <div
+                style="width: 100%; border-radius: 2px 2px 0 0; background: var(--accent)"
+                [style.height.%]="bar.pct"
+              ></div>
             </div>
-            <span class="metriques-bar-pct">{{ bar.headerPct }} / {{ bar.footerPct }}</span>
+            <span class="metriques-bar-pct">{{ bar.soldDays }} j</span>
             <span class="metriques-bar-label">{{ bar.label }}</span>
           </div>
         }
@@ -207,7 +132,7 @@
         </div>
         @if (advertiserExposure().length > 0) {
           <button class="btn btn-flat btn-sm" type="button" (click)="exportExposureCsv()">
-            <tui-icon icon="@tui.download" style="font-size:14px;" />
+            <tui-icon icon="@tui.download" style="font-size: 14px" />
             Exporter CSV
           </button>
         }
@@ -219,26 +144,50 @@
           <thead>
             <tr>
               <th>Annonceur</th>
-              <th style="text-align:right">Campagnes</th>
-              <th style="text-align:right" title="Jours passés où une campagne validée était diffusée">Jours diffusés</th>
-              <th style="text-align:right" title="Jours futurs déjà réservés (campagne validée et active)">Jours réservés</th>
-              <th style="text-align:right">Impressions</th>
-              <th style="text-align:right">Clics</th>
-              <th style="text-align:right">CTR</th>
+              <th style="text-align: right">Campagnes</th>
+              <th
+                style="text-align: right"
+                title="Jours passés où une campagne validée était diffusée"
+              >
+                Jours diffusés
+              </th>
+              <th
+                style="text-align: right"
+                title="Jours futurs déjà réservés (campagne validée et active)"
+              >
+                Jours réservés
+              </th>
+              <th style="text-align: right">Impressions</th>
+              <th style="text-align: right">Clics</th>
+              <th style="text-align: right">CTR</th>
             </tr>
           </thead>
           <tbody>
             @for (row of advertiserExposure(); track row.company_id) {
               <tr>
-                <td style="font-weight:500;">{{ row.company_name }}</td>
-                <td style="text-align:right; font-variant-numeric:tabular-nums">{{ row.campaigns }}</td>
-                <td style="text-align:right; font-variant-numeric:tabular-nums">{{ row.days_aired }}</td>
-                <td style="text-align:right; font-variant-numeric:tabular-nums; color:var(--fg-3)">{{ row.days_booked }}</td>
-                <td style="text-align:right; font-weight:600; font-variant-numeric:tabular-nums">{{ row.impressions | number }}</td>
-                <td style="text-align:right; font-variant-numeric:tabular-nums">{{ row.clicks | number }}</td>
-                <td style="text-align:right; font-variant-numeric:tabular-nums; color:var(--fg-3)">
+                <td style="font-weight: 500">{{ row.company_name }}</td>
+                <td style="text-align: right; font-variant-numeric: tabular-nums">
+                  {{ row.campaigns }}
+                </td>
+                <td style="text-align: right; font-variant-numeric: tabular-nums">
+                  {{ row.days_aired }}
+                </td>
+                <td
+                  style="text-align: right; font-variant-numeric: tabular-nums; color: var(--fg-3)"
+                >
+                  {{ row.days_booked }}
+                </td>
+                <td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums">
+                  {{ row.impressions | number }}
+                </td>
+                <td style="text-align: right; font-variant-numeric: tabular-nums">
+                  {{ row.clicks | number }}
+                </td>
+                <td
+                  style="text-align: right; font-variant-numeric: tabular-nums; color: var(--fg-3)"
+                >
                   @if (exposureCtr(row) !== null) {
-                    {{ exposureCtr(row)! | percent:'1.2-2' }}
+                    {{ exposureCtr(row)! | percent: '1.2-2' }}
                   } @else {
                     —
                   }
@@ -260,9 +209,16 @@
           </div>
         </div>
         @if (velocityTrend(); as trend) {
-          <span class="metriques-chart-peak"
-                [style.color]="trend.direction === 'up' ? 'var(--success)'
-                             : trend.direction === 'down' ? 'var(--danger)' : 'var(--fg-3)'">
+          <span
+            class="metriques-chart-peak"
+            [style.color]="
+              trend.direction === 'up'
+                ? 'var(--success)'
+                : trend.direction === 'down'
+                  ? 'var(--danger)'
+                  : 'var(--fg-3)'
+            "
+          >
             @if (trend.deltaPct !== null) {
               {{ trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '▬' }}
               {{ trend.deltaPct > 0 ? '+' : '' }}{{ trend.deltaPct }}% vs semaine précédente
@@ -277,32 +233,82 @@
       } @else {
         <div class="metriques-bar-chart">
           @for (week of teamVelocity(); track week.week_start) {
-            <div class="metriques-bar-col"
-                 [title]="week.events + ' événement(s) · ' + week.entries + ' affectation(s) · ' + week.campaigns + ' campagne(s)'">
-              <div class="metriques-bar-track" style="display:flex; flex-direction:column-reverse;">
-                <div style="width:100%; background:var(--accent);"
-                     [style.height.%]="(week.events / velocityMax()) * 100"></div>
-                <div style="width:100%; background:var(--accent-2);"
-                     [style.height.%]="(week.entries / velocityMax()) * 100"></div>
-                <div style="width:100%; background:var(--info); border-radius:2px 2px 0 0;"
-                     [style.height.%]="(week.campaigns / velocityMax()) * 100"></div>
+            <div
+              class="metriques-bar-col"
+              [title]="
+                week.events +
+                ' événement(s) · ' +
+                week.entries +
+                ' affectation(s) · ' +
+                week.campaigns +
+                ' campagne(s)'
+              "
+            >
+              <div
+                class="metriques-bar-track"
+                style="display: flex; flex-direction: column-reverse"
+              >
+                <div
+                  style="width: 100%; background: var(--accent)"
+                  [style.height.%]="(week.events / velocityMax()) * 100"
+                ></div>
+                <div
+                  style="width: 100%; background: var(--accent-2)"
+                  [style.height.%]="(week.entries / velocityMax()) * 100"
+                ></div>
+                <div
+                  style="width: 100%; background: var(--info); border-radius: 2px 2px 0 0"
+                  [style.height.%]="(week.campaigns / velocityMax()) * 100"
+                ></div>
               </div>
               <span class="metriques-bar-pct">{{ week.total | number }}</span>
               <span class="metriques-bar-label">{{ weekLabel(week.week_start) }}</span>
             </div>
           }
         </div>
-        <div style="display:flex; gap:16px; font-size:11.5px; color:var(--fg-3); padding:4px 4px 0;">
-          <span style="display:inline-flex; align-items:center; gap:5px;">
-            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent); display:inline-block;"></span>
+        <div
+          style="
+            display: flex;
+            gap: 16px;
+            font-size: 11.5px;
+            color: var(--fg-3);
+            padding: 4px 4px 0;
+          "
+        >
+          <span style="display: inline-flex; align-items: center; gap: 5px">
+            <span
+              style="
+                width: 10px;
+                height: 10px;
+                border-radius: 2px;
+                background: var(--accent);
+                display: inline-block;
+              "
+            ></span>
             Événements
           </span>
-          <span style="display:inline-flex; align-items:center; gap:5px;">
-            <span style="width:10px; height:10px; border-radius:2px; background:var(--accent-2); display:inline-block;"></span>
+          <span style="display: inline-flex; align-items: center; gap: 5px">
+            <span
+              style="
+                width: 10px;
+                height: 10px;
+                border-radius: 2px;
+                background: var(--accent-2);
+                display: inline-block;
+              "
+            ></span>
             Affectations
           </span>
-          <span style="display:inline-flex; align-items:center; gap:5px;">
-            <span style="width:10px; height:10px; border-radius:2px; background:var(--info); display:inline-block;"></span>
+          <span style="display: inline-flex; align-items: center; gap: 5px">
+            <span
+              style="
+                width: 10px;
+                height: 10px;
+                border-radius: 2px;
+                background: var(--info);
+                display: inline-block;
+              "
+            ></span>
             Campagnes
           </span>
         </div>
@@ -311,11 +317,13 @@
 
     <!-- ══ Row: Campaign taps + Device logs ══ -->
     <div class="metriques-two-col">
-
       <!-- Campaign taps table -->
       <div class="card">
         <div class="metriques-table-header">
-          <tui-icon icon="@tui.mouse-pointer-click" style="font-size:15px; color:var(--warning);" />
+          <tui-icon
+            icon="@tui.mouse-pointer-click"
+            style="font-size: 15px; color: var(--warning)"
+          />
           <span class="metriques-table-title">Performances par campagne</span>
         </div>
         @if (campaignTaps().length === 0) {
@@ -326,25 +334,37 @@
               <tr>
                 <th>Campagne</th>
                 <th>Annonceur</th>
-                <th style="text-align:right" title="Impressions (bannière vue sur mobile)">Impr.</th>
-                <th style="text-align:right" title="Clics (tap sur la bannière)">Clics</th>
-                <th style="text-align:right" title="Click-Through Rate = clics / impressions">CTR</th>
+                <th style="text-align: right" title="Impressions (bannière vue sur mobile)">
+                  Impr.
+                </th>
+                <th style="text-align: right" title="Clics (tap sur la bannière)">Clics</th>
+                <th style="text-align: right" title="Click-Through Rate = clics / impressions">
+                  CTR
+                </th>
               </tr>
             </thead>
             <tbody>
               @for (tap of campaignTaps(); track tap.campaign_id) {
                 <tr>
                   <td>{{ tap.campaign_name }}</td>
-                  <td style="color:var(--fg-3)">{{ tap.advertiser }}</td>
-                  <td style="text-align:right; font-weight:600; font-variant-numeric:tabular-nums">
+                  <td style="color: var(--fg-3)">{{ tap.advertiser }}</td>
+                  <td
+                    style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums"
+                  >
                     {{ tap.tap_count | number }}
                   </td>
-                  <td style="text-align:right; font-variant-numeric:tabular-nums">
+                  <td style="text-align: right; font-variant-numeric: tabular-nums">
                     {{ tap.click_count | number }}
                   </td>
-                  <td style="text-align:right; font-variant-numeric:tabular-nums; color: var(--fg-3)">
+                  <td
+                    style="
+                      text-align: right;
+                      font-variant-numeric: tabular-nums;
+                      color: var(--fg-3);
+                    "
+                  >
                     @if (tap.ctr !== null) {
-                      {{ tap.ctr | percent:'1.2-2' }}
+                      {{ tap.ctr | percent: '1.2-2' }}
                     } @else {
                       —
                     }
@@ -359,7 +379,7 @@
       <!-- Device log breakdown -->
       <div class="card">
         <div class="metriques-table-header">
-          <tui-icon icon="@tui.activity" style="font-size:15px; color:var(--accent);" />
+          <tui-icon icon="@tui.activity" style="font-size: 15px; color: var(--accent)" />
           <span class="metriques-table-title">Événements appareils</span>
         </div>
         @if (logBreakdown().length === 0) {
@@ -369,18 +389,24 @@
             <thead>
               <tr>
                 <th>Action</th>
-                <th style="text-align:right">Total</th>
-                <th style="text-align:right">Succès</th>
+                <th style="text-align: right">Total</th>
+                <th style="text-align: right">Succès</th>
               </tr>
             </thead>
             <tbody>
               @for (log of logBreakdown(); track log.action) {
                 <tr>
-                  <td style="font-size:12px; font-family:var(--font-mono, monospace);">{{ log.action }}</td>
-                  <td style="text-align:right; font-variant-numeric:tabular-nums">{{ log.count }}</td>
-                  <td style="text-align:right;">
-                    <span [class.metriques-ok]="log.success === log.count"
-                          [class.metriques-warn]="log.success < log.count">
+                  <td style="font-size: 12px; font-family: var(--font-mono, monospace)">
+                    {{ log.action }}
+                  </td>
+                  <td style="text-align: right; font-variant-numeric: tabular-nums">
+                    {{ log.count }}
+                  </td>
+                  <td style="text-align: right">
+                    <span
+                      [class.metriques-ok]="log.success === log.count"
+                      [class.metriques-warn]="log.success < log.count"
+                    >
                       {{ log.success }}
                     </span>
                   </td>
@@ -390,43 +416,46 @@
           </table>
         }
       </div>
-
     </div>
 
     <!-- ══ Mobile platform breakdown ══ -->
     <div class="card metriques-platform-card">
       <div class="metriques-table-header">
-        <tui-icon icon="@tui.smartphone" style="font-size:15px; color:var(--success);" />
+        <tui-icon icon="@tui.smartphone" style="font-size: 15px; color: var(--success)" />
         <span class="metriques-table-title">Répartition des appareils mobiles</span>
       </div>
       <div class="metriques-platform-grid">
         <div class="metriques-platform-item">
           <div class="metriques-platform-icon metriques-platform-icon--android">
-            <tui-icon icon="@tui.smartphone" style="font-size:20px;" />
+            <tui-icon icon="@tui.smartphone" style="font-size: 20px" />
           </div>
           <div class="metriques-platform-label">Android</div>
           <div class="metriques-platform-value">{{ deviceStats().android }}</div>
           <div class="metriques-platform-bar">
-            <div class="metriques-platform-bar-fill metriques-platform-bar-fill--android"
-                 [style.width.%]="deviceStats().total > 0 ? (deviceStats().android / deviceStats().total) * 100 : 0">
-            </div>
+            <div
+              class="metriques-platform-bar-fill metriques-platform-bar-fill--android"
+              [style.width.%]="
+                deviceStats().total > 0 ? (deviceStats().android / deviceStats().total) * 100 : 0
+              "
+            ></div>
           </div>
         </div>
         <div class="metriques-platform-item">
           <div class="metriques-platform-icon metriques-platform-icon--ios">
-            <tui-icon icon="@tui.smartphone" style="font-size:20px;" />
+            <tui-icon icon="@tui.smartphone" style="font-size: 20px" />
           </div>
           <div class="metriques-platform-label">iOS</div>
           <div class="metriques-platform-value">{{ deviceStats().ios }}</div>
           <div class="metriques-platform-bar">
-            <div class="metriques-platform-bar-fill metriques-platform-bar-fill--ios"
-                 [style.width.%]="deviceStats().total > 0 ? (deviceStats().ios / deviceStats().total) * 100 : 0">
-            </div>
+            <div
+              class="metriques-platform-bar-fill metriques-platform-bar-fill--ios"
+              [style.width.%]="
+                deviceStats().total > 0 ? (deviceStats().ios / deviceStats().total) * 100 : 0
+              "
+            ></div>
           </div>
         </div>
       </div>
     </div>
-
   }
-
 </div>
