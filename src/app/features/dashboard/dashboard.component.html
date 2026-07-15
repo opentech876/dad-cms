@@ -1,133 +1,367 @@
 <div class="dashboard-page">
-
   <!-- ── Hero — today's event ── -->
-  <div class="card" style="display:grid; grid-template-columns:1.6fr 1fr; overflow:hidden; border-radius:16px; margin-bottom:20px;">
-
-    <!-- Left column ─────────────────────────────────────────── -->
-    <div style="padding:28px 32px; display:flex; flex-direction:column; justify-content:space-between; gap:20px;">
+  <div
+    class="card"
+    style="
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      overflow: hidden;
+      border-radius: 16px;
+      margin-bottom: 20px;
+    "
+  >
+    <!-- Left column — main event (slot 1) on the red panel ──────── -->
+    <div
+      style="
+        background:
+          linear-gradient(135deg, rgba(138, 42, 35, 0.92) 0%, rgba(31, 26, 20, 0.97) 100%),
+          repeating-linear-gradient(45deg, rgba(216, 161, 85, 0.15) 0 2px, transparent 2px 8px);
+        color: #f3e6c8;
+        padding: 28px 32px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 20px;
+      "
+    >
       @if (featuredEventLoading()) {
         <div>
-          <div class="dateline">Aujourd'hui · {{ todayLabel }}</div>
-          <div class="skeleton" style="height:11px; width:38%; margin-top:14px;"></div>
-          <div class="skeleton" style="height:32px; width:78%; margin-top:14px;"></div>
-          <div class="skeleton" style="height:11px; width:90%; margin-top:18px;"></div>
-          <div class="skeleton" style="height:11px; width:84%; margin-top:6px;"></div>
+          <div
+            style="font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.8"
+          >
+            Éphéméride du jour
+          </div>
+          <div
+            class="skeleton"
+            style="height: 32px; width: 78%; margin-top: 16px; opacity: 0.3"
+          ></div>
+          <div
+            class="skeleton"
+            style="height: 11px; width: 90%; margin-top: 18px; opacity: 0.3"
+          ></div>
+          <div
+            class="skeleton"
+            style="height: 11px; width: 84%; margin-top: 6px; opacity: 0.3"
+          ></div>
         </div>
       } @else if (hasFeaturedEvent()) {
         <div>
-          <div class="dateline">Aujourd'hui · {{ todayLabel }}</div>
-          <div class="eyebrow" style="margin-top:8px;">Événement publié sur mobile</div>
-          <h2 style="font-family:var(--font-serif); font-size:30px; font-weight:600; margin-top:8px; letter-spacing:-0.015em; line-height:1.15;">
+          <div
+            style="font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.8"
+          >
+            Éphéméride du jour
+          </div>
+          <h2
+            style="
+              font-family: var(--font-serif);
+              font-size: 30px;
+              font-weight: 600;
+              margin-top: 10px;
+              letter-spacing: -0.015em;
+              line-height: 1.15;
+              color: #f3e6c8;
+            "
+          >
             {{ featuredEvent().title }}
           </h2>
-          <p style="margin-top:12px; font-family:var(--font-serif); font-size:15px; line-height:1.55; color:var(--fg-2);">
-            <span class="hero-dropcap">{{ featuredEvent().dropLetter }}</span>{{ featuredEvent().excerpt }}
+          <p
+            style="
+              margin-top: 12px;
+              font-family: var(--font-serif);
+              font-size: 15px;
+              line-height: 1.55;
+              color: rgba(243, 230, 200, 0.85);
+            "
+          >
+            <span class="hero-dropcap" style="color: #f3e6c8">{{ featuredEvent().dropLetter }}</span
+            >{{ featuredEvent().excerpt }}
           </p>
         </div>
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <span class="badge badge-success badge-dot">Publié</span>
-          <span class="tag">800×600</span>
-          <div style="flex:1;"></div>
-          <a routerLink="/evenements" class="btn btn-secondary btn-sm">Modifier</a>
+        <div>
+          <span
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              padding: 4px 12px;
+              border: 1px solid rgba(243, 230, 200, 0.45);
+              border-radius: 999px;
+              font-size: 11px;
+              font-weight: 600;
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+              color: #f3e6c8;
+            "
+            >● Publié sur mobile</span
+          >
         </div>
       } @else {
         <!-- Empty state — no calendar_entry assigned for today -->
         <div>
-          <div class="dateline">Aujourd'hui · {{ todayLabel }}</div>
-          <div class="eyebrow" style="margin-top:8px; color:var(--fg-3);">Aucun événement publié sur mobile</div>
-          <h2 style="font-family:var(--font-serif); font-size:26px; font-weight:600; margin-top:10px; letter-spacing:-0.015em; line-height:1.2; color:var(--fg-2);">
+          <div
+            style="font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.8"
+          >
+            Éphéméride du jour
+          </div>
+          <h2
+            style="
+              font-family: var(--font-serif);
+              font-size: 26px;
+              font-weight: 600;
+              margin-top: 12px;
+              letter-spacing: -0.015em;
+              line-height: 1.2;
+              color: #f3e6c8;
+            "
+          >
             Aucune éphéméride à publier aujourd'hui.
           </h2>
-          <p style="margin-top:12px; font-family:var(--font-serif); font-size:14.5px; line-height:1.55; color:var(--fg-3);">
-            Le calendrier {{ currentYear }} n'a pas encore d'événement assigné au {{ todayDayNum }} {{ todayMonthCap.toLowerCase() }}.
-            Choisissez-en un depuis la bibliothèque ou demandez au Curateur de proposer une recommandation pour cette date.
+          <p
+            style="
+              margin-top: 12px;
+              font-family: var(--font-serif);
+              font-size: 14.5px;
+              line-height: 1.55;
+              color: rgba(243, 230, 200, 0.75);
+            "
+          >
+            Le calendrier {{ currentYear }} n'a pas encore d'événement assigné à cette date.
+            Choisissez-en un depuis la bibliothèque ou demandez au Curateur de proposer une
+            recommandation.
           </p>
         </div>
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <span class="badge badge-dot">En attente</span>
-          <div style="flex:1;"></div>
-          <a routerLink="/calendrier" class="btn btn-flat btn-sm">Voir le calendrier</a>
-          <a routerLink="/evenements" class="btn btn-secondary btn-sm">Ouvrir la bibliothèque</a>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+          <a
+            routerLink="/calendrier"
+            class="btn btn-sm"
+            style="
+              border: 1px solid rgba(243, 230, 200, 0.45);
+              color: #f3e6c8;
+              background: transparent;
+            "
+            >Voir le calendrier</a
+          >
+          <a
+            routerLink="/evenements"
+            class="btn btn-sm"
+            style="
+              border: 1px solid rgba(243, 230, 200, 0.45);
+              color: #f3e6c8;
+              background: transparent;
+            "
+            >Ouvrir la bibliothèque</a
+          >
         </div>
       }
     </div>
 
-    <!-- Right column — mobile preview ───────────────────────── -->
-    <div style="background:linear-gradient(135deg, rgba(138,42,35,0.85) 0%, rgba(31,26,20,0.97) 100%), repeating-linear-gradient(45deg, rgba(216,161,85,0.15) 0 2px, transparent 2px 8px); color:#f3e6c8; padding:32px; display:flex; flex-direction:column; justify-content:space-between; border-left:1px solid var(--border-1);">
-      <div style="display:flex; justify-content:space-between; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; opacity:0.8;">
-        <span>Éphéméride du jour</span>
-        <span>{{ todayDayNum }} {{ todayMonthCap }}</span>
+    <!-- Right column — the date, shown once ─────────────────────── -->
+    <div
+      style="
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+        border-left: 1px solid var(--border-1);
+      "
+    >
+      <div
+        style="font-family: var(--font-serif); font-size: 96px; font-weight: 700; line-height: 1"
+        [style.opacity]="hasFeaturedEvent() ? 1 : 0.55"
+      >
+        {{ hasFeaturedEvent() ? featuredEvent().day : todayDayNum }}
       </div>
-      <div style="text-align:center;">
-        @if (hasFeaturedEvent()) {
-          <div style="font-family:var(--font-serif); font-size:96px; font-weight:700; line-height:1; color:#f3e6c8;">{{ featuredEvent().day }}</div>
-          <div style="font-family:var(--font-serif); font-size:22px; font-style:italic; margin-top:4px;">{{ featuredEvent().month }} {{ featuredEvent().year }}</div>
-          <div style="margin-top:14px; font-size:12px; opacity:0.7; letter-spacing:0.08em;">—— C'est aussi ——</div>
-          <div style="font-family:var(--font-serif); font-size:14px; margin-top:6px; opacity:0.9;">{{ featuredEvent().also }}</div>
-        } @else {
-          <div style="font-family:var(--font-serif); font-size:96px; font-weight:700; line-height:1; color:#f3e6c8; opacity:0.55;">{{ todayDayNum }}</div>
-          <div style="font-family:var(--font-serif); font-size:22px; font-style:italic; margin-top:4px; opacity:0.7;">{{ todayMonthCap }} {{ currentYear }}</div>
-          <div style="margin-top:14px; font-size:12px; opacity:0.6; letter-spacing:0.08em;">—— En attente ——</div>
-          <div style="font-family:var(--font-serif); font-size:13px; font-style:italic; margin-top:6px; opacity:0.7;">Aucun contenu publié pour ce jour</div>
-        }
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 22px;
+          font-style: italic;
+          margin-top: 4px;
+          color: var(--fg-2);
+        "
+      >
+        {{ hasFeaturedEvent() ? featuredEvent().month : todayMonthCap }}
+        {{ hasFeaturedEvent() ? featuredEvent().year : currentYear }}
       </div>
-      <div style="font-size:10.5px; opacity:0.55; text-align:right;">Day After Day · v2025.1</div>
+      @if (hasFeaturedEvent() && featuredEvent().also) {
+        <div style="margin-top: 16px; font-size: 12px; color: var(--fg-3); letter-spacing: 0.08em">
+          —— C'est aussi ——
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 14px;
+            margin-top: 6px;
+            color: var(--fg-2);
+          "
+        >
+          {{ featuredEvent().also }}
+        </div>
+      }
     </div>
   </div>
 
-  <!-- ── KPI grid ── -->
+  <!-- ── KPI grid — what mobile shows this year + the ad business ── -->
   @if (loading()) {
-    <div class="kpi-grid" style="margin-bottom:20px;">
-      @for (_ of [1,2,3,4]; track $index) {
-        <div class="card" style="padding:20px;">
-          <div class="skeleton" style="height:11px; width:55%;"></div>
-          <div class="skeleton" style="height:38px; width:40%; margin-top:12px;"></div>
-          <div class="skeleton" style="height:11px; width:70%; margin-top:10px;"></div>
+    <div class="kpi-grid" style="margin-bottom: 20px">
+      @for (_ of [1, 2, 3, 4]; track $index) {
+        <div class="card" style="padding: 20px">
+          <div class="skeleton" style="height: 11px; width: 55%"></div>
+          <div class="skeleton" style="height: 38px; width: 40%; margin-top: 12px"></div>
+          <div class="skeleton" style="height: 11px; width: 70%; margin-top: 10px"></div>
         </div>
       }
     </div>
   } @else {
-    <div class="kpi-grid" style="margin-bottom:20px;">
-      <div class="card" style="padding:20px;">
-        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Événements publiés</div>
-        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1;">{{ stats().totalEvents | number }}</div>
-        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">total sur tous les calendriers</div>
-      </div>
-      <div class="card" style="padding:20px;">
-        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Couverture {{ currentYear }}</div>
-        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--success);">{{ fillRate() }}%</div>
-        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">{{ stats().yearEvents }} dates renseignées</div>
-      </div>
-      <div class="card" style="padding:20px;">
-        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Encarts actifs</div>
-        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--warning);">{{ stats().activeCampaigns }}</div>
-        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">encarts diffusés en ce moment</div>
-      </div>
-      <a routerLink="/campagnes" class="card" style="padding:20px; text-decoration:none; color:inherit; display:block;">
-        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Validations en attente</div>
-        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1;"
-             [style.color]="stats().pendingValidations > 0 ? 'var(--warning)' : 'var(--fg-2)'">
-          {{ stats().pendingValidations }}
+    <div class="kpi-grid" style="margin-bottom: 20px">
+      <div class="card" style="padding: 20px">
+        <div
+          style="
+            font-size: 12px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Événements sur mobile
         </div>
-        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">
-          @if (stats().pendingValidations > 0) {
-            <span style="color:var(--warning); font-weight:600;">à valider →</span>
-          } @else {
-            tout est à jour
-          }
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 38px;
+            font-weight: 600;
+            margin-top: 8px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+          "
+        >
+          {{ contentStats().mobileEvents | number }}
         </div>
+        <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
+          diffusés par le calendrier {{ currentYear }}
+        </div>
+      </div>
+      <div class="card" style="padding: 20px">
+        <div
+          style="
+            font-size: 12px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Jours couverts — {{ currentYear }}
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 38px;
+            font-weight: 600;
+            margin-top: 8px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: var(--success);
+          "
+        >
+          {{ contentStats().filledDays }}
+        </div>
+        <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
+          {{ yearCoveragePct() }} % de l'année a une éphéméride
+        </div>
+      </div>
+      <a
+        routerLink="/campagnes"
+        class="card"
+        style="padding: 20px; text-decoration: none; color: inherit; display: block"
+      >
+        <div
+          style="
+            font-size: 12px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Publicité en diffusion
+        </div>
+        @if (currentAd(); as ad) {
+          <div
+            style="
+              font-family: var(--font-serif);
+              font-size: 24px;
+              font-weight: 600;
+              margin-top: 12px;
+              letter-spacing: -0.01em;
+              line-height: 1.2;
+              color: var(--accent);
+            "
+          >
+            {{ ad.companyName }}
+          </div>
+          <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
+            « {{ ad.campaignName }} » — jusqu'au {{ ad.endDate | date: DATE_FMT.long : '' : 'fr' }}
+          </div>
+        } @else {
+          <div
+            style="
+              font-family: var(--font-serif);
+              font-size: 38px;
+              font-weight: 600;
+              margin-top: 8px;
+              letter-spacing: -0.02em;
+              line-height: 1;
+              color: var(--fg-3);
+            "
+          >
+            —
+          </div>
+          <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
+            aucune bannière ne diffuse aujourd'hui
+          </div>
+        }
       </a>
-      <a routerLink="/compagnies" class="card" style="padding:20px; text-decoration:none; color:inherit; display:block;">
-        <div style="font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-3); font-weight:600;">Compagnies actives</div>
-        <div style="font-family:var(--font-serif); font-size:38px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; line-height:1; color:var(--info);">{{ stats().activeCompanies }}</div>
-        <div style="font-size:12.5px; color:var(--fg-3); margin-top:6px;">annuaire annonceurs →</div>
+      <a
+        routerLink="/campagnes"
+        class="card"
+        style="padding: 20px; text-decoration: none; color: inherit; display: block"
+      >
+        <div
+          style="
+            font-size: 12px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Jours vendus — {{ currentYear }}
+        </div>
+        <div
+          style="
+            font-family: var(--font-serif);
+            font-size: 38px;
+            font-weight: 600;
+            margin-top: 8px;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            color: var(--info);
+          "
+        >
+          {{ soldDaysYear() }}
+        </div>
+        <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
+          jours de publicité vendus aux annonceurs →
+        </div>
       </a>
     </div>
   }
 
-  <!-- ── Two-column: activity + coverage ── -->
-  <div class="dashboard-two-col" style="margin-bottom:20px;">
-
+  <!-- ── Two-column: activity + monthly ad sales ── -->
+  <div class="dashboard-two-col" style="margin-bottom: 20px">
     <!-- Activity feed — real audit_log entries via dashboard_operational_stats() -->
     <div class="card">
       <div class="card-header">
@@ -138,198 +372,319 @@
       </div>
       <div>
         @if (activityFeed().length === 0) {
-          <div style="padding:32px 20px; text-align:center; color:var(--fg-3); font-style:italic; font-size:13px;">
+          <div
+            style="
+              padding: 32px 20px;
+              text-align: center;
+              color: var(--fg-3);
+              font-style: italic;
+              font-size: 13px;
+            "
+          >
             Aucune activité enregistrée pour le moment.
           </div>
         }
         @for (a of activityFeed(); track $index) {
-          <div style="display:flex; gap:12px; padding:14px 20px; border-top:1px solid var(--border-1); align-items:flex-start;">
-            <div class="avatar avatar-sm" style="margin-top:2px;">{{ a.initials }}</div>
-            <div style="flex:1; min-width:0;">
-              <div style="font-size:13.5px;">
+          <div
+            style="
+              display: flex;
+              gap: 12px;
+              padding: 14px 20px;
+              border-top: 1px solid var(--border-1);
+              align-items: flex-start;
+            "
+          >
+            <div class="avatar avatar-sm" style="margin-top: 2px">{{ a.initials }}</div>
+            <div style="flex: 1; min-width: 0">
+              <div style="font-size: 13.5px">
                 <strong>{{ a.who }}</strong>
-                <span style="color:var(--fg-3);"> {{ a.action }} </span>
+                <span style="color: var(--fg-3)"> {{ a.action }} </span>
                 @if (a.target) {
-                  <span style="font-family:var(--font-serif); font-style:italic; color:var(--accent);">« {{ a.target }} »</span>
+                  <span
+                    style="font-family: var(--font-serif); font-style: italic; color: var(--accent)"
+                    >« {{ a.target }} »</span
+                  >
                 }
               </div>
-              <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ a.meta }}</div>
+              <div style="font-size: 12px; color: var(--fg-3); margin-top: 2px">{{ a.meta }}</div>
             </div>
-            <span style="font-size:11.5px; color:var(--fg-3); white-space:nowrap;">{{ a.time }}</span>
+            <span style="font-size: 11.5px; color: var(--fg-3); white-space: nowrap">{{
+              a.time
+            }}</span>
           </div>
         }
       </div>
     </div>
 
-    <!-- Right column -->
-    <div style="display:flex; flex-direction:column; gap:16px;">
-
-      <!-- Coverage bar chart -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Remplissage par mois — {{ currentYear }}</div>
-            <div class="card-subtitle">% de dates avec ≥ 1 événement</div>
-          </div>
-        </div>
-        <div class="card-body">
-          @if (coverageBars().length === 0) {
-            <div style="padding:20px; text-align:center; color:var(--fg-3); font-style:italic; font-size:13px;">
-              Aucune donnée de couverture.
-            </div>
-          } @else {
-            <div style="display:grid; grid-template-columns:repeat(12,1fr); gap:6px; align-items:flex-end; height:100px;">
-              @for (bar of coverageBars(); track $index) {
-                <div style="display:flex; flex-direction:column; align-items:center; gap:4px;"
-                     [title]="bar.pct + '%'">
-                  <div style="flex:1; width:100%; display:flex; align-items:flex-end;">
-                    <div [style.height]="bar.pct + '%'"
-                         [style.background]="bar.current ? 'var(--accent)' : 'var(--accent-2-soft)'"
-                         style="width:100%; border-radius:3px 3px 0 0; border:1px solid rgba(0,0,0,0.06); border-bottom:none;">
-                    </div>
-                  </div>
-                  <div style="font-size:10px; color:var(--fg-3);">{{ bar.label }}</div>
-                </div>
-              }
-            </div>
-          }
+    <!-- Monthly ad sales — days sold to advertisers, per month -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Jours vendus par mois — {{ currentYear }}</div>
+          <div class="card-subtitle">Jours couverts par une campagne validée</div>
         </div>
       </div>
-
-      <!-- To-do before publication — computed live from the DB -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Avant publication {{ currentYear }}</div>
-        </div>
-        <div>
-          @if (publicationTodos().length === 0) {
-            <div style="display:flex; align-items:center; gap:12px; padding:16px 20px;">
-              <div style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex:none; background:var(--success-soft); color:var(--success);">
-                ✓
+      <div class="card-body">
+        @if (salesBars().length === 0) {
+          <div
+            style="
+              padding: 20px;
+              text-align: center;
+              color: var(--fg-3);
+              font-style: italic;
+              font-size: 13px;
+            "
+          >
+            Aucune donnée de vente.
+          </div>
+        } @else {
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(12, 1fr);
+              gap: 6px;
+              align-items: flex-end;
+              height: 100px;
+            "
+          >
+            @for (bar of salesBars(); track $index) {
+              <div
+                style="display: flex; flex-direction: column; align-items: center; gap: 4px"
+                [title]="bar.soldDays + ' j vendus sur ' + bar.totalDays + ' (' + bar.pct + '%)'"
+              >
+                <div style="flex: 1; width: 100%; display: flex; align-items: flex-end">
+                  <div
+                    [style.height]="bar.pct + '%'"
+                    [style.background]="bar.current ? 'var(--accent)' : 'var(--accent-2-soft)'"
+                    style="
+                      width: 100%;
+                      border-radius: 3px 3px 0 0;
+                      border: 1px solid rgba(0, 0, 0, 0.06);
+                      border-bottom: none;
+                    "
+                  ></div>
+                </div>
+                <div style="font-size: 10px; color: var(--fg-3)">{{ bar.label }}</div>
               </div>
-              <div style="font-size:13px; font-weight:500; color:var(--success);">
-                Tout est prêt — aucune action requise.
-              </div>
-            </div>
-          }
-          @for (todo of publicationTodos(); track todo.text; let i = $index) {
-            <a [routerLink]="todo.link"
-               style="display:flex; align-items:center; gap:12px; padding:12px 20px; text-decoration:none; color:inherit;"
-               [style.border-top]="i > 0 ? '1px solid var(--border-1)' : 'none'">
-              <div [style.background]="todo.bg" [style.color]="todo.fg"
-                   style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex:none;">
-                {{ todo.icon }}
-              </div>
-              <div style="flex:1;">
-                <div style="font-size:13px; font-weight:500;">{{ todo.text }}</div>
-                <div style="font-size:11.5px; color:var(--fg-3);">{{ todo.meta }}</div>
-              </div>
-              <span style="color:var(--fg-3); font-size:18px;">›</span>
-            </a>
-          }
-        </div>
+            }
+          </div>
+          <div style="margin-top: 12px; font-size: 12px; color: var(--fg-3); text-align: right">
+            {{ soldDaysYear() }} jour{{ soldDaysYear() > 1 ? 's' : '' }} vendu{{
+              soldDaysYear() > 1 ? 's' : ''
+            }}
+            sur l'année
+          </div>
+        }
       </div>
     </div>
   </div>
 
-  <!-- ── Risky days — content the mobile app will miss soon ── -->
-  @if (opStats() && opStats()!.empty_days !== null) {
-    <div class="card" style="margin-bottom:20px;">
+  <!-- ── Empty days on mobile — next 30 days, events + ads ── -->
+  @if (!loading()) {
+    <div class="card" style="margin-bottom: 20px">
       <div class="card-header">
         <div>
-          <div class="card-title">Jours à risque — 30 prochains jours</div>
+          <div class="card-title">Jours vides sur mobile — 30 prochains jours</div>
           <div class="card-subtitle">
-            Dates que l'application mobile affichera incomplètes ou vides
+            Dates où l'application mobile n'aura pas d'éphéméride ou pas de publicité à afficher
           </div>
         </div>
-        <a routerLink="/calendrier" class="btn btn-flat btn-sm">Compléter le calendrier →</a>
       </div>
-      @if (riskyDays().length === 0) {
-        <div style="display:flex; align-items:center; gap:12px; padding:18px 20px;">
-          <div style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex:none; background:var(--success-soft); color:var(--success);">
-            ✓
-          </div>
-          <div style="font-size:13px; font-weight:500; color:var(--success);">
-            Les 30 prochains jours sont entièrement couverts — deux événements par date.
-          </div>
-        </div>
-      } @else {
-        <div style="display:flex; flex-wrap:wrap; gap:10px; padding:16px 20px;">
-          @for (day of riskyDays(); track day.date) {
-            <a routerLink="/calendrier"
-               [title]="day.entries === 0
-                 ? 'Aucun événement assigné — la journée sera vide sur mobile'
-                 : 'Une seule des deux positions est remplie'"
-               style="display:flex; flex-direction:column; gap:4px; padding:10px 14px; border-radius:var(--r-md); text-decoration:none; min-width:118px;"
-               [style.background]="riskySeverity(day) === 'critical' ? 'var(--danger-soft)'
-                                 : riskySeverity(day) === 'warning' ? 'var(--warning-soft)'
-                                 : 'var(--info-soft)'"
-               [style.color]="riskySeverity(day) === 'critical' ? 'var(--danger)'
-                            : riskySeverity(day) === 'warning' ? 'var(--warning)'
-                            : 'var(--info)'">
-              <span style="font-family:var(--font-serif); font-size:15px; font-weight:600;">
-                {{ riskyDateLabel(day) }}
-              </span>
-              <span style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">
-                {{ day.entries === 0 ? 'vide' : '1 sur 2' }} · {{ riskyCountdown(day) }}
-              </span>
-            </a>
-          }
-        </div>
-      }
-    </div>
-  }
-
-  <!-- ── Ad inventory — next 30 days, sold vs available per position ── -->
-  <!-- Campaign PERFORMANCE detail lives on /metriques; this block answers
-       the forward-looking commercial question: "what can I still sell?" -->
-  @if (inventory().length > 0) {
-    <div class="card" style="margin-bottom:20px;">
-      <div class="card-header">
+      <div class="card-body" style="display: flex; flex-direction: column; gap: 20px">
+        <!-- Days without any event -->
         <div>
-          <div class="card-title">Inventaire publicitaire — 30 prochains jours</div>
-          <div class="card-subtitle">
-            Jours couverts par une campagne validée et active, par position
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: baseline;
+              margin-bottom: 8px;
+            "
+          >
+            <span
+              style="
+                font-size: 12px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--fg-3);
+              "
+            >
+              Sans éphéméride
+              @if (emptyEventDays().length > 0) {
+                — {{ emptyEventDays().length }} jour{{ emptyEventDays().length > 1 ? 's' : '' }}
+              }
+            </span>
+            <a routerLink="/calendrier" class="btn btn-flat btn-sm">Compléter le calendrier →</a>
           </div>
-        </div>
-        <a routerLink="/campagnes" class="btn btn-flat btn-sm">Planifier une campagne →</a>
-      </div>
-      <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
-        @for (pos of [{ key: 'h', label: 'Header', unsold: unsoldHeaderDays() }, { key: 'f', label: 'Footer', unsold: unsoldFooterDays() }]; track pos.key) {
-          <div>
-            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-              <span style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--fg-3);">
-                {{ pos.label }}
-              </span>
-              <span style="font-size:12px;"
-                    [style.color]="pos.unsold > 0 ? 'var(--warning)' : 'var(--success)'">
-                @if (pos.unsold > 0) {
-                  {{ pos.unsold }} jour{{ pos.unsold > 1 ? 's' : '' }} disponible{{ pos.unsold > 1 ? 's' : '' }}
-                } @else {
-                  complet
-                }
-              </span>
+          @if (emptyEventDays().length === 0) {
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--success);
+              "
+            >
+              <span
+                style="
+                  width: 24px;
+                  height: 24px;
+                  border-radius: 6px;
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  background: var(--success-soft);
+                "
+                >✓</span
+              >
+              Chaque jour a au moins un événement.
             </div>
-            <div style="display:grid; grid-template-columns:repeat(30, 1fr); gap:2px;">
-              @for (day of inventory(); track day.d) {
-                <div [title]="inventoryTitle(day, $any(pos.key))"
-                     [style.background]="(pos.key === 'h' ? day.h : day.f) ? 'var(--success)' : 'var(--bg-sunken)'"
-                     [style.border]="(pos.key === 'h' ? day.h : day.f) ? 'none' : '1px dashed var(--border-2)'"
-                     style="height:16px; border-radius:3px;">
-                </div>
+          } @else {
+            <div style="display: flex; flex-wrap: wrap; gap: 8px">
+              @for (day of emptyEventDays(); track day.date) {
+                <a
+                  routerLink="/calendrier"
+                  title="Aucun événement assigné — la journée sera vide sur mobile"
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 3px;
+                    padding: 8px 12px;
+                    border-radius: var(--r-md);
+                    text-decoration: none;
+                    min-width: 104px;
+                  "
+                  [style.background]="
+                    gapSeverity(day) === 'critical' ? 'var(--danger-soft)' : 'var(--warning-soft)'
+                  "
+                  [style.color]="
+                    gapSeverity(day) === 'critical' ? 'var(--danger)' : 'var(--warning)'
+                  "
+                >
+                  <span style="font-family: var(--font-serif); font-size: 14px; font-weight: 600">{{
+                    gapLabel(day.date)
+                  }}</span>
+                  <span
+                    style="
+                      font-size: 10.5px;
+                      font-weight: 600;
+                      text-transform: uppercase;
+                      letter-spacing: 0.04em;
+                    "
+                    >{{ countdownLabel(day.daysUntil) }}</span
+                  >
+                </a>
               }
             </div>
+          }
+        </div>
+
+        <!-- Days without an ad — one banner per day, sold vs available -->
+        <div>
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: baseline;
+              margin-bottom: 8px;
+            "
+          >
+            <span
+              style="
+                font-size: 12px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--fg-3);
+              "
+            >
+              Sans publicité
+              @if (unsoldAdDays() > 0) {
+                — {{ unsoldAdDays() }} jour{{ unsoldAdDays() > 1 ? 's' : '' }} disponible{{
+                  unsoldAdDays() > 1 ? 's' : ''
+                }}
+                à la vente
+              }
+            </span>
+            <a routerLink="/campagnes" class="btn btn-flat btn-sm">Planifier une campagne →</a>
           </div>
-        }
-        <div style="display:flex; gap:16px; font-size:11.5px; color:var(--fg-3);">
-          <span style="display:inline-flex; align-items:center; gap:5px;">
-            <span style="width:10px; height:10px; border-radius:2px; background:var(--success); display:inline-block;"></span>
-            vendu
-          </span>
-          <span style="display:inline-flex; align-items:center; gap:5px;">
-            <span style="width:10px; height:10px; border-radius:2px; background:var(--bg-sunken); border:1px dashed var(--border-2); display:inline-block;"></span>
-            disponible à la vente
-          </span>
+          @if (unsoldAdDays() === 0) {
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--success);
+              "
+            >
+              <span
+                style="
+                  width: 24px;
+                  height: 24px;
+                  border-radius: 6px;
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  background: var(--success-soft);
+                "
+                >✓</span
+              >
+              Les 30 prochains jours sont entièrement vendus.
+            </div>
+          } @else {
+            <div style="display: grid; grid-template-columns: repeat(30, 1fr); gap: 2px">
+              @for (day of next30(); track day.date) {
+                <div
+                  [title]="
+                    gapLabel(day.date) + ' — ' + (day.sold ? 'vendu' : 'disponible à la vente')
+                  "
+                  [style.background]="day.sold ? 'var(--success)' : 'var(--bg-sunken)'"
+                  [style.border]="day.sold ? 'none' : '1px dashed var(--border-2)'"
+                  style="height: 16px; border-radius: 3px"
+                ></div>
+              }
+            </div>
+            <div
+              style="
+                display: flex;
+                gap: 16px;
+                font-size: 11.5px;
+                color: var(--fg-3);
+                margin-top: 8px;
+              "
+            >
+              <span style="display: inline-flex; align-items: center; gap: 5px">
+                <span
+                  style="
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 2px;
+                    background: var(--success);
+                    display: inline-block;
+                  "
+                ></span>
+                vendu
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 5px">
+                <span
+                  style="
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 2px;
+                    background: var(--bg-sunken);
+                    border: 1px dashed var(--border-2);
+                    display: inline-block;
+                  "
+                ></span>
+                disponible à la vente
+              </span>
+            </div>
+          }
         </div>
       </div>
     </div>

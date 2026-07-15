@@ -1,14 +1,22 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { CompanyService } from '../../core/companies/company.service';
-import { MetriquesService } from '../../core/metriques/metriques.service';
-import { DashboardOperationalStats, InsightsService, RiskyDay } from '../../core/insights/insights.service';
-import { DashboardService, FeaturedEvent, KpiStats } from '../../core/dashboard/dashboard.service';
+import { DashboardOperationalStats, InsightsService } from '../../core/insights/insights.service';
+import {
+  AdOutlook,
+  DashboardService,
+  FeaturedEvent,
+  GapDay,
+  YearContentStats,
+} from '../../core/dashboard/dashboard.service';
 import { getInitials } from '../../core/utils/labels.utils';
-import { MONTHS_FR_LONG, MONTHS_FR_LONG_CAP, formatRelativeFr, formatWeekdayLong } from '../../core/utils/date.utils';
-import { MonthCoverage } from '../../models';
+import {
+  DATE_FMT,
+  MONTHS_FR_LONG,
+  MONTHS_FR_LONG_CAP,
+  formatRelativeFr,
+} from '../../core/utils/date.utils';
 
 /** One row of the real activity feed, ready for display. */
 interface FeedRow {
@@ -20,22 +28,12 @@ interface FeedRow {
   time: string;
 }
 
-/** One actionable item of the "Avant publication" checklist. */
-interface TodoRow {
-  icon: string;
-  text: string;
-  meta: string;
-  bg: string;
-  fg: string;
-  link: string;
-}
-
 const TABLE_LABELS: Record<string, string> = {
-  events:                     'Événement',
-  calendars:                  'Calendrier',
-  calendar_entries:           'Affectation de calendrier',
-  ad_campaigns:               'Campagne publicitaire',
-  companies:                  'Entreprise',
+  events: 'Événement',
+  calendars: 'Calendrier',
+  calendar_entries: 'Affectation de calendrier',
+  ad_campaigns: 'Campagne publicitaire',
+  companies: 'Entreprise',
   presidency_recommendations: 'Recommandation du Curateur',
 };
 
@@ -45,194 +43,151 @@ const ACTION_VERBS: Record<string, string> = {
   DELETE: 'a supprimé',
 };
 
+const MONTH_LETTERS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink, DecimalPipe, DatePipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit {
-  private companyService    = inject(CompanyService);
-  private metriquesService  = inject(MetriquesService);
-  private insightsService   = inject(InsightsService);
-  private dashboardService  = inject(DashboardService);
+  private insightsService = inject(InsightsService);
+  private dashboardService = inject(DashboardService);
+
+  protected readonly DATE_FMT = DATE_FMT;
 
   readonly loading = signal(true);
-  readonly stats = signal<KpiStats>({
-    totalEvents: 0,
-    publishedCalendars: 0,
-    activeCampaigns: 0,
-    yearEvents: 0,
-    pendingValidations: 0,
-    activeCompanies: 0,
+
+  /** Everything the mobile app shows this year (published calendar only). */
+  readonly contentStats = signal<YearContentStats>({
+    mobileEvents: 0,
+    filledDays: 0,
+    emptyNext30: [],
   });
 
-  /** One-round-trip operational snapshot (activity, checklist inputs,
-   *  30-day ad inventory). Null until loaded or when no workspace. */
+  /** Commercial outlook — one ad per day, current-year scope. */
+  readonly adOutlook = signal<AdOutlook | null>(null);
+
+  /** One-round-trip operational snapshot; only the activity slice is
+   *  rendered here. Null until loaded or when no workspace. */
   readonly opStats = signal<DashboardOperationalStats | null>(null);
 
   readonly currentYear = new Date().getFullYear();
-  readonly todayLabel = formatWeekdayLong(new Date());
-  // Used by the hero's empty-state right-side preview.
-  readonly todayDayNum   = String(new Date().getDate()).padStart(2, '0');
+  // Fallbacks for the hero's right-side date when nothing is published today.
+  readonly todayDayNum = String(new Date().getDate()).padStart(2, '0');
   readonly todayMonthCap = MONTHS_FR_LONG_CAP[new Date().getMonth()];
 
   readonly featuredEvent = signal<FeaturedEvent>({
-    title: '', dropLetter: '', excerpt: '', day: '--', month: '---', year: '----', also: '',
+    title: '',
+    dropLetter: '',
+    excerpt: '',
+    day: '--',
+    month: '---',
+    year: '----',
+    also: '',
   });
   readonly featuredEventLoading = signal(true);
 
   /** True once we know there's an event published for today on mobile. */
   readonly hasFeaturedEvent = computed(() => this.featuredEvent().title.length > 0);
 
-  readonly fillRate = computed(() => {
-    const maxSlots = 365 * 2;
-    return Math.round((this.stats().yearEvents / maxSlots) * 100);
+  /** % of the year's days that have at least one event on mobile. */
+  readonly yearCoveragePct = computed(() => {
+    const y = this.currentYear;
+    const daysInYear = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
+    return Math.round((this.contentStats().filledDays / daysInYear) * 100);
   });
+
+  readonly currentAd = computed(() => this.adOutlook()?.currentAd ?? null);
+  readonly soldDaysYear = computed(() => this.adOutlook()?.soldDaysYear ?? 0);
+
+  /** Monthly bars of ad days sold to advertisers. */
+  readonly salesBars = computed(() =>
+    (this.adOutlook()?.salesByMonth ?? []).map((m) => ({
+      pct: m.totalDays > 0 ? Math.round((m.soldDays / m.totalDays) * 100) : 0,
+      soldDays: m.soldDays,
+      totalDays: m.totalDays,
+      label: MONTH_LETTERS[m.month - 1],
+      current: m.month - 1 === new Date().getMonth(),
+    })),
+  );
+
+  /** Next-30-day gaps: dates mobile will show with no event at all. */
+  readonly emptyEventDays = computed<GapDay[]>(() => this.contentStats().emptyNext30);
+
+  /** Next-30-day sales outlook and its unsold subset. */
+  readonly next30 = computed(() => this.adOutlook()?.next30 ?? []);
+  readonly emptyAdDays = computed(() => this.next30().filter((d) => !d.sold));
+  readonly unsoldAdDays = computed(() => this.emptyAdDays().length);
 
   /** Real activity feed derived from the audit_log slice in opStats. */
   readonly activityFeed = computed<FeedRow[]>(() => {
     const entries = this.opStats()?.activity ?? [];
-    return entries.map(e => {
+    return entries.map((e) => {
       const name = e.actor_name || 'Système';
       return {
         initials: getInitials(name, 'S'),
-        who:      name,
-        action:   ACTION_VERBS[e.action] ?? e.action.toLowerCase(),
-        target:   e.record_label ?? (TABLE_LABELS[e.table_name] ?? e.table_name),
-        meta:     TABLE_LABELS[e.table_name] ?? e.table_name,
-        time:     formatRelativeFr(e.changed_at),
+        who: name,
+        action: ACTION_VERBS[e.action] ?? e.action.toLowerCase(),
+        target: e.record_label ?? TABLE_LABELS[e.table_name] ?? e.table_name,
+        meta: TABLE_LABELS[e.table_name] ?? e.table_name,
+        time: formatRelativeFr(e.changed_at),
       };
     });
   });
 
-  /** Real per-month fill bars (same RPC the metrics page uses). */
-  readonly coverage = signal<MonthCoverage[]>([]);
-  readonly coverageBars = computed(() =>
-    this.coverage().map(c => ({
-      pct:     Number(c.percent),
-      label:   ['J','F','M','A','M','J','J','A','S','O','N','D'][c.month - 1],
-      current: c.month - 1 === new Date().getMonth(),
-    })),
-  );
-
-  /** "Avant publication" checklist — computed live from opStats. Only
-   *  items with something to do appear; a fully green workspace shows
-   *  the all-clear row instead. */
-  readonly publicationTodos = computed<TodoRow[]>(() => {
-    const s = this.opStats();
-    if (!s) return [];
-    const todos: TodoRow[] = [];
-
-    if (s.empty_days === null) {
-      todos.push({
-        icon: '📅', text: `Aucun calendrier ${this.currentYear}`,
-        meta: 'Créez le calendrier de l\'année pour commencer',
-        bg: 'var(--danger-soft)', fg: 'var(--danger)', link: '/calendrier',
-      });
-    } else if (s.empty_days.count > 0) {
-      todos.push({
-        icon: '⚠️', text: `${s.empty_days.count} date${s.empty_days.count > 1 ? 's' : ''} sans événement`,
-        meta: s.empty_days.next.map(m => this.mmddLabel(m)).join(' · ') || 'toutes déjà passées',
-        bg: 'var(--warning-soft)', fg: 'var(--warning)', link: '/calendrier',
-      });
-    }
-
-    if (s.events_no_image > 0) {
-      todos.push({
-        icon: '🖼️', text: `${s.events_no_image} événement${s.events_no_image > 1 ? 's' : ''} sans illustration`,
-        meta: 'Compresser à 800×600 / ≤150 Ko avant téléversement',
-        bg: 'var(--info-soft)', fg: 'var(--info)', link: '/evenements',
-      });
-    }
-
-    if (s.validations_soon.length > 0) {
-      todos.push({
-        icon: '📢', text: `${s.validations_soon.length} campagne${s.validations_soon.length > 1 ? 's' : ''} à valider avant diffusion`,
-        meta: s.validations_soon.map(v => v.name).slice(0, 3).join(' · '),
-        bg: 'var(--accent-soft)', fg: 'var(--accent)', link: '/campagnes',
-      });
-    }
-
-    if (s.pending_recommendations > 0) {
-      todos.push({
-        icon: '✅', text: `${s.pending_recommendations} recommandation${s.pending_recommendations > 1 ? 's' : ''} du Curateur à appliquer`,
-        meta: 'Ouvrir le calendrier puis « Appliquer la recommandation »',
-        bg: 'var(--success-soft)', fg: 'var(--success)', link: '/calendrier',
-      });
-    }
-
-    return todos;
-  });
-
-  /** 30-day sold/unsold outlook per ad position + unsold-day counters. */
-  readonly inventory = computed(() => this.opStats()?.inventory ?? []);
-  readonly unsoldHeaderDays = computed(() => this.inventory().filter(d => !d.h).length);
-  readonly unsoldFooterDays = computed(() => this.inventory().filter(d => !d.f).length);
-
-  /** Days in the next 30 that mobile would show incomplete (0 or 1 of
-   *  2 positions filled). Sorted by date, max 10 (RPC-limited). */
-  readonly riskyDays = computed<RiskyDay[]>(() => this.opStats()?.risky_days ?? []);
-
-  /** Severity drives the card's row color:
-   *  - blank day within a week → critical (mobile shows NOTHING, imminent)
-   *  - blank day further out   → warning
-   *  - partial day (1 of 2)    → info */
-  riskySeverity(day: RiskyDay): 'critical' | 'warning' | 'info' {
-    if (day.entries === 0) return day.days_until <= 7 ? 'critical' : 'warning';
-    return 'info';
+  /** A blank editorial day within a week is an emergency; further out, a warning. */
+  gapSeverity(day: GapDay): 'critical' | 'warning' {
+    return day.daysUntil <= 7 ? 'critical' : 'warning';
   }
 
-  riskyDateLabel(day: RiskyDay): string {
-    return this.mmddLabel(day.mmdd);
+  countdownLabel(daysUntil: number): string {
+    if (daysUntil === 0) return "aujourd'hui";
+    if (daysUntil === 1) return 'demain';
+    return `dans ${daysUntil} j`;
   }
 
-  riskyCountdown(day: RiskyDay): string {
-    if (day.days_until === 0) return "aujourd'hui";
-    if (day.days_until === 1) return 'demain';
-    return `dans ${day.days_until} j`;
-  }
-
-  /** '08-07' → '7 août' */
-  private mmddLabel(mmdd: string): string {
-    const [mm, dd] = mmdd.split('-').map(Number);
+  /** '2026-08-07' → '7 août' */
+  gapLabel(dateISO: string): string {
+    const dd = Number(dateISO.slice(8, 10));
+    const mm = Number(dateISO.slice(5, 7));
     return `${dd} ${MONTHS_FR_LONG[mm - 1] ?? ''}`;
   }
 
-  /** Tooltip for one inventory cell. */
-  inventoryTitle(day: { d: string; h: boolean; f: boolean }, position: 'h' | 'f'): string {
-    const sold = position === 'h' ? day.h : day.f;
-    const label = position === 'h' ? 'Header' : 'Footer';
-    return `${day.d} — ${label} : ${sold ? 'vendu' : 'disponible'}`;
+  /** Awaits a source and falls back silently, so a single broken source
+   *  never blanks the whole page (catches synchronous throws too). */
+  private async safe<T>(load: () => Promise<T>, fallback: T): Promise<T> {
+    try {
+      return await load();
+    } catch {
+      return fallback;
+    }
   }
 
   async ngOnInit(): Promise<void> {
     const year = this.currentYear;
 
-    // Companies + operational snapshot + coverage in parallel; each falls
-    // back silently so a single broken source never blanks the whole page.
-    const [companies, opStats, coverage] = await Promise.all([
-      firstValueFrom(this.companyService.listCompanies()).catch(() => []),
-      firstValueFrom(this.insightsService.getDashboardStats()).catch(() => null),
-      firstValueFrom(this.metriquesService.getCalendarCoverage()).catch(() => []),
+    const [contentStats, adOutlook, opStats] = await Promise.all([
+      this.safe(() => firstValueFrom(this.dashboardService.getYearContentStats(year)), {
+        mobileEvents: 0,
+        filledDays: 0,
+        emptyNext30: [],
+      } as YearContentStats),
+      this.safe(() => firstValueFrom(this.dashboardService.getAdOutlook(year)), null),
+      this.safe(() => firstValueFrom(this.insightsService.getDashboardStats()), null),
     ]);
 
-    const stats = await firstValueFrom(
-      this.dashboardService.getKpiStats(year, companies.length),
-    ).catch(() => ({
-      totalEvents: 0, publishedCalendars: 0, activeCampaigns: 0,
-      yearEvents: 0, pendingValidations: 0, activeCompanies: 0,
-    }));
-
-    this.stats.set(stats);
+    this.contentStats.set(contentStats);
+    this.adOutlook.set(adOutlook);
     this.opStats.set(opStats);
-    this.coverage.set(coverage);
     this.loading.set(false);
 
-    const featured = await firstValueFrom(
-      this.dashboardService.getFeaturedEvent(year),
-    ).catch(() => null);
+    const featured = await this.safe(
+      () => firstValueFrom(this.dashboardService.getFeaturedEvent(year)),
+      null,
+    );
     if (featured) this.featuredEvent.set(featured);
     this.featuredEventLoading.set(false);
   }
