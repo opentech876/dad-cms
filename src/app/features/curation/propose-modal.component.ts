@@ -211,11 +211,11 @@ export class ProposeModalComponent {
       }
 
       if (!eventId) return;
-      // The DB forbids one event on both positions of the same day — catch
-      // it here with a readable message instead of a failed round-trip.
-      if (this.store.hasSameEventElsewhereOnDay(this.mmdd(), position, eventId)) {
+      // One event holds one position per day — catch a duplicate proposal
+      // here with a readable message instead of a failed round-trip.
+      if (this.store.hasSameEventRecommendedElsewhere(this.mmdd(), position, eventId)) {
         this.error.set(
-          "Cet événement occupe déjà l'autre position de cette date — choisissez un autre événement ou une autre position.",
+          "Vous proposez déjà cet événement sur l'autre position de cette date — modifiez plutôt cette recommandation.",
         );
         return;
       }

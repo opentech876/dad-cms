@@ -42,11 +42,11 @@ describe('EventService', () => {
     const chain: any = {};
     Object.assign(chain, {
       select: jest.fn().mockReturnValue(chain),
-      eq:     jest.fn().mockReturnValue(chain),
-      is:     jest.fn().mockReturnValue(chain),
-      order:  jest.fn().mockReturnValue(chain),
-      range:  jest.fn().mockResolvedValue(result),
-      then:   (resolve: any, reject?: any) => Promise.resolve(result).then(resolve, reject),
+      eq: jest.fn().mockReturnValue(chain),
+      is: jest.fn().mockReturnValue(chain),
+      order: jest.fn().mockReturnValue(chain),
+      range: jest.fn().mockResolvedValue(result),
+      then: (resolve: any, reject?: any) => Promise.resolve(result).then(resolve, reject),
     });
     return chain;
   }
@@ -62,7 +62,7 @@ describe('EventService', () => {
   function buildUpdateChain(result: any) {
     return {
       update: jest.fn().mockReturnThis(),
-      eq:     jest.fn().mockResolvedValue(result),
+      eq: jest.fn().mockResolvedValue(result),
     };
   }
 
@@ -71,8 +71,10 @@ describe('EventService', () => {
   beforeEach(() => {
     mockStorage = {
       from: jest.fn().mockReturnValue({
-        upload:       jest.fn().mockResolvedValue({ data: { path: 'evt-1/cover.jpg' }, error: null }),
-        getPublicUrl: jest.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/img.jpg' } }),
+        upload: jest.fn().mockResolvedValue({ data: { path: 'evt-1/cover.jpg' }, error: null }),
+        getPublicUrl: jest
+          .fn()
+          .mockReturnValue({ data: { publicUrl: 'https://example.com/img.jpg' } }),
       }),
     };
 
@@ -147,7 +149,10 @@ describe('EventService', () => {
     it('pagine au-delà de 1000 lignes (limite PostgREST par défaut)', async () => {
       // Page 1: 1000 rows ; Page 2: 35 rows → total 1035
       const page1 = Array.from({ length: 1000 }, (_, i) => ({ ...MOCK_EVENT, id: `evt-${i + 1}` }));
-      const page2 = Array.from({ length: 35 },   (_, i) => ({ ...MOCK_EVENT, id: `evt-${1001 + i}` }));
+      const page2 = Array.from({ length: 35 }, (_, i) => ({
+        ...MOCK_EVENT,
+        id: `evt-${1001 + i}`,
+      }));
 
       // Build a chain whose .range() resolves with different pages on each call
       const results = [
@@ -157,10 +162,10 @@ describe('EventService', () => {
       const chain: any = {};
       Object.assign(chain, {
         select: jest.fn().mockReturnValue(chain),
-        eq:     jest.fn().mockReturnValue(chain),
-        is:     jest.fn().mockReturnValue(chain),
-        order:  jest.fn().mockReturnValue(chain),
-        range:  jest.fn().mockImplementation(() => {
+        eq: jest.fn().mockReturnValue(chain),
+        is: jest.fn().mockReturnValue(chain),
+        order: jest.fn().mockReturnValue(chain),
+        range: jest.fn().mockImplementation(() => {
           const next = results.shift() ?? { data: [], error: null };
           return Promise.resolve(next);
         }),
@@ -181,10 +186,10 @@ describe('EventService', () => {
       const chain: any = {};
       Object.assign(chain, {
         select: jest.fn().mockReturnValue(chain),
-        eq:     jest.fn().mockReturnValue(chain),
-        is:     jest.fn().mockReturnValue(chain),
-        order:  jest.fn().mockReturnValue(chain),
-        range:  jest.fn().mockResolvedValue({ data: page1, error: null }),
+        eq: jest.fn().mockReturnValue(chain),
+        is: jest.fn().mockReturnValue(chain),
+        order: jest.fn().mockReturnValue(chain),
+        range: jest.fn().mockResolvedValue({ data: page1, error: null }),
       });
       mockSupabase.client.from.mockReturnValue(chain);
 
@@ -205,7 +210,7 @@ describe('EventService', () => {
       const result = await firstValueFrom(service.listEventsByMmdd('08-15'));
 
       expect(result).toEqual([MOCK_EVENT]);
-      expect(result.every(e => e.event_date.slice(5) === '08-15')).toBe(true);
+      expect(result.every((e) => e.event_date.slice(5) === '08-15')).toBe(true);
     });
 
     it('retourne un tableau vide quand aucun événement ne correspond au MM-DD', async () => {
@@ -233,6 +238,37 @@ describe('EventService', () => {
           event_date: '1960-08-15',
           status: 'draft',
         }),
+      );
+    });
+
+    it("renseigne l'historien avec le nom du profil du créateur (jamais un simple rôle)", async () => {
+      const insertChain = buildInsertChain({ data: { id: 'evt-new' }, error: null });
+      const profileChain = {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        maybeSingle: jest
+          .fn()
+          .mockResolvedValue({ data: { full_name: 'Marie Mvondo' }, error: null }),
+      };
+      mockSupabase.client.from.mockImplementation((table: string) =>
+        table === 'profiles' ? profileChain : insertChain,
+      );
+
+      await firstValueFrom(service.createEvent(MOCK_CREATE_DTO));
+
+      expect(insertChain.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ historian: 'Marie Mvondo' }),
+      );
+    });
+
+    it("respecte l'historien fourni explicitement par l'appelant", async () => {
+      const insertChain = buildInsertChain({ data: { id: 'evt-new' }, error: null });
+      mockSupabase.client.from.mockReturnValue(insertChain);
+
+      await firstValueFrom(service.createEvent({ ...MOCK_CREATE_DTO, historian: 'Import Excel' }));
+
+      expect(insertChain.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ historian: 'Import Excel' }),
       );
     });
 
@@ -304,7 +340,7 @@ describe('EventService', () => {
       expect(storageMock.upload).toHaveBeenCalledWith('evt-1/cover.jpg', file, { upsert: true });
     });
 
-    it("retourne le path du fichier uploadé", async () => {
+    it('retourne le path du fichier uploadé', async () => {
       const file = new File(['data'], 'photo.jpg', { type: 'image/jpeg' });
       mockStorage.from.mockReturnValue({
         upload: jest.fn().mockResolvedValue({ data: { path: 'evt-1/cover.jpg' }, error: null }),
@@ -336,7 +372,9 @@ describe('EventService', () => {
       await firstValueFrom(service.uploadImage('evt-1', file));
 
       expect(storageMock.upload).toHaveBeenCalledWith(
-        expect.stringMatching(/evt-1\/cover\.png$/), file, { upsert: true },
+        expect.stringMatching(/evt-1\/cover\.png$/),
+        file,
+        { upsert: true },
       );
     });
   });
@@ -347,7 +385,9 @@ describe('EventService', () => {
     it('retourne la publicUrl depuis le bucket historical-images', () => {
       const storageMock = {
         upload: jest.fn(),
-        getPublicUrl: jest.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/img.jpg' } }),
+        getPublicUrl: jest
+          .fn()
+          .mockReturnValue({ data: { publicUrl: 'https://example.com/img.jpg' } }),
       };
       mockStorage.from.mockReturnValue(storageMock);
 
@@ -367,9 +407,7 @@ describe('EventService', () => {
 
       await firstValueFrom(service.deleteEvent('evt-1'));
 
-      expect(chain.update).toHaveBeenCalledWith(
-        expect.objectContaining({ deleted_by: 'user-1' }),
-      );
+      expect(chain.update).toHaveBeenCalledWith(expect.objectContaining({ deleted_by: 'user-1' }));
       const updateCall = chain.update.mock.calls[0][0];
       expect(updateCall.deleted_at).toBeDefined();
     });

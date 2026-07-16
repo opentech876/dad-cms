@@ -77,18 +77,15 @@ export class CurationStore {
     return m;
   });
 
-  /** True when the given event already sits on the OTHER position of the
-   *  same day — in my own recommendations or in the calendar itself. The
-   *  DB forbids one event on both positions of a day (unique constraint),
-   *  so the UI blocks it with a readable message before the round-trip. */
-  hasSameEventElsewhereOnDay(mmdd: string, position: 1 | 2, eventId: string): boolean {
-    const inMyRecs = (this.myRecsByMmdd().get(mmdd) ?? []).some(
+  /** True when I already recommend this event on the OTHER position of the
+   *  same day — one event holds at most one position per day, so the UI
+   *  blocks the duplicate with a readable message before the round-trip.
+   *  (An event merely OCCUPYING the other calendar slot is fine: applying
+   *  the recommendation moves it, it doesn't duplicate it.) */
+  hasSameEventRecommendedElsewhere(mmdd: string, position: 1 | 2, eventId: string): boolean {
+    return (this.myRecsByMmdd().get(mmdd) ?? []).some(
       (r) => r.position !== position && r.event_id === eventId,
     );
-    const inEntries = (this.entriesByMmdd().get(mmdd) ?? []).some(
-      (e) => e.position !== position && e.event_id === eventId,
-    );
-    return inMyRecs || inEntries;
   }
 
   hubDayState(mmdd: string): HubDayState {

@@ -188,7 +188,7 @@ describe('CurationStore', () => {
     });
   });
 
-  describe('hasSameEventElsewhereOnDay()', () => {
+  describe('hasSameEventRecommendedElsewhere()', () => {
     it("détecte le même événement déjà proposé par moi sur l'autre position", async () => {
       mockRecs.listMine.mockReturnValue(
         of([makeRec({ mmdd: '08-15', position: 1, event_id: 'ev-1' })]),
@@ -196,21 +196,20 @@ describe('CurationStore', () => {
 
       await store.load();
 
-      expect(store.hasSameEventElsewhereOnDay('08-15', 2, 'ev-1')).toBe(true);
+      expect(store.hasSameEventRecommendedElsewhere('08-15', 2, 'ev-1')).toBe(true);
       // Same slot = simple update of my own recommendation, no conflict.
-      expect(store.hasSameEventElsewhereOnDay('08-15', 1, 'ev-1')).toBe(false);
-      expect(store.hasSameEventElsewhereOnDay('08-15', 2, 'ev-2')).toBe(false);
+      expect(store.hasSameEventRecommendedElsewhere('08-15', 1, 'ev-1')).toBe(false);
+      expect(store.hasSameEventRecommendedElsewhere('08-15', 2, 'ev-2')).toBe(false);
     });
 
-    it("détecte le même événement déjà en place sur l'autre position du calendrier", async () => {
+    it("ne bloque PAS un événement en place sur l'autre position — l'appliquer le DÉPLACE", async () => {
       mockEntries.getEntriesForCalendar.mockReturnValue(
         of([makeEntry({ mmdd: '08-15', position: 1, event_id: 'ev-9' })]),
       );
 
       await store.load();
 
-      expect(store.hasSameEventElsewhereOnDay('08-15', 2, 'ev-9')).toBe(true);
-      expect(store.hasSameEventElsewhereOnDay('08-16', 2, 'ev-9')).toBe(false);
+      expect(store.hasSameEventRecommendedElsewhere('08-15', 2, 'ev-9')).toBe(false);
     });
   });
 
