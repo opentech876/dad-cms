@@ -174,6 +174,21 @@ describe('RecommendationService', () => {
     });
   });
 
+  describe('listMine()', () => {
+    it('liste mes recommandations (created_by = utilisateur courant)', async () => {
+      mockSupabase.client = buildClient({ data: [makeRec()] });
+      const result = await firstValueFrom(service.listMine());
+      expect(result.length).toBe(1);
+      expect(eqCalls).toContainEqual(['created_by', 'u-1']);
+    });
+
+    it("retourne [] en cas d'erreur", async () => {
+      mockSupabase.client = buildClient({ data: null, error: { message: 'fail' } });
+      const result = await firstValueFrom(service.listMine());
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('countAllPending()', () => {
     it("compte les pending de tout l'espace, sans filtre calendrier (badge global)", async () => {
       mockSupabase.client = buildClient({ count: 3 });

@@ -1,5 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { Router } from '@angular/router';
 import { of } from 'rxjs';
 import { RecommandationsComponent } from './recommandations.component';
 import { AuthService } from '../../core/auth/auth.service';
@@ -25,18 +26,29 @@ describe('RecommandationsComponent (shell)', () => {
   let mockCalendar: { listCalendars: jest.Mock };
   let mockCalendarEntry: { getEntriesForCalendar: jest.Mock };
   let mockRec: { listByCalendar: jest.Mock };
+  let mockRouter: { navigateByUrl: jest.Mock };
 
-  async function createComponent(granted: AppRole[]): Promise<void> {
+  async function createComponent(granted: AppRole[], role: AppRole | null = null): Promise<void> {
     const grantedSet = new Set<AppRole>(granted);
     mockCalendar     = { listCalendars: jest.fn().mockReturnValue(of(FAKE_CALENDARS)) };
     mockCalendarEntry = { getEntriesForCalendar: jest.fn().mockReturnValue(of([])) };
     mockRec          = { listByCalendar: jest.fn().mockReturnValue(of([FAKE_REC])) };
+    mockRouter       = { navigateByUrl: jest.fn().mockResolvedValue(true) };
 
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [RecommandationsComponent],
       providers: [
-        { provide: AuthService, useValue: { hasRoleAtLeast: jest.fn((role: AppRole) => of(grantedSet.has(role))) } },
+        {
+          provide: AuthService,
+          useValue: {
+            hasRoleAtLeast: jest.fn((role: AppRole) => of(grantedSet.has(role))),
+            // Steering vers /curation : of(null) complète sans émettre de
+            // rôle → la redirection reste inerte par défaut dans ces specs.
+            currentRole$: of(role),
+          },
+        },
+        { provide: Router, useValue: mockRouter },
         { provide: CalendarService, useValue: mockCalendar },
         { provide: CalendarEntryService, useValue: mockCalendarEntry },
         { provide: RecommendationService, useValue: mockRec },
@@ -112,6 +124,22 @@ describe('RecommandationsComponent (shell)', () => {
       await createComponent(['editeur']);
       fixture.detectChanges();
       expect(component.canApply()).toBe(false);
+    });
+  });
+
+  describe('steering Espace Curation', () => {
+    it('presidence est redirigée vers /curation', async () => {
+      await createComponent(['presidence'], 'presidence');
+      await component.ngOnInit();
+      await Promise.resolve();
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/curation');
+    });
+
+    it("owner n'est pas redirigé (il garde la vue recommandations)", async () => {
+      await createComponent(['presidence', 'owner'], 'owner');
+      await component.ngOnInit();
+      await Promise.resolve();
+      expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
     });
   });
 });

@@ -76,7 +76,9 @@ export const routes: Routes = [
         canActivate: [roleGuard],
         data: { requiredRoles: ['owner', 'chef_equipe', 'editeur'] },
         loadComponent: () =>
-          import('./features/calendar/day-detail/day-detail.component').then((m) => m.DayDetailComponent),
+          import('./features/calendar/day-detail/day-detail.component').then(
+            (m) => m.DayDetailComponent,
+          ),
       },
       {
         path: 'evenements',
@@ -88,7 +90,14 @@ export const routes: Routes = [
       {
         path: 'campagnes',
         canActivate: [roleGuard],
-        data: { requiredRoles: ['owner', 'chef_equipe', 'charge_communication', 'chef_equipe_commerciale'] },
+        data: {
+          requiredRoles: [
+            'owner',
+            'chef_equipe',
+            'charge_communication',
+            'chef_equipe_commerciale',
+          ],
+        },
         loadComponent: () =>
           import('./features/ad-campaigns/ad-campaigns.component').then(
             (m) => m.AdCampaignsComponent,
@@ -116,12 +125,57 @@ export const routes: Routes = [
         // (SECURITY DEFINER gate on both apply RPCs) — the component only
         // renders the corresponding controls per role.
         loadComponent: () =>
-          import('./features/presidence/recommandations.component').then((m) => m.RecommandationsComponent),
+          import('./features/presidence/recommandations.component').then(
+            (m) => m.RecommandationsComponent,
+          ),
       },
       {
         path: 'metriques',
         loadComponent: () =>
           import('./features/metriques/metriques.component').then((m) => m.MetriquesComponent),
+      },
+      // ── Espace Curation — the presidence (Curateur) role's own area.
+      // roleGuard: presidence only; owner bypasses all role checks.
+      {
+        path: 'curation',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['presidence'] },
+        loadComponent: () =>
+          import('./features/curation/curator-dashboard.component').then(
+            (m) => m.CuratorDashboardComponent,
+          ),
+      },
+      {
+        path: 'curation/recommander',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['presidence'] },
+        loadComponent: () =>
+          import('./features/curation/curator-hub.component').then((m) => m.CuratorHubComponent),
+      },
+      {
+        path: 'curation/mes-recommandations',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['presidence'] },
+        loadComponent: () =>
+          import('./features/curation/curator-recs.component').then((m) => m.CuratorRecsComponent),
+      },
+      {
+        path: 'curation/mes-recommandations/:id',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['presidence'] },
+        loadComponent: () =>
+          import('./features/curation/curator-rec-detail.component').then(
+            (m) => m.CuratorRecDetailComponent,
+          ),
+      },
+      {
+        path: 'curation/evenements',
+        canActivate: [roleGuard],
+        data: { requiredRoles: ['presidence'] },
+        loadComponent: () =>
+          import('./features/curation/curator-events.component').then(
+            (m) => m.CuratorEventsComponent,
+          ),
       },
       {
         path: 'recherche',
@@ -132,7 +186,9 @@ export const routes: Routes = [
         path: 'admin',
         canActivate: [systemAdminGuard],
         loadComponent: () =>
-          import('./features/admin/admin-dashboard.component').then((m) => m.AdminDashboardComponent),
+          import('./features/admin/admin-dashboard.component').then(
+            (m) => m.AdminDashboardComponent,
+          ),
       },
       {
         path: 'admin/espaces',
@@ -159,7 +215,9 @@ export const routes: Routes = [
         path: 'admin/notifications',
         canActivate: [systemAdminGuard],
         loadComponent: () =>
-          import('./features/notifications/notifications.component').then((m) => m.NotificationsComponent),
+          import('./features/notifications/notifications.component').then(
+            (m) => m.NotificationsComponent,
+          ),
       },
       {
         path: 'admin/profil',
@@ -176,7 +234,9 @@ export const routes: Routes = [
       {
         path: 'notifications',
         loadComponent: () =>
-          import('./features/notifications/notifications.component').then((m) => m.NotificationsComponent),
+          import('./features/notifications/notifications.component').then(
+            (m) => m.NotificationsComponent,
+          ),
       },
       {
         path: 'profil',
@@ -191,7 +251,9 @@ export const routes: Routes = [
       {
         path: 'espace-de-travail',
         loadComponent: () =>
-          import('./features/workspace/workspace-info.component').then((m) => m.WorkspaceInfoComponent),
+          import('./features/workspace/workspace-info.component').then(
+            (m) => m.WorkspaceInfoComponent,
+          ),
       },
     ],
   },

@@ -58,7 +58,13 @@
       @if (!collapsed()) {
         <div class="sidebar-brand">
           <span class="sidebar-brand-name">Day After Day</span>
-          <span class="sidebar-brand-sub">Système de Gestion de Contenu</span>
+          <span
+            class="sidebar-brand-sub"
+            [style.color]="isCurator() ? 'var(--sidebar-accent)' : null"
+            [style.text-transform]="isCurator() ? 'uppercase' : null"
+            [style.letter-spacing]="isCurator() ? '0.16em' : null"
+            >{{ isCurator() ? 'Espace Curation' : 'Système de Gestion de Contenu' }}</span
+          >
         </div>
       }
     </div>
@@ -272,6 +278,7 @@
               class="sidebar-nav-item"
               [routerLink]="item.path"
               routerLinkActive="sidebar-nav-item--active"
+              [routerLinkActiveOptions]="{ exact: item.path === '/curation' }"
               [title]="collapsed() ? item.label : ''"
               (click)="closeMobileSidebar()"
             >
@@ -282,10 +289,13 @@
                   <span class="sidebar-nav-badge">{{
                     notifUnread() > 9 ? '9+' : notifUnread()
                   }}</span>
-                } @else if (item.id === 'recommandations' && pendingRecs() > 0) {
+                } @else if (
+                  (item.id === 'recommandations' || item.id === 'mes-recommandations') &&
+                  pendingRecs() > 0
+                ) {
                   <span
                     class="sidebar-nav-badge"
-                    [title]="pendingRecs() + ' recommandation(s) du Curateur à traiter'"
+                    [title]="pendingRecs() + ' recommandation(s) en attente de publication'"
                     >{{ pendingRecs() > 9 ? '9+' : pendingRecs() }}</span
                   >
                 } @else if (item.badge) {
@@ -297,6 +307,43 @@
         </div>
       }
     </nav>
+
+    <!-- Curator role notice — the Espace Curation contract in one line -->
+    @if (isCurator() && !collapsed()) {
+      <div
+        style="
+          margin: 0 12px 8px;
+          padding: 10px 12px;
+          background: var(--sidebar-accent-soft);
+          border: 1px solid var(--sidebar-accent-soft);
+          border-radius: 8px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--sidebar-accent);
+            font-size: 11px;
+            font-weight: 600;
+          "
+        >
+          <tui-icon icon="@tui.info" style="font-size: 13px" /> Rôle Curateur
+        </div>
+        <div
+          style="
+            font-size: 10.5px;
+            color: var(--sidebar-fg);
+            opacity: 0.8;
+            margin-top: 3px;
+            line-height: 1.4;
+          "
+        >
+          Vous proposez du contenu. L'équipe éditoriale valide avant publication.
+        </div>
+      </div>
+    }
 
     <!-- User card -->
     <div class="sidebar-footer">

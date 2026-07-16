@@ -552,6 +552,85 @@ export class ShellComponent implements OnInit {
     },
   ];
 
+  /** Espace Curation — the presidence (Curateur) role gets its own
+   *  navigation universe instead of the generic role-filtered sections.
+   *  Same shell, different map: propose, follow, author. */
+  private readonly curatorSections: NavSection[] = [
+    {
+      id: 'pilotage',
+      label: 'Pilotage',
+      items: [
+        {
+          id: 'curation-dashboard',
+          label: 'Tableau de bord',
+          icon: '@tui.layout-dashboard',
+          path: '/curation',
+          roles: [],
+        },
+      ],
+    },
+    {
+      id: 'curation',
+      label: 'Curation',
+      items: [
+        {
+          id: 'recommander',
+          label: 'Recommander',
+          icon: '@tui.sparkles',
+          path: '/curation/recommander',
+          roles: [],
+        },
+        {
+          id: 'mes-recommandations',
+          label: 'Mes recommandations',
+          icon: '@tui.flag',
+          path: '/curation/mes-recommandations',
+          roles: [],
+        },
+        {
+          id: 'mes-evenements',
+          label: 'Mes événements',
+          icon: '@tui.book-open',
+          path: '/curation/evenements',
+          roles: [],
+        },
+      ],
+    },
+    {
+      id: 'alertes',
+      label: 'Alertes',
+      items: [
+        {
+          id: 'notifications',
+          label: 'Notifications',
+          icon: '@tui.bell',
+          path: '/notifications',
+          roles: [],
+        },
+      ],
+    },
+    {
+      id: 'compte-curation',
+      label: 'Compte',
+      items: [
+        { id: 'profil', label: 'Mon profil', icon: '@tui.user', path: '/profil', roles: [] },
+        {
+          id: 'parametres',
+          label: 'Customisation',
+          icon: '@tui.settings',
+          path: '/parametres',
+          roles: [],
+        },
+      ],
+    },
+  ];
+
+  /** True when the signed-in user is the Curateur (pure presidence role).
+   *  Owner inherits presidence rights but keeps the full CMS navigation. */
+  readonly isCurator = computed(
+    () => this.currentRole() === 'presidence' && !this.inPlatformMode(),
+  );
+
   /** Platform-level admin section — only rendered while the sysadmin is
    *  in platform mode (URL under /admin). Labels are explicit about being
    *  "plateforme" so if a mode transition renders both sections briefly,
@@ -639,6 +718,7 @@ export class ShellComponent implements OnInit {
       return [this.platformSection, this.accountSection];
     }
     const role = this.currentRole();
+    if (role === 'presidence') return this.curatorSections;
     if (!role && !this.isSystemAdmin()) return [];
     return this.navSections
       .map((s) => ({
@@ -668,6 +748,10 @@ export class ShellComponent implements OnInit {
     profil: 'Mon profil',
     parametres: 'Customisation',
     'espace-de-travail': 'Espace de travail',
+    curation: 'Espace Curation · Tableau de bord',
+    'curation/recommander': 'Recommander un événement',
+    'curation/mes-recommandations': 'Mes recommandations',
+    'curation/evenements': 'Mes événements',
     admin: 'Administration plateforme · Tableau de bord',
     'admin/espaces': 'Administration plateforme · Espaces',
     'admin/utilisateurs': 'Administration plateforme · Utilisateurs',
@@ -814,7 +898,10 @@ export class ShellComponent implements OnInit {
     // titles without colliding with same-named top-level routes.
     const fullKey = segments.join('/');
     const tailKey = segments.at(-1) ?? 'dashboard';
-    const title = this.routeTitles[fullKey] ?? this.routeTitles[tailKey] ?? 'Day After Day';
+    // Deep curation URLs (e.g. a recommendation detail) fall back to the
+    // area title rather than the app name.
+    const areaFallback = segments[0] === 'curation' ? 'Espace Curation' : 'Day After Day';
+    const title = this.routeTitles[fullKey] ?? this.routeTitles[tailKey] ?? areaFallback;
     this.pageTitle.set(title);
   }
 

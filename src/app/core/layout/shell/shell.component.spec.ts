@@ -247,15 +247,30 @@ describe('ShellComponent — navigation par rôle', () => {
     expect(component.visibleNavItems().map((i) => i.path)).toContain('/metriques');
   });
 
-  // ── presidence ─────────────────────────────────────────────────────────────
+  // ── presidence — Espace Curation ───────────────────────────────────────────
 
-  it("presidence voit 'recommandations' mais pas evenements/campagnes/utilisateurs", () => {
+  it('presidence voit la navigation Espace Curation, pas la navigation générale', () => {
     createComponent('presidence');
     const paths = component.visibleNavItems().map((i) => i.path);
-    expect(paths).toContain('/recommandations');
+    expect(paths).toContain('/curation');
+    expect(paths).toContain('/curation/recommander');
+    expect(paths).toContain('/curation/mes-recommandations');
+    expect(paths).toContain('/curation/evenements');
+    expect(paths).toContain('/notifications');
+    expect(paths).not.toContain('/recommandations');
+    expect(paths).not.toContain('/calendrier');
     expect(paths).not.toContain('/evenements');
     expect(paths).not.toContain('/campagnes');
     expect(paths).not.toContain('/utilisateurs');
+  });
+
+  it("isCurator est vrai pour presidence et faux pour owner (l'owner garde le CMS complet)", () => {
+    createComponent('presidence');
+    expect(component.isCurator()).toBe(true);
+
+    createComponent('owner');
+    expect(component.isCurator()).toBe(false);
+    expect(component.visibleNavItems().map((i) => i.path)).not.toContain('/curation');
   });
 
   it("editeur voit 'recommandations' en lecture seule (elle doit pouvoir consulter avant d'appliquer)", () => {

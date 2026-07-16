@@ -1,0 +1,284 @@
+@if (rec(); as r) {
+  <div
+    style="
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 20px;
+      max-width: 1200px;
+      align-items: flex-start;
+    "
+  >
+    <div style="display: flex; flex-direction: column; gap: 16px">
+      <a
+        routerLink="/curation/mes-recommandations"
+        class="btn-link"
+        style="
+          align-self: flex-start;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 13px;
+        "
+      >
+        <tui-icon icon="@tui.chevron-left" style="font-size: 14px" /> Mes recommandations
+      </a>
+
+      <!-- Event card -->
+      <div class="card" style="overflow: hidden">
+        <div style="display: grid; grid-template-columns: 200px 1fr">
+          <div
+            style="min-height: 180px"
+            [style.background]="
+              imageUrl(r) ? 'url(' + imageUrl(r) + ') center/cover' : artFor(r.event_id)
+            "
+          ></div>
+          <div style="padding: 20px">
+            <div
+              style="display: flex; align-items: center; gap: 8px; justify-content: space-between"
+            >
+              <span class="eyebrow">Recommandation</span>
+              <span [class]="'badge badge-dot ' + STATUS_META[r.status].badge">{{
+                STATUS_META[r.status].label
+              }}</span>
+            </div>
+            <h2
+              style="
+                font-family: var(--font-serif);
+                font-size: 24px;
+                font-weight: 600;
+                margin-top: 8px;
+                line-height: 1.2;
+              "
+            >
+              {{ r.event?.title ?? '—' }}
+            </h2>
+            @if (r.event?.description) {
+              <p style="font-size: 13.5px; color: var(--fg-2); margin-top: 10px; line-height: 1.55">
+                {{ r.event?.description }}
+              </p>
+            }
+            <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap">
+              <span class="tag"
+                ><tui-icon icon="@tui.calendar" style="font-size: 12px" />
+                {{ mmddLabel(r.mmdd) }}</span
+              >
+              <span class="tag"
+                ><tui-icon icon="@tui.crosshair" style="font-size: 12px" />
+                {{ positionLabel(r.position) }}</span
+              >
+              @if (store.selectedCalendar(); as cal) {
+                <span class="tag"
+                  ><tui-icon icon="@tui.archive" style="font-size: 12px" /> {{ cal.name }}</span
+                >
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Replacement preview -->
+      @if (replacedTitle(); as replaced) {
+        <div class="card">
+          <div class="card-header"><div class="card-title">Impact sur le calendrier</div></div>
+          <div class="card-body" style="display: flex; align-items: center; gap: 16px">
+            <div style="flex: 1">
+              <div class="eyebrow" style="color: var(--fg-3)">Avant</div>
+              <div
+                style="
+                  font-family: var(--font-serif);
+                  font-style: italic;
+                  font-size: 14px;
+                  margin-top: 4px;
+                "
+              >
+                « {{ replaced }} »
+              </div>
+            </div>
+            <tui-icon
+              icon="@tui.arrow-right"
+              style="font-size: 20px; color: var(--fg-3); flex: none"
+            />
+            <div style="flex: 1">
+              <div class="eyebrow">Proposé</div>
+              <div
+                style="
+                  font-family: var(--font-serif);
+                  font-style: italic;
+                  font-size: 14px;
+                  margin-top: 4px;
+                  color: var(--accent);
+                "
+              >
+                « {{ r.event?.title }} »
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Right — timeline + curator control -->
+    <div style="display: flex; flex-direction: column; gap: 16px; position: sticky; top: 0">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Suivi</div></div>
+        <div class="card-body">
+          <div style="display: flex; flex-direction: column">
+            @for (step of timeline(); track step.title; let i = $index; let last = $last) {
+              <div style="display: flex; gap: 12px">
+                <div style="display: flex; flex-direction: column; align-items: center">
+                  <div
+                    style="
+                      width: 30px;
+                      height: 30px;
+                      border-radius: 50%;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      flex: none;
+                    "
+                    [style.background]="
+                      step.tone === 'success'
+                        ? 'var(--success-soft)'
+                        : step.active
+                          ? 'var(--warning-soft)'
+                          : step.done
+                            ? 'var(--accent-soft)'
+                            : 'var(--bg-sunken)'
+                    "
+                    [style.color]="
+                      step.tone === 'success'
+                        ? 'var(--success)'
+                        : step.active
+                          ? 'var(--warning)'
+                          : step.done
+                            ? 'var(--accent)'
+                            : 'var(--fg-3)'
+                    "
+                    [style.border]="step.active ? '1.5px solid var(--warning)' : 'none'"
+                  >
+                    <tui-icon [icon]="step.icon" style="font-size: 15px" />
+                  </div>
+                  @if (!last) {
+                    <div
+                      style="
+                        width: 2px;
+                        flex: 1;
+                        min-height: 24px;
+                        background: var(--border-1);
+                        margin: 2px 0;
+                      "
+                    ></div>
+                  }
+                </div>
+                <div style="padding-bottom: 16px; flex: 1">
+                  <div
+                    style="font-size: 13.5px; font-weight: 600"
+                    [style.color]="step.active ? 'var(--warning)' : 'var(--fg-1)'"
+                  >
+                    {{ step.title }}
+                  </div>
+                  <div style="font-size: 11.5px; color: var(--fg-3); margin-top: 1px">
+                    {{ step.by }}
+                    @if (step.when) {
+                      · {{ step.when | date: DATE_FMT.long : '' : 'fr' }}
+                    } @else {
+                      · À paraître
+                    }
+                  </div>
+                  <div
+                    style="font-size: 12px; color: var(--fg-2); margin-top: 4px; line-height: 1.45"
+                  >
+                    {{ step.note }}
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Contrôle de la curatrice</div></div>
+        <div class="card-body" style="display: flex; flex-direction: column; gap: 8px">
+          @if (r.status === 'pending') {
+            @if (!withdrawArmed()) {
+              <button
+                class="btn btn-flat btn-sm"
+                type="button"
+                style="color: var(--danger); justify-content: flex-start"
+                (click)="armWithdraw()"
+              >
+                <tui-icon icon="@tui.minus" style="font-size: 14px" /> Retirer la recommandation
+              </button>
+            } @else {
+              <div
+                style="
+                  padding: 10px 12px;
+                  border-radius: 8px;
+                  background: var(--danger-soft);
+                  font-size: 12.5px;
+                  color: var(--danger);
+                "
+              >
+                Retirer définitivement cette proposition ?
+              </div>
+              <div style="display: flex; gap: 8px">
+                <button
+                  class="btn btn-danger btn-sm"
+                  type="button"
+                  [disabled]="withdrawing()"
+                  (click)="withdraw()"
+                >
+                  @if (withdrawing()) {
+                    <span class="spinner"></span>
+                  }
+                  Confirmer le retrait
+                </button>
+                <button class="btn btn-flat btn-sm" type="button" (click)="cancelWithdraw()">
+                  Annuler
+                </button>
+              </div>
+            }
+            <div
+              style="
+                font-size: 11.5px;
+                color: var(--fg-3);
+                display: flex;
+                gap: 6px;
+                margin-top: 2px;
+                line-height: 1.4;
+              "
+            >
+              <tui-icon icon="@tui.info" style="font-size: 13px; flex: none; margin-top: 1px" />
+              Vous gardez le contrôle total de vos propres propositions tant qu'elles ne sont pas
+              publiées.
+            </div>
+          } @else {
+            <div
+              style="
+                font-size: 12.5px;
+                color: var(--fg-2);
+                line-height: 1.5;
+                display: flex;
+                gap: 6px;
+              "
+            >
+              <tui-icon icon="@tui.info" style="font-size: 13px; flex: none; margin-top: 1px" />
+              Cette recommandation est parue sur le calendrier. Pour la remplacer, contactez
+              l'équipe éditoriale ou proposez un nouvel événement sur la même date.
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+} @else {
+  <div class="empty">
+    <div class="empty-icon"><tui-icon icon="@tui.flag" style="font-size: 24px" /></div>
+    <div class="empty-title">Recommandation introuvable</div>
+    <p style="font-size: 13px; color: var(--fg-3)">Elle a peut-être été retirée.</p>
+    <a routerLink="/curation/mes-recommandations" class="btn btn-secondary btn-sm"
+      >Retour à mes recommandations</a
+    >
+  </div>
+}

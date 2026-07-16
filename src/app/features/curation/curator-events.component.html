@@ -1,0 +1,124 @@
+<div style="display: flex; flex-direction: column; gap: 16px; max-width: 1200px">
+  <!-- Toolbar -->
+  <div
+    class="card"
+    style="padding: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap"
+  >
+    <div class="input-group" style="width: 320px">
+      <span class="input-icon"><tui-icon icon="@tui.search" style="font-size: 16px" /></span>
+      <input
+        class="input has-icon"
+        placeholder="Rechercher dans mes événements…"
+        style="height: 36px; font-size: 13px"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+      />
+    </div>
+    <div style="flex: 1"></div>
+    <span style="font-size: 12.5px; color: var(--fg-3)">
+      {{ filtered().length }} événement{{ filtered().length > 1 ? 's' : '' }}
+    </span>
+    <a routerLink="/curation/recommander" class="btn btn-primary btn-sm">
+      <tui-icon icon="@tui.sparkles" style="font-size: 14px" /> Recommander sur une date
+    </a>
+  </div>
+
+  @if (store.myEventsLoading()) {
+    <div style="padding: 40px; text-align: center; color: var(--fg-3); font-style: italic">
+      Chargement…
+    </div>
+  } @else if (filtered().length === 0) {
+    <div class="empty">
+      <div class="empty-icon"><tui-icon icon="@tui.book-open" style="font-size: 24px" /></div>
+      <div class="empty-title">Aucun événement de votre plume</div>
+      <p style="font-size: 13px; color: var(--fg-3); max-width: 340px">
+        Les événements que vous créez en recommandant apparaissent ici, dans la bibliothèque
+        partagée.
+      </p>
+      <a routerLink="/curation/recommander" class="btn btn-secondary btn-sm">
+        <tui-icon icon="@tui.sparkles" style="font-size: 14px" /> Proposer un premier événement
+      </a>
+    </div>
+  } @else {
+    <div
+      style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px"
+    >
+      @for (ev of filtered(); track ev.id) {
+        <div class="card" style="overflow: hidden; display: flex; flex-direction: column">
+          <div
+            style="position: relative; aspect-ratio: 4/3"
+            [style.background]="
+              imageUrl(ev) ? 'url(' + imageUrl(ev) + ') center/cover' : artFor(ev.id)
+            "
+          >
+            <span
+              style="
+                position: absolute;
+                top: 8px;
+                left: 10px;
+                font-family: var(--font-serif);
+                font-size: 18px;
+                font-weight: 700;
+                color: #f3e6c8;
+                text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+              "
+              >{{ eventYear(ev) }}</span
+            >
+            <span
+              style="position: absolute; top: 8px; right: 8px"
+              [class]="ev.status === 'published' ? 'badge badge-success' : 'badge'"
+            >
+              {{ ev.status === 'published' ? 'Publié' : 'Réserve' }}
+            </span>
+          </div>
+          <div style="padding: 14px; flex: 1; display: flex; flex-direction: column">
+            <h3
+              style="
+                font-family: var(--font-serif);
+                font-size: 14.5px;
+                font-weight: 600;
+                line-height: 1.25;
+              "
+            >
+              {{ ev.title }}
+            </h3>
+            <div
+              style="
+                display: flex;
+                gap: 10px;
+                margin-top: 8px;
+                font-size: 11px;
+                color: var(--fg-3);
+                flex-wrap: wrap;
+              "
+            >
+              @if (isAssigned(ev)) {
+                <span
+                  style="display: inline-flex; align-items: center; gap: 4px; color: var(--success)"
+                >
+                  <tui-icon icon="@tui.check" style="font-size: 11px" /> Assigné au calendrier
+                </span>
+              }
+              @if (isRecommended(ev)) {
+                <span
+                  style="display: inline-flex; align-items: center; gap: 4px; color: var(--accent)"
+                >
+                  <tui-icon icon="@tui.flag" style="font-size: 11px" /> Recommandé
+                </span>
+              }
+            </div>
+            <div style="margin-top: auto; padding-top: 12px; display: flex; gap: 6px">
+              <a
+                routerLink="/curation/recommander"
+                class="btn btn-secondary btn-sm"
+                style="flex: 1; height: 30px; font-size: 12px"
+              >
+                <tui-icon icon="@tui.sparkles" style="font-size: 12px" /> Recommander
+              </a>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

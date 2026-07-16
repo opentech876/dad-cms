@@ -72,6 +72,24 @@ export class RecommendationService {
     ).pipe(map(({ count, error }: any) => (error ? 0 : (count ?? 0))));
   }
 
+  /** The signed-in curator's own recommendations across all calendars,
+   *  newest first, with the joined event. Powers the Espace Curation. */
+  listMine(): Observable<PresidencyRecommendationWithEvent[]> {
+    return from(
+      this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
+        this.supabase.client
+          .from('presidency_recommendations')
+          .select('*, event:events(*)')
+          .eq('created_by', user?.id ?? '')
+          .order('created_at', { ascending: false }),
+      ),
+    ).pipe(
+      map(({ data, error }: any) =>
+        error || !data ? [] : (data as PresidencyRecommendationWithEvent[]),
+      ),
+    );
+  }
+
   /** Workspace-wide pending count (RLS-scoped), across all calendars.
    *  Drives the sidebar badge that disappears once everything is applied. */
   countAllPending(): Observable<number> {
