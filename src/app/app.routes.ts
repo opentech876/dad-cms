@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
+import { curatorHomeGuard } from './core/auth/curator-home.guard';
 import { roleGuard } from './core/auth/role.guard';
 import { systemAdminGuard } from './core/auth/system-admin.guard';
 import { onboardingGuard } from './core/onboarding/onboarding.guard';
@@ -63,6 +64,9 @@ export const routes: Routes = [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       {
         path: 'dashboard',
+        // The Curateur's only dashboard is /curation — this guard reroutes
+        // presidence there so login/deep links never show two dashboards.
+        canActivate: [curatorHomeGuard],
         loadComponent: () =>
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
