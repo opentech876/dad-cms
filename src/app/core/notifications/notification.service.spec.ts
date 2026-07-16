@@ -1,17 +1,14 @@
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
 import { NotificationService } from './notification.service';
+import { AuthService } from '../auth/auth.service';
 import { SupabaseService } from '../supabase/supabase.service';
 
-function makeClientMock(
-  listData: any[] = [],
-  listError: any = null,
-  upsertError: any = null,
-) {
-  const upsertMock   = jest.fn().mockResolvedValue({ error: upsertError });
-  const orderMock    = jest.fn().mockResolvedValue({ data: listData, error: listError });
-  const selectMock   = jest.fn().mockReturnValue({ order: orderMock });
-  const notifFrom    = { select: selectMock };
+function makeClientMock(listData: any[] = [], listError: any = null, upsertError: any = null) {
+  const upsertMock = jest.fn().mockResolvedValue({ error: upsertError });
+  const orderMock = jest.fn().mockResolvedValue({ data: listData, error: listError });
+  const selectMock = jest.fn().mockReturnValue({ order: orderMock });
+  const notifFrom = { select: selectMock };
   const notifReadsFrom = { upsert: upsertMock };
 
   const fromMock = jest.fn((table: string) => {
@@ -19,26 +16,48 @@ function makeClientMock(
     return notifFrom;
   });
 
-  return { from: fromMock, auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) } };
+  return {
+    from: fromMock,
+    auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+  };
 }
 
 describe('NotificationService', () => {
   let service: NotificationService;
   let clientMock: ReturnType<typeof makeClientMock>;
+  let supabaseValue: { client: any };
+  let mockAuth: { currentRole$: any };
 
   beforeEach(() => {
     clientMock = makeClientMock([
-      { id: 'n1', title: 'T1', body: 'B1', category: 'editorial', created_at: '2026-05-04T10:00:00Z', notification_reads: [{ read_at: '2026-05-05T08:00:00Z' }] },
-      { id: 'n2', title: 'T2', body: 'B2', category: 'campaign',  created_at: '2026-05-03T09:00:00Z', notification_reads: [] },
+      {
+        id: 'n1',
+        title: 'T1',
+        body: 'B1',
+        category: 'editorial',
+        created_at: '2026-05-04T10:00:00Z',
+        notification_reads: [{ read_at: '2026-05-05T08:00:00Z' }],
+      },
+      {
+        id: 'n2',
+        title: 'T2',
+        body: 'B2',
+        category: 'campaign',
+        created_at: '2026-05-03T09:00:00Z',
+        notification_reads: [],
+      },
     ]);
+    supabaseValue = { client: clientMock };
+    mockAuth = { currentRole$: of('owner') };
 
     TestBed.configureTestingModule({
       providers: [
         NotificationService,
         {
           provide: SupabaseService,
-          useValue: { client: clientMock },
+          useValue: supabaseValue,
         },
+        { provide: AuthService, useValue: mockAuth },
       ],
     });
     service = TestBed.inject(NotificationService);
@@ -46,6 +65,65 @@ describe('NotificationService', () => {
 
   it('devrait être créé', () => {
     expect(service).toBeTruthy();
+  });
+
+  describe('filtre Espace Curation (presidence)', () => {
+    const ROWS = [
+      {
+        id: 'c1',
+        title: 'Campagne',
+        body: 'B',
+        category: 'campaign',
+        created_at: '2026-07-01T09:00:00Z',
+        table_name: 'ad_campaigns',
+        notification_reads: [],
+      },
+      {
+        id: 'r1',
+        title: 'Recommandation publiée',
+        body: 'B',
+        category: 'editorial',
+        created_at: '2026-07-02T09:00:00Z',
+        table_name: 'presidency_recommendations',
+        notification_reads: [],
+      },
+      {
+        id: 'e1',
+        title: 'Événement modifié',
+        body: 'B',
+        category: 'editorial',
+        created_at: '2026-07-03T09:00:00Z',
+        table_name: 'events',
+        notification_reads: [],
+      },
+    ];
+
+    it('la Curatrice ne voit que le flux de curation, rien d autre', async () => {
+      supabaseValue.client = makeClientMock(ROWS);
+      mockAuth.currentRole$ = of('presidence');
+
+      const result = await firstValueFrom(service.listNotifications());
+
+      expect(result.map((n) => n.id)).toEqual(['r1']);
+    });
+
+    it('les autres rôles voient toutes les notifications', async () => {
+      supabaseValue.client = makeClientMock(ROWS);
+      mockAuth.currentRole$ = of('chef_equipe');
+
+      const result = await firstValueFrom(service.listNotifications());
+
+      expect(result).toHaveLength(3);
+    });
+
+    it('le badge non-lu de la Curatrice ne compte que la curation', async () => {
+      supabaseValue.client = makeClientMock(ROWS);
+      mockAuth.currentRole$ = of('presidence');
+
+      await service.refreshUnread();
+
+      expect(service.unreadCount()).toBe(1);
+    });
   });
 
   describe('listNotifications()', () => {
@@ -67,7 +145,6 @@ describe('NotificationService', () => {
       const selectArg = clientMock.from.mock.results[0].value.select.mock.calls[0][0];
       expect(selectArg).toContain('notification_reads!left');
     });
-
   });
 
   describe('unreadCount signal', () => {
@@ -106,9 +183,7 @@ describe('NotificationService', () => {
     it('devrait appeler upsert sur notification_reads avec onConflict', async () => {
       await firstValueFrom(service.markAsRead('n2'));
       expect(clientMock.from).toHaveBeenCalledWith('notification_reads');
-      const readsResult = clientMock.from.mock.results.find(
-        (r: any) => r?.value?.upsert,
-      );
+      const readsResult = clientMock.from.mock.results.find((r: any) => r?.value?.upsert);
       expect(readsResult?.value.upsert).toHaveBeenCalledWith(
         expect.objectContaining({ notification_id: 'n2' }),
         expect.objectContaining({ onConflict: 'notification_id,user_id' }),
@@ -119,9 +194,7 @@ describe('NotificationService', () => {
   describe('markAllAsRead()', () => {
     it('devrait appeler upsert avec tous les ids', async () => {
       await firstValueFrom(service.markAllAsRead(['n1', 'n2']));
-      const readsResult = clientMock.from.mock.results.find(
-        (r: any) => r?.value?.upsert,
-      );
+      const readsResult = clientMock.from.mock.results.find((r: any) => r?.value?.upsert);
       expect(readsResult?.value.upsert).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ notification_id: 'n1' }),
