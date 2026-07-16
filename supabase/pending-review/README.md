@@ -13,6 +13,7 @@ into `supabase/migrations/` with a fresh timestamp prefix, then push.
 | `2026-07-13_p3_fk_indexes.sql` | `unindexed_foreign_keys` (P-3) | **Low** — additive | ✅ ready to apply |
 | `2026-07-13_security_hardening.sql` | `function_search_path_mutable` (S-4) + `anon_security_definer_...` (S-2/S-3) | S-4 low / **S-2 needs allowlist confirmation** | ⚠ review S-2 block |
 | `2026-07-15_footer_only_ads.sql` | Business rule: one ad at a time, footer only — normalize rows, default + CHECK | **Low** — column kept for mobile compat | ⚠ confirm with mobile dev (2 questions in file header) |
+| `2026-07-16_apply_one_position_per_event.sql` | **Bug fix**: apply RPCs abort with 23505 when a rec's event already sits on the day's other position; also dedups + adds the mirror UNIQUE on `presidency_recommendations` | **Low** — RPC redefinitions + additive constraint (after cleanup) | ✅ ready to apply — fixes the Espace Curation duplicate error |
 
 ## Already applied in code (not here)
 

@@ -1,7 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { Router } from '@angular/router';
 import { of } from 'rxjs';
 import { DashboardComponent } from './dashboard.component';
+import { AuthService } from '../../core/auth/auth.service';
 import {
   AdOutlook,
   DashboardService,
@@ -57,6 +59,8 @@ describe('DashboardComponent', () => {
     getFeaturedEvent: jest.Mock;
   };
   let mockInsights: { getDashboardStats: jest.Mock };
+  let mockAuth: { currentRole$: unknown };
+  let mockRouter: { navigateByUrl: jest.Mock };
 
   beforeEach(() => {
     mockDashboard = {
@@ -65,12 +69,16 @@ describe('DashboardComponent', () => {
       getFeaturedEvent: jest.fn().mockReturnValue(of(null)),
     };
     mockInsights = { getDashboardStats: jest.fn().mockReturnValue(of(makeOpStats())) };
+    mockAuth = { currentRole$: of('owner') };
+    mockRouter = { navigateByUrl: jest.fn().mockResolvedValue(true) };
 
     TestBed.configureTestingModule({
       imports: [DashboardComponent],
       providers: [
         { provide: DashboardService, useValue: mockDashboard },
         { provide: InsightsService, useValue: mockInsights },
+        { provide: AuthService, useValue: mockAuth },
+        { provide: Router, useValue: mockRouter },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     });
@@ -79,6 +87,27 @@ describe('DashboardComponent', () => {
 
     const fixture = TestBed.createComponent(DashboardComponent);
     component = fixture.componentInstance;
+  });
+
+  // ── Blocage Curatrice (défense derrière curatorHomeGuard) ──────────────────
+
+  describe('blocage Curatrice', () => {
+    it('presidence est renvoyée vers /curation sans charger le tableau de bord', async () => {
+      mockAuth.currentRole$ = of('presidence');
+
+      await component.ngOnInit();
+
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/curation');
+      expect(mockDashboard.getYearContentStats).not.toHaveBeenCalled();
+      expect(mockDashboard.getAdOutlook).not.toHaveBeenCalled();
+    });
+
+    it('les autres rôles chargent le tableau de bord normalement', async () => {
+      await component.ngOnInit();
+
+      expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
+      expect(mockDashboard.getYearContentStats).toHaveBeenCalled();
+    });
   });
 
   // ── Loading + wiring ───────────────────────────────────────────────────────

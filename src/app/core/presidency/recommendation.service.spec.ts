@@ -229,6 +229,21 @@ describe('RecommendationService', () => {
       expect(res.success).toBe(false);
       expect(res.error).toBe('unique violation');
     });
+
+    it('traduit une violation de contrainte unique (23505) en message lisible', async () => {
+      mockSupabase.client = buildClient({
+        error: {
+          code: '23505',
+          message:
+            'duplicate key value violates unique constraint "uq_presidency_one_position_per_event"',
+        },
+      });
+      const res = await firstValueFrom(service.upsertSlot('cal-1', '08-15', 2, 'ev-1'));
+      expect(res.success).toBe(false);
+      expect(res.error).toBe(
+        'Cet événement est déjà proposé ou en place sur cette date — choisissez un autre événement ou une autre date.',
+      );
+    });
   });
 
   describe('removeSlot()', () => {

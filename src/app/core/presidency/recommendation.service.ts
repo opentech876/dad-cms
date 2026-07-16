@@ -125,9 +125,19 @@ export class RecommendationService {
         ),
       ),
     ).pipe(
-      map(({ error }: any) =>
-        error ? { success: false, error: error.message } : { success: true },
-      ),
+      map(({ error }: any) => {
+        if (!error) return { success: true };
+        // 23505: another unique constraint fired (one event per day across
+        // both positions) — surface a readable message, not raw Postgres.
+        if (error.code === '23505') {
+          return {
+            success: false,
+            error:
+              'Cet événement est déjà proposé ou en place sur cette date — choisissez un autre événement ou une autre date.',
+          };
+        }
+        return { success: false, error: error.message };
+      }),
     );
   }
 

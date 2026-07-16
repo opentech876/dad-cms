@@ -78,9 +78,12 @@ export class ProposeModalComponent {
   readonly currentMain = computed(() => this.dayEntries().find((e) => e.position === 1) ?? null);
   readonly currentAlso = computed(() => this.dayEntries().find((e) => e.position === 2) ?? null);
 
-  /** Library events for this date not already on the calendar day. */
+  /** Library events for this date not already on the calendar day and not
+   *  already in one of my recommendations for it — the DB forbids the same
+   *  event twice on one day. */
   readonly suggestions = computed<HistoricalEvent[]>(() => {
     const used = new Set(this.dayEntries().map((e) => e.event_id));
+    for (const rec of this.store.myRecsByMmdd().get(this.mmdd()) ?? []) used.add(rec.event_id);
     return this.library().filter((e) => !used.has(e.id));
   });
 
@@ -208,6 +211,14 @@ export class ProposeModalComponent {
       }
 
       if (!eventId) return;
+      // The DB forbids one event on both positions of the same day — catch
+      // it here with a readable message instead of a failed round-trip.
+      if (this.store.hasSameEventElsewhereOnDay(this.mmdd(), position, eventId)) {
+        this.error.set(
+          "Cet événement occupe déjà l'autre position de cette date — choisissez un autre événement ou une autre position.",
+        );
+        return;
+      }
       const res = await firstValueFrom(
         this.recommendationService.upsertSlot(calId, this.mmdd(), position, eventId),
       );

@@ -77,6 +77,20 @@ export class CurationStore {
     return m;
   });
 
+  /** True when the given event already sits on the OTHER position of the
+   *  same day — in my own recommendations or in the calendar itself. The
+   *  DB forbids one event on both positions of a day (unique constraint),
+   *  so the UI blocks it with a readable message before the round-trip. */
+  hasSameEventElsewhereOnDay(mmdd: string, position: 1 | 2, eventId: string): boolean {
+    const inMyRecs = (this.myRecsByMmdd().get(mmdd) ?? []).some(
+      (r) => r.position !== position && r.event_id === eventId,
+    );
+    const inEntries = (this.entriesByMmdd().get(mmdd) ?? []).some(
+      (e) => e.position !== position && e.event_id === eventId,
+    );
+    return inMyRecs || inEntries;
+  }
+
   hubDayState(mmdd: string): HubDayState {
     const recs = this.myRecsByMmdd().get(mmdd) ?? [];
     if (recs.some((r) => r.status === 'pending')) return 'pending';

@@ -1,7 +1,9 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { take } from 'rxjs/operators';
+import { AuthService } from '../../core/auth/auth.service';
 import { DashboardOperationalStats, InsightsService } from '../../core/insights/insights.service';
 import {
   AdOutlook,
@@ -55,6 +57,8 @@ const MONTH_LETTERS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D
 export class DashboardComponent implements OnInit {
   private insightsService = inject(InsightsService);
   private dashboardService = inject(DashboardService);
+  private auth = inject(AuthService);
+  private router = inject(Router);
 
   protected readonly DATE_FMT = DATE_FMT;
 
@@ -167,6 +171,14 @@ export class DashboardComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    // Defense in depth behind curatorHomeGuard: this page is not for the
+    // Curateur, whatever route exposes it — bail before any query fires.
+    const role = await this.safe(() => firstValueFrom(this.auth.currentRole$.pipe(take(1))), null);
+    if (role === 'presidence') {
+      void this.router.navigateByUrl('/curation');
+      return;
+    }
+
     const year = this.currentYear;
 
     const [contentStats, adOutlook, opStats] = await Promise.all([
