@@ -37,12 +37,15 @@ export class CalendarEntryService {
     );
   }
 
-  /** All entries for a calendar, with the full event record joined. */
+  /** All entries for a calendar, with the joined event's displayed columns.
+   *  Narrowed from events(*) — consumers only render id/title/description/
+   *  image/date/status, and a full year can join ~730 rows, so the audit +
+   *  source/historian/origin columns are dead weight over the wire. */
   getEntriesForCalendar(calendarId: string): Observable<CalendarEntryWithEvent[]> {
     return from(
       this.supabase.client
         .from('calendar_entries')
-        .select('*, event:events(*)')
+        .select('*, event:events(id, title, description, image_path, event_date, status)')
         .eq('calendar_id', calendarId)
         .order('mmdd', { ascending: true }),
     ).pipe(

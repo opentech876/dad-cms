@@ -45,12 +45,13 @@ export class RecommendationService {
   private supabase = inject(SupabaseService);
   private workspaceContext = inject(WorkspaceContextService);
 
-  /** All pending+applied recommendations for a calendar, with the joined event. */
+  /** All pending+applied recommendations for a calendar, with the joined
+   *  event's displayed columns (narrowed from events(*) — see listMine). */
   listByCalendar(calendarId: string): Observable<PresidencyRecommendationWithEvent[]> {
     return from(
       this.supabase.client
         .from('presidency_recommendations')
-        .select('*, event:events(*)')
+        .select('*, event:events(id, title, description, image_path, event_date, status)')
         .eq('calendar_id', calendarId)
         .order('mmdd', { ascending: true })
         .order('position', { ascending: true }),
@@ -73,13 +74,15 @@ export class RecommendationService {
   }
 
   /** The signed-in curator's own recommendations across all calendars,
-   *  newest first, with the joined event. Powers the Espace Curation. */
+   *  newest first, with the joined event's displayed columns. Narrowed
+   *  from events(*): the curation pages only render id/title/description/
+   *  image/date/status off the join. */
   listMine(): Observable<PresidencyRecommendationWithEvent[]> {
     return from(
       this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
         this.supabase.client
           .from('presidency_recommendations')
-          .select('*, event:events(*)')
+          .select('*, event:events(id, title, description, image_path, event_date, status)')
           .eq('created_by', user?.id ?? '')
           .order('created_at', { ascending: false }),
       ),
