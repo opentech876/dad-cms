@@ -15,6 +15,11 @@ import { Event as HistoricalEvent } from '../../models';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
+/** How long a loaded snapshot stays fresh. Navigating between the five
+ *  curation pages within this window reuses the snapshot instead of
+ *  re-fetching calendars + recommendations + entries each time. */
+const CURATION_TTL_MS = 60_000;
+
 /** Hub day states, by priority: my pending rec > my published rec >
  *  calendar already filled > empty date. */
 export type HubDayState = 'pending' | 'published' | 'filled' | 'empty';
@@ -119,7 +124,30 @@ export class CurationStore {
     return upcoming.length > 0 ? upcoming : all;
   });
 
-  async load(): Promise<void> {
+  /** Freshness bookkeeping: `loadedAt` gates the TTL, `inFlight` collapses
+   *  concurrent callers (e.g. two curator components mounting together)
+   *  onto one round-trip. */
+  private loadedAt = 0;
+  private inFlight: Promise<void> | null = null;
+
+  /**
+   * Load (or reuse) the curation snapshot. A no-op when data is still fresh
+   * unless `force` is passed — so moving between curation pages doesn't
+   * re-fetch. Concurrent calls share one in-flight load.
+   */
+  async load(force = false): Promise<void> {
+    const fresh = this.loadedAt > 0 && Date.now() - this.loadedAt < CURATION_TTL_MS;
+    if (!force && fresh) return;
+    if (this.inFlight) return this.inFlight;
+    this.inFlight = this._doLoad();
+    try {
+      await this.inFlight;
+    } finally {
+      this.inFlight = null;
+    }
+  }
+
+  private async _doLoad(): Promise<void> {
     this.loading.set(true);
     try {
       const [calendars, myRecs] = await Promise.all([
@@ -137,6 +165,7 @@ export class CurationStore {
         kept ?? calendars.find((c) => c.year === currentYear) ?? calendars[0] ?? null;
       this.selectedCalendarId.set(preferred?.id ?? null);
       await this.reloadEntries();
+      this.loadedAt = Date.now();
     } finally {
       this.loading.set(false);
     }

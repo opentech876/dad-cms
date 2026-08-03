@@ -115,6 +115,42 @@ describe('CurationStore', () => {
       expect(store.entries().length).toBe(1);
       expect(mockEntries.getEntriesForCalendar).toHaveBeenCalledWith('cal-1');
     });
+
+    it('ne recharge pas dans la fenêtre de fraîcheur (navigation entre pages)', async () => {
+      await store.load();
+      await store.load();
+      await store.load();
+
+      // Trois pages de curation ouvertes coup sur coup → un seul aller-retour.
+      expect(mockCalendars.listCalendars).toHaveBeenCalledTimes(1);
+      expect(mockRecs.listMine).toHaveBeenCalledTimes(1);
+      expect(mockEntries.getEntriesForCalendar).toHaveBeenCalledTimes(1);
+    });
+
+    it('force=true recharge malgré la fraîcheur', async () => {
+      await store.load();
+      await store.load(true);
+
+      expect(mockCalendars.listCalendars).toHaveBeenCalledTimes(2);
+    });
+
+    it('recharge après expiration du TTL', async () => {
+      const nowSpy = jest.spyOn(Date, 'now');
+      nowSpy.mockReturnValue(1_000_000);
+      await store.load();
+      // > 60 s plus tard : les données sont périmées.
+      nowSpy.mockReturnValue(1_000_000 + 61_000);
+      await store.load();
+
+      expect(mockCalendars.listCalendars).toHaveBeenCalledTimes(2);
+      nowSpy.mockRestore();
+    });
+
+    it('déduplique les chargements concurrents', async () => {
+      await Promise.all([store.load(), store.load(), store.load()]);
+
+      expect(mockCalendars.listCalendars).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('compteurs de statut', () => {
