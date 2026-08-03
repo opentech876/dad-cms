@@ -1,6 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import * as XLSX from 'xlsx';
 import { FormsModule } from '@angular/forms';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
 import { TuiIcon } from '@taiga-ui/core';
@@ -567,8 +566,12 @@ export class EventsComponent implements OnInit {
     const file = ev?.target?.files?.[0] as File | undefined;
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        // SheetJS (~500 KB) is only needed while importing, so it's loaded on
+        // demand here instead of shipped in the events-page chunk. Every visit
+        // to /evenements that never imports pays nothing for it.
+        const XLSX = await import('xlsx');
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
         // IMPORTANT: cellDates is intentionally OFF. SheetJS's date-instance
         // conversion is unreliable for pre-1970 dates (it returns Date objects
@@ -750,7 +753,7 @@ export class EventsComponent implements OnInit {
     // 3. ISO yyyy-mm-dd (or yyyy-mm-ddTHH:MM:SS from Date.toISOString())
     const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (iso) {
-      const y = +iso[1], m = +iso[2], d = +iso[3];
+      const m = +iso[2], d = +iso[3];
       if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
         return `${iso[1]}-${iso[2]}-${iso[3]}`;
       }
