@@ -918,6 +918,10 @@
                       <img
                         [src]="campaignService.getBannerUrl(row.imagePath!)"
                         alt=""
+                        loading="lazy"
+                        decoding="async"
+                        width="48"
+                        height="28"
                         style="
                           width: 48px;
                           height: 28px;

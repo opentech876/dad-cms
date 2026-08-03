@@ -30,7 +30,7 @@
       @for (rec of pendingRecs(); track rec.id) {
         <li class="reco-pending-item">
           @if (imageUrl(rec.event); as url) {
-            <img [src]="url" alt="" class="reco-pending-thumb" />
+            <img [src]="url" alt="" class="reco-pending-thumb" loading="lazy" decoding="async" />
           } @else {
             <div class="reco-pending-thumb reco-pending-thumb--empty">
               <tui-icon icon="@tui.image-off" style="font-size:14px;" />

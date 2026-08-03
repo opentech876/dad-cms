@@ -113,7 +113,7 @@
               <tr>
                 <td>
                   @if (imageUrl(e); as url) {
-                    <img [src]="url" alt=""
+                    <img [src]="url" alt="" loading="lazy" decoding="async" width="40" height="30"
                          style="width:40px; height:30px; object-fit:cover; border-radius:4px; border:1px solid var(--border-1);" />
                   } @else {
                     <div style="width:40px; height:30px; border-radius:4px; background:var(--bg-sunken); display:flex; align-items:center; justify-content:center;">
