@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { TuiIcon } from '@taiga-ui/core';
 import { MONTHS_FR_LONG_CAP } from '../../core/utils/date.utils';
 import { CurationStore, HubDayState } from './curation-store.service';
@@ -20,6 +20,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
  *  open the propose modal on it. Day cells show the curator's own
  *  recommendation state plus whether the calendar already has content. */
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-curator-hub',
   standalone: true,
   imports: [TuiIcon, ProposeModalComponent],

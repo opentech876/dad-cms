@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
@@ -39,6 +39,7 @@ const MONTH_SECTIONS: MonthSection[] = MONTHS_FR_LONG_CAP.map((name, idx) => {
 });
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-curator-workspace',
   standalone: true,
   imports: [CommonModule, TuiIcon],

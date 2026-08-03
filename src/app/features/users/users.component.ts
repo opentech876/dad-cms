@@ -1,4 +1,4 @@
-import { Component, computed, HostListener, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, HostListener, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, SlicePipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TuiIcon } from '@taiga-ui/core';
@@ -25,6 +25,7 @@ interface UserRow {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-users',
   standalone: true,
   imports: [TuiIcon, DatePipe, SlicePipe],

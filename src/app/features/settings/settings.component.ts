@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom, map } from 'rxjs';
@@ -7,6 +7,7 @@ import { ThemeService, ThemeId, ColorMode } from '../../core/services/theme.serv
 import { SupabaseService } from '../../core/supabase/supabase.service';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-settings',
   standalone: true,
   imports: [TuiIcon],

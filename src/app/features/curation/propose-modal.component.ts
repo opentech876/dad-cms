@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
@@ -20,6 +20,7 @@ type SourceTab = 'create' | 'reuse';
  * pins it to a position. Submitting writes one pending recommendation.
  */
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-propose-modal',
   standalone: true,
   imports: [TuiIcon],

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
@@ -15,6 +15,7 @@ import { ProposeModalComponent } from './propose-modal.component';
 /** Landing page of the Espace Curation: greeting, personal stats, recent
  *  recommendations and the empty dates worth filling. */
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-curator-dashboard',
   standalone: true,
   imports: [RouterLink, TuiIcon, ProposeModalComponent],

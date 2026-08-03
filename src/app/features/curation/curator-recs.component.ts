@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { EventService } from '../../core/events/event.service';
@@ -13,6 +13,7 @@ type RecSort = 'recent' | 'event-date' | 'status';
 /** "Mes recommandations" — every proposal the curator has made, across
  *  calendars, with status filters and a sortable table. */
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-curator-recs',
   standalone: true,
   imports: [RouterLink, TuiIcon],

@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
@@ -13,6 +13,7 @@ import { compressImage } from '../../core/utils/image.utils';
 import { ROLE_LABELS, getInitials } from '../../core/utils/labels.utils';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-profile',
   standalone: true,
   imports: [TuiIcon, FormsModule],

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { EventService } from '../../core/events/event.service';
@@ -11,6 +11,7 @@ import { artFor } from './curation.utils';
  *  as the design specifies: the existing library surface filtered to her
  *  own additions, with a path into recommending them. */
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-curator-events',
   standalone: true,
   imports: [RouterLink, TuiIcon],

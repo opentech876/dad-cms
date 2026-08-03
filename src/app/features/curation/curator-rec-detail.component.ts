@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
@@ -27,6 +27,7 @@ interface TimelineStep {
 /** Detail of one of the curator's recommendations: event card, calendar
  *  impact preview, publication timeline and the curator's own controls. */
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-curator-rec-detail',
   standalone: true,
   imports: [RouterLink, TuiIcon, DatePipe],

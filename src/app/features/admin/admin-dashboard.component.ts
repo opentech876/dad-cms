@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
@@ -13,6 +13,7 @@ import { DATE_FMT } from '../../core/utils/date.utils';
  * /admin/utilisateurs.
  */
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-admin-dashboard',
   standalone: true,
   imports: [TuiIcon, DatePipe, RouterLink],

@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
@@ -13,6 +13,7 @@ type NotifFilter = 'all' | 'unread' | NotificationCategory;
 const PAGE_SIZE = 20;
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-notifications',
   standalone: true,
   imports: [TuiIcon, DatePipe],
