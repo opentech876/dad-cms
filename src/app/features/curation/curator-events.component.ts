@@ -45,8 +45,16 @@ export class CuratorEventsComponent implements OnInit {
     return artFor(seed);
   }
 
-  imageUrl(event: HistoricalEvent): string | null {
-    return event.image_path ? this.eventService.getImageUrl(event.image_path) : null;
+  /** Small thumbnail URL for the card grid (falls back to the cover on 404). */
+  thumbUrl(event: HistoricalEvent): string | null {
+    return event.image_path ? this.eventService.getThumbUrl(event.image_path) : null;
+  }
+
+  onThumbError(ev: globalThis.Event, coverPath: string): void {
+    const img = ev.target as HTMLImageElement;
+    if (img.dataset['fellBack']) return;
+    img.dataset['fellBack'] = '1';
+    img.src = this.eventService.getImageUrl(coverPath);
   }
 
   eventYear(event: HistoricalEvent): string {
