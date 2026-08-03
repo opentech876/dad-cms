@@ -371,6 +371,16 @@ export class EventsComponent implements OnInit {
     return TuiDay.normalizeOf(+parts[0], +parts[1] - 1, +parts[2]);
   }
 
+  /** Grid thumbnails load the small variant; if it 404s (event uploaded
+   *  before thumbnails existed) fall back to the full cover exactly once —
+   *  the dataset flag prevents an error→reload loop if the cover is gone too. */
+  onThumbError(ev: globalThis.Event, coverPath: string): void {
+    const img = ev.target as HTMLImageElement;
+    if (img.dataset['fellBack']) return;
+    img.dataset['fellBack'] = '1';
+    img.src = this.eventService.getImageUrl(coverPath);
+  }
+
   openEditor(eventId?: string): void {
     const evt = eventId ? this.events().find(e => e.id === eventId) : undefined;
 
@@ -527,6 +537,7 @@ export class EventsComponent implements OnInit {
       const upload = await firstValueFrom(this.eventService.uploadImage(eventId, compressed));
       if (upload.path) {
         await firstValueFrom(this.eventService.updateEvent(eventId, { image_path: upload.path }));
+        await this.eventService.uploadThumbnailFor(upload.path, file);
         this.editorImageFile.set(null);
       } else if (upload.error) {
         this.toast.warning(`Événement sauvegardé, mais l'upload de l'image a échoué : ${upload.error}`);

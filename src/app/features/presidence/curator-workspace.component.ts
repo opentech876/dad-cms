@@ -306,6 +306,7 @@ export class CuratorWorkspaceComponent {
           await firstValueFrom(
             this.eventService.updateEvent(created.id, { image_path: upload.path }),
           );
+          await this.eventService.uploadThumbnailFor(upload.path, file);
         } else {
           this.toast.warning(
             "Événement créé, mais le téléversement de l'image a échoué. Réessayez depuis la bibliothèque.",

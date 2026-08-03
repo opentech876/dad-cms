@@ -53,6 +53,7 @@ describe('CuratorWorkspaceComponent', () => {
       listEvents:       jest.fn().mockReturnValue(of([FAKE_EVENT, FAKE_CURATED_EVENT])),
       createEvent:      jest.fn().mockReturnValue(of({ success: true, id: 'ev-new' })),
       uploadImage:      jest.fn().mockReturnValue(of({ path: 'ev-new/cover.jpg' })),
+      uploadThumbnailFor: jest.fn().mockResolvedValue(undefined),
       updateEvent:      jest.fn().mockReturnValue(of({ success: true })),
       getImageUrl:      jest.fn((p: string) => `https://cdn/${p}`),
     };

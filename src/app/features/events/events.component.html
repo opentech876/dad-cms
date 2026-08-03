@@ -735,7 +735,8 @@
                 <td style="text-align: center">
                   @if (row.imagePath) {
                     <img
-                      [src]="eventService.getImageUrl(row.imagePath)"
+                      [src]="eventService.getThumbUrl(row.imagePath)"
+                      (error)="onThumbError($event, row.imagePath)"
                       alt=""
                       loading="lazy"
                       decoding="async"

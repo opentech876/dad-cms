@@ -398,6 +398,52 @@ describe('EventService', () => {
     });
   });
 
+  // ─── thumbnails ─────────────────────────────────────────────
+
+  describe('thumbPathFromCover()', () => {
+    it('dérive le chemin de la vignette à côté du cover (même extension)', () => {
+      expect(service.thumbPathFromCover('evt-1/cover.jpg')).toBe('evt-1/thumb.jpg');
+      expect(service.thumbPathFromCover('evt-1/cover.png')).toBe('evt-1/thumb.png');
+    });
+
+    it('renvoie le chemin inchangé si le motif cover.<ext> est absent', () => {
+      expect(service.thumbPathFromCover('evt-1/autre.jpg')).toBe('evt-1/autre.jpg');
+    });
+  });
+
+  describe('getThumbUrl()', () => {
+    it('construit la publicUrl à partir du chemin de la vignette', () => {
+      const storageMock = {
+        upload: jest.fn(),
+        getPublicUrl: jest
+          .fn()
+          .mockReturnValue({ data: { publicUrl: 'https://example.com/thumb.jpg' } }),
+      };
+      mockStorage.from.mockReturnValue(storageMock);
+
+      const url = service.getThumbUrl('evt-1/cover.jpg');
+
+      expect(storageMock.getPublicUrl).toHaveBeenCalledWith('evt-1/thumb.jpg');
+      expect(url).toBe('https://example.com/thumb.jpg');
+    });
+  });
+
+  describe('uploadThumbnail()', () => {
+    it('uploade la vignette au chemin thumb dérivé du cover', async () => {
+      const file = new File(['thumb'], 'photo.jpg', { type: 'image/jpeg' });
+      const storageMock = {
+        upload: jest.fn().mockResolvedValue({ data: { path: 'evt-1/thumb.jpg' }, error: null }),
+        getPublicUrl: jest.fn(),
+      };
+      mockStorage.from.mockReturnValue(storageMock);
+
+      const result = await firstValueFrom(service.uploadThumbnail('evt-1/cover.jpg', file));
+
+      expect(storageMock.upload).toHaveBeenCalledWith('evt-1/thumb.jpg', file, { upsert: true });
+      expect(result.path).toBe('evt-1/thumb.jpg');
+    });
+  });
+
   // ─── deleteEvent() ──────────────────────────────────────────
 
   describe('deleteEvent()', () => {

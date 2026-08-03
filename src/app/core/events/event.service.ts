@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
-import { Observable, from, of } from 'rxjs';
+import { Observable, firstValueFrom, from, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { CreateEventDto, Event } from '../../models';
 import { SupabaseService } from '../supabase/supabase.service';
 import { WorkspaceContextService } from '../workspace/workspace-context.service';
+import { compressThumbnail } from '../utils/image.utils';
 
 /** How long a cached full-library snapshot stays valid. Mutations through
  *  this service invalidate immediately; the TTL only bounds staleness from
@@ -189,6 +190,54 @@ export class EventService {
   getImageUrl(storagePath: string): string {
     return this.supabase.client.storage.from('historical-images').getPublicUrl(storagePath).data
       .publicUrl;
+  }
+
+  /** Derive the thumbnail's storage path from the cover path: the sibling
+   *  `thumb.*` next to `cover.*` (same extension). Pure so it's testable
+   *  and callers can build a thumb URL without an extra round-trip. */
+  thumbPathFromCover(coverPath: string): string {
+    return /cover\.[^./]+$/.test(coverPath)
+      ? coverPath.replace(/cover(\.[^./]+)$/, 'thumb$1')
+      : coverPath;
+  }
+
+  /** Public URL of the small thumbnail beside a cover. Grids use this; on a
+   *  404 (events uploaded before thumbnails existed) the caller falls back
+   *  to getImageUrl(cover). */
+  getThumbUrl(coverPath: string): string {
+    return this.getImageUrl(this.thumbPathFromCover(coverPath));
+  }
+
+  /**
+   * Best-effort: compress `originalFile` into a thumbnail and upload it
+   * beside the cover. Never throws — the cover is already saved, so a
+   * failed thumb just means grids fall back to the cover on a 404.
+   * Awaitable at the call site without a try/catch of its own.
+   */
+  async uploadThumbnailFor(coverPath: string, originalFile: File): Promise<void> {
+    try {
+      const thumb = await compressThumbnail(originalFile);
+      await firstValueFrom(this.uploadThumbnail(coverPath, thumb));
+    } catch {
+      // Cover remains the source of truth; grids degrade gracefully.
+    }
+  }
+
+  /** Uploads a thumbnail beside its cover (best-effort — the cover is the
+   *  source of truth; a failed thumb just means grids serve the cover). */
+  uploadThumbnail(coverPath: string, file: File): Observable<{ path: string | null; error?: string }> {
+    const storagePath = this.thumbPathFromCover(coverPath);
+    return from(
+      this.supabase.client.storage
+        .from('historical-images')
+        .upload(storagePath, file, { upsert: true }),
+    ).pipe(
+      map(({ data, error }: any) =>
+        error
+          ? { path: null, error: error.message }
+          : { path: (data?.path as string) ?? storagePath },
+      ),
+    );
   }
 
   /**

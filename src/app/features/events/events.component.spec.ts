@@ -63,6 +63,7 @@ describe('EventsComponent', () => {
       updateEvent: jest.fn().mockReturnValue(of({ success: true })),
       deleteEvent: jest.fn().mockReturnValue(of({ success: true })),
       uploadImage: jest.fn().mockReturnValue(of({ path: 'evt-new/cover.jpg' })),
+      uploadThumbnailFor: jest.fn().mockResolvedValue(undefined),
       getImageUrl: jest.fn().mockReturnValue('https://supabase.example/historical-images/evt-1/cover.jpg'),
     };
     mockCalendarService = {
