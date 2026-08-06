@@ -253,6 +253,19 @@ describe('DayDetailComponent', () => {
       expect(mockCalendarEntryService.unassignSlot).toHaveBeenCalledWith('cal-1', '08-15', 2);
     });
 
+    it('refuse le même événement sur les deux positions (erreur lisible, pas de round-trip)', async () => {
+      component.selectedPos1.set('evt-1');
+      component.selectedPos2.set('evt-1');
+      mockCalendarEntryService.assignEvent.mockClear();
+
+      await component.save();
+
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Le même événement ne peut pas occuper les deux positions du même jour.',
+      );
+      expect(mockCalendarEntryService.assignEvent).not.toHaveBeenCalled();
+    });
+
     it('ne sauvegarde pas quand saveLoading est true', async () => {
       component.saveLoading.set(true);
       await component.save();

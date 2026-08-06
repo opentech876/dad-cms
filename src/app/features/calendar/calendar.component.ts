@@ -613,6 +613,12 @@ export class CalendarComponent implements OnInit {
       return;
     }
     this.toast.success(`${result.applied ?? 0} recommandation(s) appliquée(s).`);
+    // Applying writes calendar_entries server-side (SECURITY DEFINER RPC), so
+    // re-fetch — otherwise the grid shows stale entries until a reload. Mirrors
+    // assignToSlot/unassignFromSlot; keeps the mmdd cache honest.
+    const entries = await firstValueFrom(this.calendarEntryService.getEntriesForCalendar(id));
+    this._entriesCache.set(id, entries);
+    this.entries.set(entries);
     await this.refreshPendingCount();
   }
 
