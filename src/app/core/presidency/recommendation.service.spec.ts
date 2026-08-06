@@ -205,6 +205,22 @@ describe('RecommendationService', () => {
     });
   });
 
+  describe('countMyPending()', () => {
+    it("compte uniquement MES pending (created_by = utilisateur courant)", async () => {
+      mockSupabase.client = buildClient({ count: 2 });
+      const result = await firstValueFrom(service.countMyPending());
+      expect(result).toBe(2);
+      expect(eqCalls).toContainEqual(['status', 'pending']);
+      expect(eqCalls).toContainEqual(['created_by', 'u-1']);
+    });
+
+    it("retourne 0 en cas d'erreur", async () => {
+      mockSupabase.client = buildClient({ error: { message: 'x' }, count: null });
+      const result = await firstValueFrom(service.countMyPending());
+      expect(result).toBe(0);
+    });
+  });
+
   describe('upsertSlot()', () => {
     it('appelle upsert avec created_by, workspace_id et status pending', async () => {
       const res = await firstValueFrom(service.upsertSlot('cal-1', '08-15', 1, 'ev-1'));

@@ -94,13 +94,29 @@ export class RecommendationService {
   }
 
   /** Workspace-wide pending count (RLS-scoped), across all calendars.
-   *  Drives the sidebar badge that disappears once everything is applied. */
+   *  Drives the editorial "Recommandations" badge — those roles apply
+   *  everyone's recommendations, so the whole workspace's total is right. */
   countAllPending(): Observable<number> {
     return from(
       this.supabase.client
         .from('presidency_recommendations')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'pending'),
+    ).pipe(map(({ count, error }: any) => (error ? 0 : (count ?? 0))));
+  }
+
+  /** The signed-in curator's OWN pending count. Drives the "Mes
+   *  recommandations" badge — with several curators in a workspace, hers
+   *  must not be inflated by other curators' pending proposals. */
+  countMyPending(): Observable<number> {
+    return from(
+      this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
+        this.supabase.client
+          .from('presidency_recommendations')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending')
+          .eq('created_by', user?.id ?? ''),
+      ),
     ).pipe(map(({ count, error }: any) => (error ? 0 : (count ?? 0))));
   }
 

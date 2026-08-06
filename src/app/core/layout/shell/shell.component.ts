@@ -885,7 +885,14 @@ export class ShellComponent implements OnInit {
    *  on failure so a transient error doesn't flicker the badge. */
   private async refreshPendingRecs(): Promise<void> {
     try {
-      this.pendingRecs.set(await firstValueFrom(this.recommendationService.countAllPending()));
+      // The Curateur's "Mes recommandations" badge counts only HER pending
+      // proposals; editorial roles' "Recommandations" badge counts the whole
+      // workspace (they apply everyone's). One signal, role-appropriate source.
+      const count$ =
+        this.currentRole() === 'presidence'
+          ? this.recommendationService.countMyPending()
+          : this.recommendationService.countAllPending();
+      this.pendingRecs.set(await firstValueFrom(count$));
     } catch {
       // Keep previous count.
     }

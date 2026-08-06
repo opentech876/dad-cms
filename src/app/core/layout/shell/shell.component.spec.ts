@@ -26,7 +26,7 @@ describe('ShellComponent — navigation par rôle', () => {
   let mockRouter: { events: any; navigate: jest.Mock; navigateByUrl: jest.Mock; url: string };
   let routerEvents$: Subject<unknown>;
   let mockRouteReuse: { triggerRefresh: jest.Mock };
-  let mockRecs: { countAllPending: jest.Mock };
+  let mockRecs: { countAllPending: jest.Mock; countMyPending: jest.Mock };
   let mockWorkspaceContext: {
     activeWorkspaceId: jest.Mock;
     setActiveWorkspace: jest.Mock;
@@ -61,7 +61,10 @@ describe('ShellComponent — navigation par rôle', () => {
       url: '/dashboard',
     };
     mockRouteReuse = { triggerRefresh: jest.fn() };
-    mockRecs = { countAllPending: jest.fn().mockReturnValue(of(0)) };
+    mockRecs = {
+      countAllPending: jest.fn().mockReturnValue(of(0)),
+      countMyPending: jest.fn().mockReturnValue(of(0)),
+    };
     mockWorkspace = {
       getMyProfile: jest
         .fn()
@@ -957,6 +960,29 @@ describe('ShellComponent — navigation par rôle', () => {
       await component.ngOnInit();
 
       expect(component.pendingRecs()).toBe(0);
+    });
+
+    it('la Curatrice compte SES pending (countMyPending), pas tout l\'espace', async () => {
+      createComponent('presidence');
+      mockRecs.countMyPending.mockReturnValue(of(2));
+      mockRecs.countAllPending.mockReturnValue(of(9));
+
+      await component.ngOnInit();
+
+      expect(mockRecs.countMyPending).toHaveBeenCalled();
+      expect(mockRecs.countAllPending).not.toHaveBeenCalled();
+      expect(component.pendingRecs()).toBe(2);
+    });
+
+    it('les rôles éditoriaux comptent tout l\'espace (countAllPending)', async () => {
+      createComponent('chef_equipe');
+      mockRecs.countAllPending.mockReturnValue(of(9));
+
+      await component.ngOnInit();
+
+      expect(mockRecs.countAllPending).toHaveBeenCalled();
+      expect(mockRecs.countMyPending).not.toHaveBeenCalled();
+      expect(component.pendingRecs()).toBe(9);
     });
   });
 });
