@@ -6,6 +6,7 @@ import { CalendarEntryService } from '../../core/calendar/calendar-entry.service
 import { RecommendationService } from '../../core/presidency/recommendation.service';
 import { EventService } from '../../core/events/event.service';
 import { SupabaseService } from '../../core/supabase/supabase.service';
+import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -60,6 +61,7 @@ describe('CurationStore', () => {
   let mockRecs: { listMine: jest.Mock };
   let mockEvents: { listEvents: jest.Mock };
   let mockSupabase: { client: any };
+  let mockWorkspace: { activeWorkspaceId: jest.Mock };
 
   beforeEach(() => {
     mockCalendars = { listCalendars: jest.fn().mockReturnValue(of([makeCal()])) };
@@ -69,6 +71,7 @@ describe('CurationStore', () => {
     mockSupabase = {
       client: { auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u-1' } } }) } },
     };
+    mockWorkspace = { activeWorkspaceId: jest.fn().mockReturnValue('ws-1') };
 
     TestBed.configureTestingModule({
       providers: [
@@ -78,6 +81,7 @@ describe('CurationStore', () => {
         { provide: RecommendationService, useValue: mockRecs },
         { provide: EventService, useValue: mockEvents },
         { provide: SupabaseService, useValue: mockSupabase },
+        { provide: WorkspaceContextService, useValue: mockWorkspace },
       ],
     });
     store = TestBed.inject(CurationStore);
@@ -150,6 +154,15 @@ describe('CurationStore', () => {
       await Promise.all([store.load(), store.load(), store.load()]);
 
       expect(mockCalendars.listCalendars).toHaveBeenCalledTimes(1);
+    });
+
+    it("recharge quand l'espace de travail actif change (pas de données périmées inter-tenant)", async () => {
+      await store.load();
+      // Bascule d'espace : la fraîcheur ne doit plus s'appliquer.
+      mockWorkspace.activeWorkspaceId.mockReturnValue('ws-2');
+      await store.load();
+
+      expect(mockCalendars.listCalendars).toHaveBeenCalledTimes(2);
     });
   });
 

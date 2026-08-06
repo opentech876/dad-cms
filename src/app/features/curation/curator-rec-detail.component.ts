@@ -115,6 +115,15 @@ export class CuratorRecDetailComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     this.recId.set(this.route.snapshot.paramMap.get('id') ?? '');
     if (this.store.myRecs().length === 0) await this.store.load();
+    // A recommendation can belong to any calendar (e.g. a next-year draft),
+    // not necessarily the one the store defaulted to. Align the store to the
+    // rec's calendar so the year label, impact preview and timeline read the
+    // right calendar's entries — otherwise a cross-calendar rec shows the
+    // wrong year and a wrong "Remplacera" occupant.
+    const rec = this.rec();
+    if (rec && rec.calendar_id !== this.store.selectedCalendarId()) {
+      await this.store.selectCalendar(rec.calendar_id);
+    }
   }
 
   mmddLabel(mmdd: string): string {

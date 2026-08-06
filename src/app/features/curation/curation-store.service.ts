@@ -11,6 +11,7 @@ import {
 } from '../../core/presidency/recommendation.service';
 import { EventService } from '../../core/events/event.service';
 import { SupabaseService } from '../../core/supabase/supabase.service';
+import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
 import { Event as HistoricalEvent } from '../../models';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -36,6 +37,7 @@ export class CurationStore {
   private recommendationService = inject(RecommendationService);
   private eventService = inject(EventService);
   private supabase = inject(SupabaseService);
+  private workspaceContext = inject(WorkspaceContextService);
 
   readonly loading = signal(false);
   readonly calendars = signal<CalendarSummary[]>([]);
@@ -124,19 +126,26 @@ export class CurationStore {
     return upcoming.length > 0 ? upcoming : all;
   });
 
-  /** Freshness bookkeeping: `loadedAt` gates the TTL, `inFlight` collapses
-   *  concurrent callers (e.g. two curator components mounting together)
-   *  onto one round-trip. */
+  /** Freshness bookkeeping: `loadedAt`/`loadedForWs` gate the TTL (the
+   *  snapshot is stale the moment the active workspace changes, since this
+   *  store is a root singleton shared across tenants), and `inFlight`
+   *  collapses concurrent callers onto one round-trip. */
   private loadedAt = 0;
+  private loadedForWs: string | null = null;
   private inFlight: Promise<void> | null = null;
 
   /**
    * Load (or reuse) the curation snapshot. A no-op when data is still fresh
-   * unless `force` is passed — so moving between curation pages doesn't
-   * re-fetch. Concurrent calls share one in-flight load.
+   * for the ACTIVE workspace unless `force` is passed — so moving between
+   * curation pages doesn't re-fetch, but switching workspace always does.
+   * Concurrent calls share one in-flight load.
    */
   async load(force = false): Promise<void> {
-    const fresh = this.loadedAt > 0 && Date.now() - this.loadedAt < CURATION_TTL_MS;
+    const wsId = this.workspaceContext.activeWorkspaceId();
+    const fresh =
+      this.loadedAt > 0 &&
+      this.loadedForWs === wsId &&
+      Date.now() - this.loadedAt < CURATION_TTL_MS;
     if (!force && fresh) return;
     if (this.inFlight) return this.inFlight;
     this.inFlight = this._doLoad();
@@ -166,6 +175,7 @@ export class CurationStore {
       this.selectedCalendarId.set(preferred?.id ?? null);
       await this.reloadEntries();
       this.loadedAt = Date.now();
+      this.loadedForWs = this.workspaceContext.activeWorkspaceId();
     } finally {
       this.loading.set(false);
     }

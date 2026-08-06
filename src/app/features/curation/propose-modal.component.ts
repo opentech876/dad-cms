@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, computed, effect, inject, input, output, signal } from '@angular/core';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
@@ -26,7 +26,7 @@ type SourceTab = 'create' | 'reuse';
   imports: [TuiIcon],
   templateUrl: './propose-modal.component.html',
 })
-export class ProposeModalComponent {
+export class ProposeModalComponent implements OnDestroy {
   private readonly eventService = inject(EventService);
   private readonly recommendationService = inject(RecommendationService);
   private readonly toast = inject(ToastService);
@@ -155,16 +155,29 @@ export class ProposeModalComponent {
     const file = (ev.target as HTMLInputElement).files?.[0];
     if (!file) return;
     this.imageFile.set(file);
-    const prev = this.imagePreview();
-    if (prev) URL.revokeObjectURL(prev);
+    this.revokePreview();
     this.imagePreview.set(URL.createObjectURL(file));
+  }
+
+  /** Free the blob URL backing the local image preview, once. */
+  private revokePreview(): void {
+    const prev = this.imagePreview();
+    if (prev) {
+      URL.revokeObjectURL(prev);
+      this.imagePreview.set(null);
+    }
   }
 
   close(): void {
     if (this.saving()) return;
-    const prev = this.imagePreview();
-    if (prev) URL.revokeObjectURL(prev);
+    this.revokePreview();
     this.closed.emit();
+  }
+
+  // A successful submit destroys this modal via the parent (no close() call),
+  // so revoke here too — otherwise the preview blob URL leaks per proposal.
+  ngOnDestroy(): void {
+    this.revokePreview();
   }
 
   async submit(): Promise<void> {
