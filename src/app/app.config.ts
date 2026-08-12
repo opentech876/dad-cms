@@ -19,6 +19,14 @@ registerLocaleData(localeFr);
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
+    // NOTE (perf): the app is fully OnPush + signal-driven, so it is a
+    // candidate for zoneless CD — `provideZonelessChangeDetection()` builds
+    // clean and would drop zone.js (~35 KB) + its per-task overhead. Not
+    // switched yet: it needs interactive runtime QA (Taiga UI interactions,
+    // modals, async flows) that unit tests can't cover. To try it: swap this
+    // provider, remove "zone.js" from angular.json polyfills, switch
+    // src/setup-jest.ts to `jest-preset-angular/setup-env/zoneless`, then
+    // exercise every page. See sprint notes.
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withRouterConfig({ onSameUrlNavigation: 'reload' })),
     provideHttpClient(),

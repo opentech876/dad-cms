@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { Router } from '@angular/router';
@@ -7,6 +7,7 @@ import { filter, map, take } from 'rxjs/operators';
 import { SupabaseService } from '../../../core/supabase/supabase.service';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-reset-password',
   standalone: true,
   imports: [TuiIcon, RouterLink],

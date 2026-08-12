@@ -1,11 +1,19 @@
 import { inject, Injectable, signal } from '@angular/core';
-import { firstValueFrom, from, map, Observable, switchMap, tap } from 'rxjs';
+import { firstValueFrom, from, map, Observable, switchMap, take, tap } from 'rxjs';
 import { Notification, NotificationActor } from '../../models';
+import { AuthService } from '../auth/auth.service';
 import { SupabaseService } from '../supabase/supabase.service';
+
+/** True when a notification belongs to the curation workflow — the only
+ *  slice of the system the Curateur's feed and badge are allowed to show. */
+export function isCurationNotification(n: Notification): boolean {
+  return n.table_name === 'presidency_recommendations';
+}
 
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
   private supabase = inject(SupabaseService);
+  private auth = inject(AuthService);
 
   /** Single source of truth for the unread counter. The shell's bell badge
    *  reads this directly. markAsRead / markAllAsRead update it optimistically
@@ -19,13 +27,27 @@ export class NotificationService {
   async refreshUnread(): Promise<void> {
     try {
       const list = await firstValueFrom(this.listNotifications());
-      this.unreadCount.set(list.filter(n => !n.read_at).length);
+      this.unreadCount.set(list.filter((n) => !n.read_at).length);
     } catch {
       // Non-fatal: leave the previous count in place.
     }
   }
 
+  /** Workspace notifications, role-aware: the Curateur (presidence) only
+   *  receives her curation workflow — nothing else in the system. The
+   *  unread badge goes through here too, so page and badge always agree. */
   listNotifications(): Observable<Notification[]> {
+    return this.auth.currentRole$.pipe(
+      take(1),
+      switchMap((role) =>
+        this.fetchAll().pipe(
+          map((list) => (role === 'presidence' ? list.filter(isCurationNotification) : list)),
+        ),
+      ),
+    );
+  }
+
+  private fetchAll(): Observable<Notification[]> {
     return from(
       this.supabase.client
         .from('notifications')
@@ -35,18 +57,18 @@ export class NotificationService {
       map(({ data, error }) => {
         if (error) throw error;
         return (data ?? []).map((row: any) => ({
-          id:           row.id,
-          title:        row.title,
-          body:         row.body,
-          category:     row.category,
-          created_at:   row.created_at,
-          read_at:      row.notification_reads?.[0]?.read_at ?? null,
+          id: row.id,
+          title: row.title,
+          body: row.body,
+          category: row.category,
+          created_at: row.created_at,
+          read_at: row.notification_reads?.[0]?.read_at ?? null,
           workspace_id: row.workspace_id ?? null,
-          actor_id:     row.actor_id ?? null,
-          action:       row.action ?? null,
-          table_name:   row.table_name ?? null,
-          record_id:    row.record_id ?? null,
-          link_path:    row.link_path ?? null,
+          actor_id: row.actor_id ?? null,
+          action: row.action ?? null,
+          table_name: row.table_name ?? null,
+          record_id: row.record_id ?? null,
+          link_path: row.link_path ?? null,
         }));
       }),
     );
@@ -56,7 +78,10 @@ export class NotificationService {
    *  avatar_url from the workspace-scoped profiles row. Returns null
    *  when there is no actor (system-generated notification) or when
    *  the profile isn't accessible (RLS / missing row). */
-  getActorProfile(actorId: string | null, workspaceId: string | null): Observable<NotificationActor | null> {
+  getActorProfile(
+    actorId: string | null,
+    workspaceId: string | null,
+  ): Observable<NotificationActor | null> {
     if (!actorId || !workspaceId) return from(Promise.resolve(null));
     return from(
       this.supabase.client
@@ -80,14 +105,18 @@ export class NotificationService {
           this.supabase.client
             .from('notification_reads')
             .upsert(
-              { notification_id: notificationId, user_id: data.user?.id ?? null, read_at: new Date().toISOString() },
+              {
+                notification_id: notificationId,
+                user_id: data.user?.id ?? null,
+                read_at: new Date().toISOString(),
+              },
               { onConflict: 'notification_id,user_id' },
             ),
         ),
       ),
       // Optimistically decrement the badge — no round-trip needed to keep
       // the UI honest. Clamped at 0 for safety.
-      tap(() => this.unreadCount.update(n => Math.max(0, n - 1))),
+      tap(() => this.unreadCount.update((n) => Math.max(0, n - 1))),
       map(() => undefined),
     );
   }
@@ -97,7 +126,7 @@ export class NotificationService {
     return from(this.supabase.client.auth.getUser()).pipe(
       switchMap(({ data }) => {
         const now = new Date().toISOString();
-        const rows = ids.map(id => ({
+        const rows = ids.map((id) => ({
           notification_id: id,
           user_id: data.user?.id ?? null,
           read_at: now,

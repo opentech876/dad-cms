@@ -29,7 +29,7 @@ const MOCK_LIBRARY_EVENTS: Event[] = [
 
 const MOCK_CAMPAIGNS: AdCampaign[] = [
   {
-    id: 'camp-1', name: 'MTN Congo', advertiser: 'MTN', position: 'header',
+    id: 'camp-1', name: 'MTN Congo', advertiser: 'MTN', position: 'footer',
     start_date: '2026-08-01', end_date: '2026-08-31',
     active: true, image_path: '', link_url: null, workspace_id: 'ws-1',
     created_by: 'u1', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
@@ -251,6 +251,19 @@ describe('DayDetailComponent', () => {
       component.selectedPos2.set(null);
       await component.save();
       expect(mockCalendarEntryService.unassignSlot).toHaveBeenCalledWith('cal-1', '08-15', 2);
+    });
+
+    it('refuse le même événement sur les deux positions (erreur lisible, pas de round-trip)', async () => {
+      component.selectedPos1.set('evt-1');
+      component.selectedPos2.set('evt-1');
+      mockCalendarEntryService.assignEvent.mockClear();
+
+      await component.save();
+
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Le même événement ne peut pas occuper les deux positions du même jour.',
+      );
+      expect(mockCalendarEntryService.assignEvent).not.toHaveBeenCalled();
     });
 
     it('ne sauvegarde pas quand saveLoading est true', async () => {

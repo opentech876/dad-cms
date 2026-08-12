@@ -252,7 +252,7 @@
                 <td>
                   <div style="display: flex; align-items: center; gap: 12px">
                     @if (user.avatarUrl) {
-                      <img class="avatar" [src]="user.avatarUrl" [alt]="user.fullName ?? ''" />
+                      <img class="avatar" [src]="user.avatarUrl" [alt]="user.fullName ?? ''" loading="lazy" decoding="async" />
                     } @else {
                       <div class="avatar">{{ initials(user) }}</div>
                     }

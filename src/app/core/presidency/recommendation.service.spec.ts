@@ -1,14 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
-import {
-  RecommendationService,
-  PresidencyRecommendationWithEvent,
-} from './recommendation.service';
+import { RecommendationService, PresidencyRecommendationWithEvent } from './recommendation.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { WorkspaceContextService } from '../workspace/workspace-context.service';
 import { CalendarEntryWithEvent } from '../calendar/calendar-entry.service';
 
-function makeRec(over: Partial<PresidencyRecommendationWithEvent> = {}): PresidencyRecommendationWithEvent {
+function makeRec(
+  over: Partial<PresidencyRecommendationWithEvent> = {},
+): PresidencyRecommendationWithEvent {
   return {
     id: 'r1',
     calendar_id: 'cal-1',
@@ -23,10 +22,19 @@ function makeRec(over: Partial<PresidencyRecommendationWithEvent> = {}): Preside
     applied_at: null,
     applied_by: null,
     event: {
-      id: 'ev-1', event_date: '1960-08-15', title: 'Indépendance', description: null,
-      image_path: null, status: 'published', workspace_id: 'ws-1',
-      created_by: 'u1', created_at: '', updated_at: '',
-      updated_by: null, deleted_at: null, deleted_by: null,
+      id: 'ev-1',
+      event_date: '1960-08-15',
+      title: 'Indépendance',
+      description: null,
+      image_path: null,
+      status: 'published',
+      workspace_id: 'ws-1',
+      created_by: 'u1',
+      created_at: '',
+      updated_at: '',
+      updated_by: null,
+      deleted_at: null,
+      deleted_by: null,
     },
     ...over,
   };
@@ -34,14 +42,29 @@ function makeRec(over: Partial<PresidencyRecommendationWithEvent> = {}): Preside
 
 function makeEntry(over: Partial<CalendarEntryWithEvent> = {}): CalendarEntryWithEvent {
   return {
-    id: 'e1', calendar_id: 'cal-1', mmdd: '08-15', position: 1,
-    event_id: 'ev-1', workspace_id: 'ws-1', created_by: 'u1', created_at: '',
+    id: 'e1',
+    calendar_id: 'cal-1',
+    mmdd: '08-15',
+    position: 1,
+    event_id: 'ev-1',
+    workspace_id: 'ws-1',
+    created_by: 'u1',
+    created_at: '',
     updated_at: '',
     event: {
-      id: 'ev-1', event_date: '1960-08-15', title: 'Indépendance', description: null,
-      image_path: null, status: 'published', workspace_id: 'ws-1',
-      created_by: 'u1', created_at: '', updated_at: '',
-      updated_by: null, deleted_at: null, deleted_by: null,
+      id: 'ev-1',
+      event_date: '1960-08-15',
+      title: 'Indépendance',
+      description: null,
+      image_path: null,
+      status: 'published',
+      workspace_id: 'ws-1',
+      created_by: 'u1',
+      created_at: '',
+      updated_at: '',
+      updated_by: null,
+      deleted_at: null,
+      deleted_by: null,
     },
     ...over,
   };
@@ -56,15 +79,21 @@ describe('RecommendationService', () => {
   let deleteSpy: jest.Mock;
   let rpcSpy: jest.Mock;
 
-  function buildClient(opts: { data?: any; error?: any; count?: number; rpcData?: any; rpcError?: any } = {}) {
+  function buildClient(
+    opts: { data?: any; error?: any; count?: number; rpcData?: any; rpcError?: any } = {},
+  ) {
     eqCalls = [];
     const err = opts.error ?? null;
 
     function makeQuery(data: any): any {
       return {
-        then: (fn: any) => Promise.resolve({ data, error: err, count: opts.count ?? null }).then(fn),
+        then: (fn: any) =>
+          Promise.resolve({ data, error: err, count: opts.count ?? null }).then(fn),
         select: () => makeQuery(data),
-        eq: (col: string, val: unknown) => { eqCalls.push([col, val]); return makeQuery(data); },
+        eq: (col: string, val: unknown) => {
+          eqCalls.push([col, val]);
+          return makeQuery(data);
+        },
         order: () => makeQuery(data),
       };
     }
@@ -122,7 +151,7 @@ describe('RecommendationService', () => {
       expect(eqCalls).toContainEqual(['calendar_id', 'cal-1']);
     });
 
-    it('retourne [] en cas d\'erreur', async () => {
+    it("retourne [] en cas d'erreur", async () => {
       mockSupabase.client = buildClient({ data: null, error: { message: 'fail' } });
       const result = await firstValueFrom(service.listByCalendar('cal-1'));
       expect(result).toEqual([]);
@@ -138,9 +167,56 @@ describe('RecommendationService', () => {
       expect(eqCalls).toContainEqual(['status', 'pending']);
     });
 
-    it('retourne 0 en cas d\'erreur', async () => {
+    it("retourne 0 en cas d'erreur", async () => {
       mockSupabase.client = buildClient({ error: { message: 'x' }, count: null });
       const result = await firstValueFrom(service.countPending('cal-1'));
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('listMine()', () => {
+    it('liste mes recommandations (created_by = utilisateur courant)', async () => {
+      mockSupabase.client = buildClient({ data: [makeRec()] });
+      const result = await firstValueFrom(service.listMine());
+      expect(result.length).toBe(1);
+      expect(eqCalls).toContainEqual(['created_by', 'u-1']);
+    });
+
+    it("retourne [] en cas d'erreur", async () => {
+      mockSupabase.client = buildClient({ data: null, error: { message: 'fail' } });
+      const result = await firstValueFrom(service.listMine());
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('countAllPending()', () => {
+    it("compte les pending de tout l'espace, sans filtre calendrier (badge global)", async () => {
+      mockSupabase.client = buildClient({ count: 3 });
+      const result = await firstValueFrom(service.countAllPending());
+      expect(result).toBe(3);
+      expect(eqCalls).toContainEqual(['status', 'pending']);
+      expect(eqCalls.some(([col]) => col === 'calendar_id')).toBe(false);
+    });
+
+    it("retourne 0 en cas d'erreur", async () => {
+      mockSupabase.client = buildClient({ error: { message: 'x' }, count: null });
+      const result = await firstValueFrom(service.countAllPending());
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('countMyPending()', () => {
+    it("compte uniquement MES pending (created_by = utilisateur courant)", async () => {
+      mockSupabase.client = buildClient({ count: 2 });
+      const result = await firstValueFrom(service.countMyPending());
+      expect(result).toBe(2);
+      expect(eqCalls).toContainEqual(['status', 'pending']);
+      expect(eqCalls).toContainEqual(['created_by', 'u-1']);
+    });
+
+    it("retourne 0 en cas d'erreur", async () => {
+      mockSupabase.client = buildClient({ error: { message: 'x' }, count: null });
+      const result = await firstValueFrom(service.countMyPending());
       expect(result).toBe(0);
     });
   });
@@ -151,18 +227,38 @@ describe('RecommendationService', () => {
       expect(res.success).toBe(true);
       expect(upsertSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          calendar_id: 'cal-1', mmdd: '08-15', position: 1, event_id: 'ev-1',
-          workspace_id: 'ws-1', status: 'pending', created_by: 'u-1',
+          calendar_id: 'cal-1',
+          mmdd: '08-15',
+          position: 1,
+          event_id: 'ev-1',
+          workspace_id: 'ws-1',
+          status: 'pending',
+          created_by: 'u-1',
         }),
         { onConflict: 'calendar_id,mmdd,position' },
       );
     });
 
-    it('retourne success false en cas d\'erreur', async () => {
+    it("retourne success false en cas d'erreur", async () => {
       mockSupabase.client = buildClient({ error: { message: 'unique violation' } });
       const res = await firstValueFrom(service.upsertSlot('cal-1', '08-15', 1, 'ev-1'));
       expect(res.success).toBe(false);
       expect(res.error).toBe('unique violation');
+    });
+
+    it('traduit une violation de contrainte unique (23505) en message lisible', async () => {
+      mockSupabase.client = buildClient({
+        error: {
+          code: '23505',
+          message:
+            'duplicate key value violates unique constraint "uq_presidency_one_position_per_event"',
+        },
+      });
+      const res = await firstValueFrom(service.upsertSlot('cal-1', '08-15', 2, 'ev-1'));
+      expect(res.success).toBe(false);
+      expect(res.error).toBe(
+        'Cet événement est déjà proposé ou en place sur cette date — choisissez un autre événement ou une autre date.',
+      );
     });
   });
 
@@ -177,16 +273,28 @@ describe('RecommendationService', () => {
   });
 
   describe('getConflicts()', () => {
-    it('signale un conflit quand l\'événement courant diffère de la recommandation', () => {
-      const recs = [makeRec({ event_id: 'ev-2', event: { ...makeRec().event!, id: 'ev-2', title: 'Recommandé' } })];
-      const entries = [makeEntry({ event_id: 'ev-1', event: { ...makeEntry().event!, title: 'Actuel' } })];
+    it("signale un conflit quand l'événement courant diffère de la recommandation", () => {
+      const recs = [
+        makeRec({
+          event_id: 'ev-2',
+          event: { ...makeRec().event!, id: 'ev-2', title: 'Recommandé' },
+        }),
+      ];
+      const entries = [
+        makeEntry({ event_id: 'ev-1', event: { ...makeEntry().event!, title: 'Actuel' } }),
+      ];
       const conflicts = service.getConflicts(recs, entries);
-      expect(conflicts).toEqual([{
-        mmdd: '08-15', position: 1, current_event_title: 'Actuel', recommended_event_title: 'Recommandé',
-      }]);
+      expect(conflicts).toEqual([
+        {
+          mmdd: '08-15',
+          position: 1,
+          current_event_title: 'Actuel',
+          recommended_event_title: 'Recommandé',
+        },
+      ]);
     });
 
-    it('ne signale aucun conflit quand la recommandation = l\'événement courant', () => {
+    it("ne signale aucun conflit quand la recommandation = l'événement courant", () => {
       const recs = [makeRec({ event_id: 'ev-1' })];
       const entries = [makeEntry({ event_id: 'ev-1' })];
       expect(service.getConflicts(recs, entries)).toEqual([]);
@@ -211,7 +319,8 @@ describe('RecommendationService', () => {
       expect(res.success).toBe(true);
       expect(res.applied).toBe(3);
       expect(rpcSpy).toHaveBeenCalledWith('apply_presidency_recommendations', {
-        p_calendar_id: 'cal-1', p_overwrite: true,
+        p_calendar_id: 'cal-1',
+        p_overwrite: true,
       });
     });
 

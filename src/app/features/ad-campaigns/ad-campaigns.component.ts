@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
@@ -44,6 +44,7 @@ function daysBetween(start: string, end: string): number {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-ad-campaigns',
   standalone: true,
   imports: [TuiIcon, FormsModule, RouterLink],

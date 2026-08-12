@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
@@ -12,6 +12,7 @@ type LoginMode = 'password' | 'otp';
   imports: [ReactiveFormsModule, TuiIcon, RouterLink],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LoginComponent {
   private router = inject(Router);
@@ -28,38 +29,40 @@ export class LoginComponent {
     password: new FormControl('', [Validators.minLength(8)]),
   });
 
-  loading = false;
-  errorMessage = '';
+  readonly loading = signal(false);
+  readonly errorMessage = signal('');
 
   setMode(m: LoginMode): void {
     this.mode.set(m);
-    this.errorMessage = '';
+    this.errorMessage.set('');
   }
 
   async submit(): Promise<void> {
-    if (this.loading) return;
+    if (this.loading()) return;
     const email = this.form.controls.email.value ?? '';
     if (!email || this.form.controls.email.invalid) return;
 
-    this.loading = true;
-    this.errorMessage = '';
+    this.loading.set(true);
+    this.errorMessage.set('');
 
     if (this.mode() === 'password') {
       const password = this.form.controls.password.value ?? '';
       if (password.length < 8) {
-        this.errorMessage = 'Le mot de passe doit comporter au moins 8 caractères.';
-        this.loading = false;
+        this.errorMessage.set('Le mot de passe doit comporter au moins 8 caractères.');
+        this.loading.set(false);
         return;
       }
       const { error } = await this.supabase.signInWithPassword(email, password);
       if (error) {
         const msg = (error.message ?? '').toLowerCase();
-        this.errorMessage = msg.includes('invalid login')
-          ? 'Email ou mot de passe incorrect.'
-          : msg.includes('rate') || msg.includes('limit')
-            ? 'Trop de tentatives. Veuillez patienter quelques minutes.'
-            : 'Connexion impossible. Vérifiez vos identifiants.';
-        this.loading = false;
+        this.errorMessage.set(
+          msg.includes('invalid login')
+            ? 'Email ou mot de passe incorrect.'
+            : msg.includes('rate') || msg.includes('limit')
+              ? 'Trop de tentatives. Veuillez patienter quelques minutes.'
+              : 'Connexion impossible. Vérifiez vos identifiants.',
+        );
+        this.loading.set(false);
         return;
       }
       // Mark that this user has a password — saves the /profil prompt later.
@@ -77,10 +80,12 @@ export class LoginComponent {
     const { error } = await this.supabase.sendOtp(email);
     if (error) {
       const msg = (error.message ?? '').toLowerCase();
-      this.errorMessage = msg.includes('rate') || msg.includes('security purposes') || msg.includes('limit')
-        ? 'Trop de tentatives. Veuillez patienter quelques minutes avant de réessayer.'
-        : "Cette adresse e-mail n'a pas été invitée. Contactez votre administrateur.";
-      this.loading = false;
+      this.errorMessage.set(
+        msg.includes('rate') || msg.includes('security purposes') || msg.includes('limit')
+          ? 'Trop de tentatives. Veuillez patienter quelques minutes avant de réessayer.'
+          : "Cette adresse e-mail n'a pas été invitée. Contactez votre administrateur.",
+      );
+      this.loading.set(false);
       return;
     }
     this.router.navigate(['/verifier'], { queryParams: { email, from: 'login' } });

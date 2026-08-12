@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
@@ -97,6 +97,7 @@ function isoDate(year: number, month: number, day: number): string {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-calendar',
   standalone: true,
   imports: [TuiIcon, DatePipe],
@@ -612,6 +613,12 @@ export class CalendarComponent implements OnInit {
       return;
     }
     this.toast.success(`${result.applied ?? 0} recommandation(s) appliquée(s).`);
+    // Applying writes calendar_entries server-side (SECURITY DEFINER RPC), so
+    // re-fetch — otherwise the grid shows stale entries until a reload. Mirrors
+    // assignToSlot/unassignFromSlot; keeps the mmdd cache honest.
+    const entries = await firstValueFrom(this.calendarEntryService.getEntriesForCalendar(id));
+    this._entriesCache.set(id, entries);
+    this.entries.set(entries);
     await this.refreshPendingCount();
   }
 

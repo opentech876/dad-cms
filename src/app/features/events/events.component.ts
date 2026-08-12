@@ -1,6 +1,5 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import * as XLSX from 'xlsx';
 import { FormsModule } from '@angular/forms';
 import { TuiDay } from '@taiga-ui/cdk/date-time';
 import { TuiIcon } from '@taiga-ui/core';
@@ -72,6 +71,7 @@ function colLetter(idx: number): string {
 
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-events',
   standalone: true,
   imports: [TuiIcon, FormsModule, DatePipe, ...TuiInputDate],
@@ -371,6 +371,16 @@ export class EventsComponent implements OnInit {
     return TuiDay.normalizeOf(+parts[0], +parts[1] - 1, +parts[2]);
   }
 
+  /** Grid thumbnails load the small variant; if it 404s (event uploaded
+   *  before thumbnails existed) fall back to the full cover exactly once —
+   *  the dataset flag prevents an error→reload loop if the cover is gone too. */
+  onThumbError(ev: globalThis.Event, coverPath: string): void {
+    const img = ev.target as HTMLImageElement;
+    if (img.dataset['fellBack']) return;
+    img.dataset['fellBack'] = '1';
+    img.src = this.eventService.getImageUrl(coverPath);
+  }
+
   openEditor(eventId?: string): void {
     const evt = eventId ? this.events().find(e => e.id === eventId) : undefined;
 
@@ -527,6 +537,7 @@ export class EventsComponent implements OnInit {
       const upload = await firstValueFrom(this.eventService.uploadImage(eventId, compressed));
       if (upload.path) {
         await firstValueFrom(this.eventService.updateEvent(eventId, { image_path: upload.path }));
+        await this.eventService.uploadThumbnailFor(upload.path, file);
         this.editorImageFile.set(null);
       } else if (upload.error) {
         this.toast.warning(`Événement sauvegardé, mais l'upload de l'image a échoué : ${upload.error}`);
@@ -567,8 +578,12 @@ export class EventsComponent implements OnInit {
     const file = ev?.target?.files?.[0] as File | undefined;
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        // SheetJS (~500 KB) is only needed while importing, so it's loaded on
+        // demand here instead of shipped in the events-page chunk. Every visit
+        // to /evenements that never imports pays nothing for it.
+        const XLSX = await import('xlsx');
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
         // IMPORTANT: cellDates is intentionally OFF. SheetJS's date-instance
         // conversion is unreliable for pre-1970 dates (it returns Date objects
@@ -750,7 +765,7 @@ export class EventsComponent implements OnInit {
     // 3. ISO yyyy-mm-dd (or yyyy-mm-ddTHH:MM:SS from Date.toISOString())
     const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (iso) {
-      const y = +iso[1], m = +iso[2], d = +iso[3];
+      const m = +iso[2], d = +iso[3];
       if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
         return `${iso[1]}-${iso[2]}-${iso[3]}`;
       }

@@ -1,0 +1,695 @@
+<div
+  class="modal-backdrop"
+  (click)="close()"
+  style="align-items: flex-start; padding: 40px 24px; overflow-y: auto"
+>
+  <div
+    class="modal modal-lg"
+    (click)="$event.stopPropagation()"
+    style="max-width: 1080px; width: 100%"
+  >
+    <!-- Header -->
+    <div class="modal-header" style="align-items: flex-start">
+      <div>
+        <div class="eyebrow">Nouvelle recommandation</div>
+        <div class="modal-title" style="margin-top: 2px">
+          Proposer un événement — {{ dayLabel() }}
+        </div>
+        <div
+          style="
+            font-size: 12.5px;
+            color: var(--fg-3);
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+          "
+        >
+          @if (store.selectedCalendar(); as cal) {
+            <span class="badge badge-warning badge-dot">{{ cal.name }}</span>
+          }
+          <span>{{ weekdayLabel() }}</span>
+          <span style="display: inline-flex; align-items: center; gap: 4px; color: var(--success)">
+            <tui-icon icon="@tui.check" style="font-size: 12px" /> Calendrier ouvert aux
+            recommandations
+          </span>
+        </div>
+      </div>
+      <button class="btn btn-flat btn-icon btn-sm" type="button" (click)="close()">
+        <tui-icon icon="@tui.x" style="font-size: 16px" />
+      </button>
+    </div>
+
+    <!-- Body — two columns -->
+    <div
+      style="
+        display: grid;
+        grid-template-columns: 1fr 1.15fr;
+        max-height: calc(100vh - 240px);
+        overflow: hidden;
+      "
+    >
+      <!-- LEFT — what the date already holds -->
+      <div
+        class="scroll-pretty"
+        style="
+          border-right: 1px solid var(--border-1);
+          padding: 20px;
+          overflow-y: auto;
+          background: var(--bg-surface-2);
+        "
+      >
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
+          <tui-icon icon="@tui.archive" style="font-size: 16px; color: var(--fg-2)" />
+          <h3 style="font-size: 14px; font-weight: 600">Déjà sur cette date</h3>
+        </div>
+        <p style="font-size: 12px; color: var(--fg-3); margin-bottom: 14px">
+          Une recommandation validée peut remplacer l'un de ces événements.
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div
+            style="
+              font-size: 10.5px;
+              font-weight: 600;
+              letter-spacing: 0.1em;
+              text-transform: uppercase;
+              color: var(--accent);
+            "
+          >
+            Position 1 · Événement principal
+          </div>
+          @if (currentMain(); as entry) {
+            <div
+              style="
+                display: flex;
+                gap: 12px;
+                padding: 10px;
+                border-radius: 10px;
+                border: 1px solid var(--border-1);
+                background: var(--bg-surface);
+              "
+            >
+              <div
+                style="
+                  width: 72px;
+                  flex: none;
+                  aspect-ratio: 4/3;
+                  border-radius: 8px;
+                  overflow: hidden;
+                  display: flex;
+                  align-items: flex-end;
+                  padding: 7px;
+                  color: #f3e6c8;
+                "
+                [style.background]="
+                  imageUrl(entry.event)
+                    ? 'url(' + imageUrl(entry.event) + ') center/cover'
+                    : artFor(entry.event_id)
+                "
+              >
+                <span
+                  style="
+                    font-family: var(--font-serif);
+                    font-style: italic;
+                    font-size: 10px;
+                    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+                  "
+                  >{{ eventYear(entry.event) }}</span
+                >
+              </div>
+              <div style="flex: 1; min-width: 0">
+                <div
+                  style="
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 8px;
+                  "
+                >
+                  <div
+                    style="
+                      font-family: var(--font-serif);
+                      font-style: italic;
+                      font-size: 13.5px;
+                      line-height: 1.25;
+                    "
+                  >
+                    {{ entry.event?.title }}
+                  </div>
+                  <span class="badge" style="font-size: 10px">Actuel</span>
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div
+              style="
+                padding: 12px;
+                border: 1.5px dashed var(--border-2);
+                border-radius: 10px;
+                font-size: 12px;
+                color: var(--fg-3);
+                font-style: italic;
+              "
+            >
+              Position vide — votre proposition comblerait ce créneau.
+            </div>
+          }
+
+          <div
+            style="
+              font-size: 10.5px;
+              font-weight: 600;
+              letter-spacing: 0.1em;
+              text-transform: uppercase;
+              color: var(--fg-3);
+              margin-top: 8px;
+            "
+          >
+            Position 2 · C'est aussi
+          </div>
+          @if (currentAlso(); as entry) {
+            <div
+              style="
+                display: flex;
+                gap: 12px;
+                padding: 10px;
+                border-radius: 10px;
+                border: 1px solid var(--border-1);
+                background: var(--bg-surface);
+              "
+            >
+              <div
+                style="
+                  width: 72px;
+                  flex: none;
+                  aspect-ratio: 4/3;
+                  border-radius: 8px;
+                  overflow: hidden;
+                  display: flex;
+                  align-items: flex-end;
+                  padding: 7px;
+                  color: #f3e6c8;
+                "
+                [style.background]="
+                  imageUrl(entry.event)
+                    ? 'url(' + imageUrl(entry.event) + ') center/cover'
+                    : artFor(entry.event_id)
+                "
+              >
+                <span
+                  style="
+                    font-family: var(--font-serif);
+                    font-style: italic;
+                    font-size: 10px;
+                    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+                  "
+                  >{{ eventYear(entry.event) }}</span
+                >
+              </div>
+              <div style="flex: 1; min-width: 0">
+                <div
+                  style="
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 8px;
+                  "
+                >
+                  <div
+                    style="
+                      font-family: var(--font-serif);
+                      font-style: italic;
+                      font-size: 13.5px;
+                      line-height: 1.25;
+                    "
+                  >
+                    {{ entry.event?.title }}
+                  </div>
+                  <span class="badge" style="font-size: 10px">Actuel</span>
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div
+              style="
+                padding: 12px;
+                border: 1.5px dashed var(--border-2);
+                border-radius: 10px;
+                font-size: 12px;
+                color: var(--fg-3);
+                font-style: italic;
+              "
+            >
+              Position vide — votre proposition comblerait ce créneau.
+            </div>
+          }
+        </div>
+
+        <hr class="rule" style="margin: 18px 0 14px" />
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px">
+          <tui-icon icon="@tui.search" style="font-size: 15px; color: var(--fg-2)" />
+          <h3 style="font-size: 13.5px; font-weight: 600">La bibliothèque propose aussi</h3>
+          <span class="badge" style="font-size: 10px">{{ suggestions().length }}</span>
+        </div>
+        @if (libraryLoading()) {
+          <div
+            style="
+              padding: 16px;
+              text-align: center;
+              color: var(--fg-3);
+              font-size: 12.5px;
+              font-style: italic;
+            "
+          >
+            Chargement…
+          </div>
+        } @else if (suggestions().length === 0) {
+          <div style="padding: 12px; font-size: 12px; color: var(--fg-3); font-style: italic">
+            Aucun autre événement en bibliothèque pour cette date.
+          </div>
+        } @else {
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            @for (ev of suggestions(); track ev.id) {
+              <div
+                style="display: flex; gap: 12px; padding: 10px; border-radius: 10px"
+                [style.border]="
+                  pickedLibId() === ev.id ? '1px solid var(--accent)' : '1px solid var(--border-1)'
+                "
+                [style.background]="
+                  pickedLibId() === ev.id ? 'var(--accent-soft)' : 'var(--bg-surface)'
+                "
+              >
+                <div
+                  style="
+                    width: 72px;
+                    flex: none;
+                    aspect-ratio: 4/3;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    display: flex;
+                    align-items: flex-end;
+                    padding: 7px;
+                    color: #f3e6c8;
+                  "
+                  [style.background]="
+                    imageUrl(ev) ? 'url(' + imageUrl(ev) + ') center/cover' : artFor(ev.id)
+                  "
+                >
+                  <span
+                    style="
+                      font-family: var(--font-serif);
+                      font-style: italic;
+                      font-size: 10px;
+                      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+                    "
+                    >{{ eventYear(ev) }}</span
+                  >
+                </div>
+                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                  <div
+                    style="
+                      font-family: var(--font-serif);
+                      font-style: italic;
+                      font-size: 13.5px;
+                      line-height: 1.25;
+                    "
+                  >
+                    {{ ev.title }}
+                  </div>
+                  <div style="margin-top: auto; padding-top: 8px">
+                    <button
+                      class="btn btn-secondary btn-sm"
+                      type="button"
+                      style="height: 28px; font-size: 12px"
+                      (click)="pickLibrary(ev.id)"
+                    >
+                      @if (tab() === 'reuse' && pickedLibId() === ev.id) {
+                        <tui-icon icon="@tui.check" style="font-size: 12px" /> Choisi
+                      } @else {
+                        Réutiliser
+                      }
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- RIGHT — my proposal -->
+      <div class="scroll-pretty" style="padding: 20px; overflow-y: auto">
+        <div
+          style="
+            display: flex;
+            gap: 4px;
+            padding: 3px;
+            background: var(--bg-surface-2);
+            border-radius: 8px;
+            border: 1px solid var(--border-1);
+            margin-bottom: 16px;
+          "
+        >
+          <button
+            class="btn btn-sm"
+            type="button"
+            style="flex: 1; border: none"
+            [style.background]="tab() === 'create' ? 'var(--bg-surface)' : 'transparent'"
+            [style.box-shadow]="tab() === 'create' ? 'var(--shadow-sm)' : 'none'"
+            (click)="setTab('create')"
+          >
+            <tui-icon icon="@tui.plus" style="font-size: 14px" /> Créer un nouvel événement
+          </button>
+          <button
+            class="btn btn-sm"
+            type="button"
+            style="flex: 1; border: none"
+            [style.background]="tab() === 'reuse' ? 'var(--bg-surface)' : 'transparent'"
+            [style.box-shadow]="tab() === 'reuse' ? 'var(--shadow-sm)' : 'none'"
+            (click)="setTab('reuse')"
+          >
+            <tui-icon icon="@tui.archive" style="font-size: 14px" /> Depuis la bibliothèque
+          </button>
+        </div>
+
+        @if (tab() === 'create') {
+          <div style="display: flex; flex-direction: column; gap: 14px">
+            <div class="field required">
+              <label class="field-label">Titre de l'événement</label>
+              <input
+                class="input"
+                placeholder="Ex. Fondation du Parti Progressiste Congolais"
+                style="font-family: var(--font-serif); font-size: 15px"
+                [value]="title()"
+                (input)="title.set($any($event.target).value)"
+              />
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+              <div class="field required">
+                <label class="field-label">Année historique</label>
+                <input
+                  class="input"
+                  placeholder="1946"
+                  inputmode="numeric"
+                  [value]="yearStr()"
+                  (input)="yearStr.set($any($event.target).value)"
+                />
+                <span class="field-hint">L'événement paraîtra chaque {{ dayLabel() }}.</span>
+              </div>
+            </div>
+            <div class="field required">
+              <label class="field-label">Description historique</label>
+              <textarea
+                class="textarea"
+                rows="4"
+                placeholder="Contexte, faits, portée pour l'histoire de la République du Congo…"
+                style="font-family: var(--font-serif); font-size: 13.5px; line-height: 1.5"
+                [value]="description()"
+                (input)="description.set($any($event.target).value)"
+              ></textarea>
+              <span class="field-hint">{{ description().length }} / 500 caractères</span>
+            </div>
+            <div class="field required">
+              <label class="field-label"
+                >Illustration <span style="color: var(--danger)">— obligatoire</span></label
+              >
+              <div style="display: grid; grid-template-columns: 110px 1fr; gap: 12px">
+                <div
+                  style="
+                    aspect-ratio: 4/3;
+                    border: 1.5px dashed var(--border-2);
+                    border-radius: 8px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 4px;
+                    background: var(--bg-surface-2);
+                    color: var(--fg-3);
+                    overflow: hidden;
+                  "
+                >
+                  @if (imagePreview(); as preview) {
+                    <img
+                      [src]="preview"
+                      alt="Aperçu"
+                      style="width: 100%; height: 100%; object-fit: cover"
+                    />
+                  } @else {
+                    <tui-icon icon="@tui.image" style="font-size: 20px" /><span
+                      style="font-size: 9px"
+                      >800×600</span
+                    >
+                  }
+                </div>
+                <div
+                  style="display: flex; flex-direction: column; justify-content: center; gap: 6px"
+                >
+                  <label
+                    class="btn btn-secondary btn-sm"
+                    style="align-self: flex-start; cursor: pointer"
+                  >
+                    <tui-icon icon="@tui.upload" style="font-size: 14px" /> Téléverser
+                    <input type="file" accept="image/*" hidden (change)="onImageChange($event)" />
+                  </label>
+                  <span class="field-hint"
+                    >JPG / PNG · 800 × 600 px · ≤ 150 Ko. Toutes les recommandations exigent une
+                    image.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        } @else {
+          @if (pickedLibEvent(); as ev) {
+            <div>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  margin-bottom: 10px;
+                  color: var(--success);
+                "
+              >
+                <tui-icon icon="@tui.check" style="font-size: 15px" />
+                <span style="font-size: 13px; font-weight: 600"
+                  >Événement de bibliothèque sélectionné</span
+                >
+              </div>
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  padding: 10px;
+                  border-radius: 10px;
+                  border: 1px solid var(--accent);
+                  background: var(--accent-soft);
+                "
+              >
+                <div
+                  style="
+                    width: 72px;
+                    flex: none;
+                    aspect-ratio: 4/3;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    display: flex;
+                    align-items: flex-end;
+                    padding: 7px;
+                    color: #f3e6c8;
+                  "
+                  [style.background]="
+                    imageUrl(ev) ? 'url(' + imageUrl(ev) + ') center/cover' : artFor(ev.id)
+                  "
+                >
+                  <span
+                    style="font-family: var(--font-serif); font-style: italic; font-size: 10px"
+                    >{{ eventYear(ev) }}</span
+                  >
+                </div>
+                <div style="flex: 1; min-width: 0">
+                  <div
+                    style="
+                      font-family: var(--font-serif);
+                      font-style: italic;
+                      font-size: 13.5px;
+                      line-height: 1.25;
+                    "
+                  >
+                    {{ ev.title }}
+                  </div>
+                </div>
+              </div>
+              <button
+                class="btn btn-flat btn-sm"
+                type="button"
+                style="margin-top: 8px"
+                (click)="clearPicked()"
+              >
+                <tui-icon icon="@tui.x" style="font-size: 12px" /> Changer
+              </button>
+            </div>
+          } @else {
+            <div class="empty" style="padding: 32px 16px">
+              <div class="empty-icon"><tui-icon icon="@tui.archive" style="font-size: 24px" /></div>
+              <div class="empty-title" style="font-size: 15px">Choisir un événement existant</div>
+              <p style="font-size: 12.5px; color: var(--fg-3); max-width: 260px">
+                Sélectionnez un événement dans le panneau de gauche pour le recommander sur cette
+                date.
+              </p>
+            </div>
+          }
+        }
+
+        <!-- POSITION SLOTS -->
+        <hr class="rule" style="margin: 18px 0 14px" />
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
+          <tui-icon icon="@tui.crosshair" style="font-size: 16px; color: var(--fg-2)" />
+          <h3 style="font-size: 13.5px; font-weight: 600">Position recommandée</h3>
+          <span style="color: var(--danger); font-size: 12px">requis</span>
+        </div>
+        <p style="font-size: 12px; color: var(--fg-3); margin-bottom: 12px">
+          Déposez votre événement dans l'emplacement souhaité sur la fiche du jour.
+        </p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+          @for (slot of [1, 2]; track slot) {
+            <button
+              type="button"
+              (click)="setPosition($any(slot))"
+              style="text-align: left; padding: 14px; border-radius: 12px; cursor: pointer"
+              [style.border]="
+                position() === slot ? '1.5px solid var(--accent)' : '1.5px dashed var(--border-2)'
+              "
+              [style.background]="
+                position() === slot ? 'var(--accent-soft)' : 'var(--bg-surface-2)'
+              "
+            >
+              <div style="display: flex; align-items: center; justify-content: space-between">
+                <span
+                  class="badge"
+                  [class.badge-accent]="position() === slot"
+                  style="font-size: 10px"
+                  >Position {{ slot }}</span
+                >
+                <span
+                  style="
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--accent-fg);
+                  "
+                  [style.border]="
+                    position() === slot
+                      ? '1.5px solid var(--accent)'
+                      : '1.5px solid var(--border-3)'
+                  "
+                  [style.background]="position() === slot ? 'var(--accent)' : 'transparent'"
+                >
+                  @if (position() === slot) {
+                    <tui-icon icon="@tui.check" style="font-size: 12px" />
+                  }
+                </span>
+              </div>
+              <div
+                style="
+                  font-family: var(--font-serif);
+                  font-size: 15px;
+                  font-weight: 600;
+                  margin-top: 10px;
+                "
+              >
+                {{ positionLabel($any(slot)) }}
+              </div>
+              <div style="font-size: 11.5px; color: var(--fg-3); margin-top: 2px">
+                {{
+                  slot === 1 ? 'Affiché par défaut sur mobile' : 'Accessible via le lien secondaire'
+                }}
+              </div>
+              <div
+                style="
+                  margin-top: 10px;
+                  height: 44px;
+                  border-radius: 6px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 11px;
+                  font-style: italic;
+                "
+                [style.border]="
+                  position() === slot
+                    ? '1.5px dashed var(--accent)'
+                    : '1.5px dashed var(--border-2)'
+                "
+                [style.color]="position() === slot ? 'var(--accent)' : 'var(--fg-3)'"
+              >
+                {{ position() === slot ? '✓ Votre proposition déposée ici' : 'Déposer ici' }}
+              </div>
+              @if (position() === slot && replaceTitleFor($any(slot)); as replaced) {
+                <div
+                  style="
+                    font-size: 10.5px;
+                    color: var(--warning);
+                    margin-top: 8px;
+                    display: flex;
+                    gap: 4px;
+                    align-items: center;
+                  "
+                >
+                  <tui-icon icon="@tui.refresh-cw" style="font-size: 12px" /> Remplacera :
+                  <em style="font-style: italic">{{ replaced }}</em>
+                </div>
+              }
+            </button>
+          }
+        </div>
+
+        @if (error(); as err) {
+          <div
+            style="
+              margin-top: 14px;
+              padding: 10px 12px;
+              border-radius: 8px;
+              background: var(--danger-soft);
+              color: var(--danger);
+              font-size: 12.5px;
+            "
+          >
+            {{ err }}
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-footer" style="justify-content: space-between">
+      <span
+        style="font-size: 12px; color: var(--fg-3); display: flex; align-items: center; gap: 6px"
+      >
+        <tui-icon icon="@tui.info" style="font-size: 14px" /> Votre recommandation sera revue par
+        l'équipe éditoriale avant publication.
+      </span>
+      <div style="display: flex; gap: 8px">
+        <button class="btn btn-flat btn-sm" type="button" (click)="close()">Annuler</button>
+        <button
+          class="btn btn-primary btn-sm"
+          type="button"
+          [disabled]="!canSubmit()"
+          (click)="submit()"
+        >
+          @if (saving()) {
+            <span class="spinner"></span>
+          }
+          Soumettre la recommandation <tui-icon icon="@tui.arrow-right" style="font-size: 14px" />
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

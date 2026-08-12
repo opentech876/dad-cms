@@ -1,8 +1,9 @@
-import { Component, ElementRef, inject, OnInit, QueryList, signal, ViewChildren } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, OnInit, QueryList, signal, ViewChildren } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-otp-step',
   standalone: true,
   imports: [RouterLink],

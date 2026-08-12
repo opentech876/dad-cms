@@ -71,19 +71,19 @@ describe('LoginComponent', () => {
       component.form.controls.password.setValue('court');
       await component.submit();
       expect(mockSupabase.signInWithPassword).not.toHaveBeenCalled();
-      expect(component.errorMessage).toContain('8 caractères');
+      expect(component.errorMessage()).toContain('8 caractères');
     });
 
     it('affiche message FR sur Invalid login credentials', async () => {
       mockSupabase.signInWithPassword.mockResolvedValue({ data: null, error: { message: 'Invalid login credentials' } });
       await component.submit();
-      expect(component.errorMessage).toContain('incorrect');
+      expect(component.errorMessage()).toContain('incorrect');
     });
 
     it('affiche message rate-limit sur erreur "rate"', async () => {
       mockSupabase.signInWithPassword.mockResolvedValue({ data: null, error: { message: 'rate limit exceeded' } });
       await component.submit();
-      expect(component.errorMessage).toContain('Trop de tentatives');
+      expect(component.errorMessage()).toContain('Trop de tentatives');
     });
   });
 
@@ -110,10 +110,10 @@ describe('LoginComponent', () => {
 
   describe('setMode()', () => {
     it('change le mode et efface le message d\'erreur', () => {
-      component.errorMessage = 'erreur précédente';
+      component.errorMessage.set('erreur précédente');
       component.setMode('otp');
       expect(component.mode()).toBe('otp');
-      expect(component.errorMessage).toBe('');
+      expect(component.errorMessage()).toBe('');
     });
   });
 

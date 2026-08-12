@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TuiIcon } from '@taiga-ui/core';
@@ -29,6 +29,7 @@ const COMPANY_TYPES: CompanyType[] = [
 ];
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-companies',
   standalone: true,
   imports: [CommonModule, FormsModule, TuiIcon],

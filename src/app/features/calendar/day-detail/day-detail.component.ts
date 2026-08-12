@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, SlicePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
@@ -14,6 +14,7 @@ import { APPLY_TIER } from '../../../core/utils/labels.utils';
 import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-day-detail',
   standalone: true,
   imports: [TuiIcon, SlicePipe, DatePipe],
@@ -104,11 +105,20 @@ export class DayDetailComponent implements OnInit {
       this.toast.error('Les affectations sont gérées par le Curateur et appliquées par le chef d\'équipe.');
       return;
     }
+
+    const p1 = this.selectedPos1();
+    const p2 = this.selectedPos2();
+    // One event can hold at most one position per day (DB constraint
+    // uq_calendar_entry_one_position_per_event). Catch it here with a
+    // readable message instead of a raw 23505 + a half-saved day.
+    if (p1 && p1 === p2) {
+      this.toast.error('Le même événement ne peut pas occuper les deux positions du même jour.');
+      return;
+    }
+
     this.saveLoading.set(true);
 
     const ops: Promise<{ success: boolean; error?: string }>[] = [];
-    const p1 = this.selectedPos1();
-    const p2 = this.selectedPos2();
 
     if (p1) {
       ops.push(firstValueFrom(this.calendarEntryService.assignEvent(this.calendarId, this.mmdd, p1, 1)));

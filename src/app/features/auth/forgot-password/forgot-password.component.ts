@@ -1,10 +1,11 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { SupabaseService } from '../../../core/supabase/supabase.service';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-forgot-password',
   standalone: true,
   imports: [ReactiveFormsModule, TuiIcon, RouterLink],

@@ -1,5 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
@@ -10,6 +10,7 @@ import { OnboardingService } from '../../core/onboarding/onboarding.service';
 import { DATE_FMT } from '../../core/utils/date.utils';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-workspace-step',
   standalone: true,
   imports: [CommonModule, DatePipe, TuiIcon],

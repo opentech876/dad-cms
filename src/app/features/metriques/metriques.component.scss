@@ -19,8 +19,12 @@
   font-size: 13px;
   line-height: 1.55;
 
-  span { flex: 1; }
-  strong { font-weight: 600; }
+  span {
+    flex: 1;
+  }
+  strong {
+    font-weight: 600;
+  }
   code {
     font-size: 12px;
     padding: 1px 5px;
@@ -64,13 +68,28 @@
   align-items: center;
   justify-content: center;
 
-  &--devices  { background: var(--accent-soft);  color: var(--accent); }
-  &--notif    { background: var(--success-soft); color: var(--success); }
-  &--taps     { background: var(--warning-soft); color: var(--warning); }
-  &--coverage { background: var(--accent-soft);  color: var(--accent); }
+  &--devices {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  &--notif {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+  &--taps {
+    background: var(--warning-soft);
+    color: var(--warning);
+  }
+  &--coverage {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
 }
 
-.kpi-card__body { flex: 1; min-width: 0; }
+.kpi-card__body {
+  flex: 1;
+  min-width: 0;
+}
 
 .kpi-card__value {
   font-family: var(--font-serif);
@@ -129,12 +148,18 @@
   border: 1px solid var(--border-1);
   background: var(--bg-sunken);
 
-  strong { color: var(--fg-1); }
+  strong {
+    color: var(--fg-1);
+  }
 }
 
 // ── Area chart (activity) ─────────────────────────────────
 
-.metriques-svg-wrap { display: flex; flex-direction: column; gap: 4px; }
+.metriques-svg-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
 .metriques-area-chart {
   width: 100%;
@@ -193,8 +218,13 @@
   transition: height 0.4s ease;
   min-height: 2px;
 
-  &--full  { background: var(--success); }
-  &--empty { background: var(--border-1); min-height: 0; }
+  &--full {
+    background: var(--success);
+  }
+  &--empty {
+    background: var(--border-1);
+    min-height: 0;
+  }
 }
 
 .metriques-bar-pct {
@@ -260,12 +290,22 @@
     border-bottom: 1px solid var(--border-1);
   }
 
-  tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover td { background: var(--bg-sunken); }
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+  tbody tr:hover td {
+    background: var(--bg-sunken);
+  }
 }
 
-.metriques-ok   { color: var(--success); font-weight: 600; }
-.metriques-warn { color: var(--warning); font-weight: 600; }
+.metriques-ok {
+  color: var(--success);
+  font-weight: 600;
+}
+.metriques-warn {
+  color: var(--warning);
+  font-weight: 600;
+}
 
 .metriques-empty {
   padding: 28px 20px;
@@ -299,7 +339,9 @@
   padding: 24px 32px;
   border-right: 1px solid var(--border-1);
 
-  &:last-child { border-right: none; }
+  &:last-child {
+    border-right: none;
+  }
 }
 
 .metriques-platform-icon {
@@ -310,8 +352,14 @@
   align-items: center;
   justify-content: center;
 
-  &--android { background: var(--success-soft); color: var(--success); }
-  &--ios     { background: var(--bg-sunken);    color: var(--fg-3); }
+  &--android {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+  &--ios {
+    background: var(--bg-sunken);
+    color: var(--fg-3);
+  }
 }
 
 .metriques-platform-label {
@@ -344,6 +392,10 @@
   border-radius: 3px;
   transition: width 0.4s ease;
 
-  &--android { background: var(--success); }
-  &--ios     { background: var(--accent); }
+  &--android {
+    background: var(--success);
+  }
+  &--ios {
+    background: var(--accent);
+  }
 }

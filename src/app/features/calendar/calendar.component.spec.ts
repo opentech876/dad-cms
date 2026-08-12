@@ -771,6 +771,12 @@ describe('CalendarComponent', () => {
       expect(mockRecommendationService.countPending).toHaveBeenCalled();
     });
 
+    it('confirmApply rafraîchit les entrées après succès (les événements appliqués apparaissent sans reload)', async () => {
+      mockCalendarEntryService.getEntriesForCalendar.mockClear();
+      await component.confirmApply();
+      expect(mockCalendarEntryService.getEntriesForCalendar).toHaveBeenCalledWith('cal-3');
+    });
+
     it('confirmApply affiche un toast erreur quand la RPC échoue', async () => {
       mockRecommendationService.applyAll.mockReturnValueOnce(
         of({ success: false, error: 'insufficient_privilege' }),

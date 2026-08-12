@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
@@ -6,6 +6,7 @@ import { AdminService, AdminUser, AdminUserMembership } from '../../core/admin/a
 import { DATE_FMT } from '../../core/utils/date.utils';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-admin-users',
   standalone: true,
   imports: [TuiIcon, DatePipe],

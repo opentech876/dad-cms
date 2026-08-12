@@ -1,18 +1,32 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TuiIcon } from '@taiga-ui/core';
 import { firstValueFrom } from 'rxjs';
 import { CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
 import { EventService } from '../../core/events/event.service';
-import { RecommendationService, PresidencyRecommendationWithEvent } from '../../core/presidency/recommendation.service';
+import {
+  RecommendationService,
+  PresidencyRecommendationWithEvent,
+} from '../../core/presidency/recommendation.service';
 import { ToastService } from '../../core/services/toast.service';
 import { Event as HistoricalEvent } from '../../models';
-import { MONTHS_FR_LONG_CAP, formatDayMonthLong, normalizeSearchable } from '../../core/utils/date.utils';
+import {
+  MONTHS_FR_LONG_CAP,
+  formatDayMonthLong,
+  normalizeSearchable,
+} from '../../core/utils/date.utils';
 import { compressImage } from '../../core/utils/image.utils';
 
-interface DayCell  { day: number; mmdd: string; }
-interface MonthSection { index: number; name: string; days: DayCell[]; }
-type CuratorTab   = 'proposer' | 'bibliotheque';
+interface DayCell {
+  day: number;
+  mmdd: string;
+}
+interface MonthSection {
+  index: number;
+  name: string;
+  days: DayCell[];
+}
+type CuratorTab = 'proposer' | 'bibliotheque';
 type LibraryFilter = 'tous' | 'curateur' | 'non-assignes';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -25,6 +39,7 @@ const MONTH_SECTIONS: MonthSection[] = MONTHS_FR_LONG_CAP.map((name, idx) => {
 });
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-curator-workspace',
   standalone: true,
   imports: [CommonModule, TuiIcon],
@@ -32,13 +47,13 @@ const MONTH_SECTIONS: MonthSection[] = MONTHS_FR_LONG_CAP.map((name, idx) => {
 })
 export class CuratorWorkspaceComponent {
   private readonly recommendationService = inject(RecommendationService);
-  private readonly eventService          = inject(EventService);
-  private readonly toast                 = inject(ToastService);
+  private readonly eventService = inject(EventService);
+  private readonly toast = inject(ToastService);
 
   readonly recommendations = input.required<PresidencyRecommendationWithEvent[]>();
   readonly existingEntries = input.required<CalendarEntryWithEvent[]>();
-  readonly calendarId      = input.required<string>();
-  readonly calendarYear    = input<number>(new Date().getFullYear());
+  readonly calendarId = input.required<string>();
+  readonly calendarYear = input<number>(new Date().getFullYear());
 
   readonly refreshNeeded = output<void>();
 
@@ -49,32 +64,32 @@ export class CuratorWorkspaceComponent {
 
   // ── Proposer tab — accordion + day editor ─────────────────────────────
   readonly expandedMonths = signal<Set<number>>(new Set([0, new Date().getMonth()]));
-  readonly editorOpen     = signal(false);
-  readonly editorMmdd     = signal('');
-  readonly editorLibrary  = signal<HistoricalEvent[]>([]);
-  readonly editorPos1     = signal<string | null>(null);
-  readonly editorPos2     = signal<string | null>(null);
-  readonly editorSaving   = signal(false);
-  readonly editorLoading  = signal(false);
+  readonly editorOpen = signal(false);
+  readonly editorMmdd = signal('');
+  readonly editorLibrary = signal<HistoricalEvent[]>([]);
+  readonly editorPos1 = signal<string | null>(null);
+  readonly editorPos2 = signal<string | null>(null);
+  readonly editorSaving = signal(false);
+  readonly editorLoading = signal(false);
 
   // ── Bibliothèque tab ──────────────────────────────────────────────────
-  readonly libraryEvents  = signal<HistoricalEvent[]>([]);
+  readonly libraryEvents = signal<HistoricalEvent[]>([]);
   readonly libraryLoading = signal(false);
-  readonly librarySearch  = signal('');
-  readonly libraryFilter  = signal<LibraryFilter>('tous');
+  readonly librarySearch = signal('');
+  readonly libraryFilter = signal<LibraryFilter>('tous');
 
-  readonly assignedEventIds = computed<Set<string>>(() =>
-    new Set(this.existingEntries().map(e => e.event_id)),
+  readonly assignedEventIds = computed<Set<string>>(
+    () => new Set(this.existingEntries().map((e) => e.event_id)),
   );
-  readonly recommendedEventIds = computed<Set<string>>(() =>
-    new Set(this.recommendations().map(r => r.event_id)),
+  readonly recommendedEventIds = computed<Set<string>>(
+    () => new Set(this.recommendations().map((r) => r.event_id)),
   );
 
   readonly filteredLibrary = computed<HistoricalEvent[]>(() => {
-    const search   = normalizeSearchable(this.librarySearch());
-    const filter   = this.libraryFilter();
+    const search = normalizeSearchable(this.librarySearch());
+    const filter = this.libraryFilter();
     const assigned = this.assignedEventIds();
-    return this.libraryEvents().filter(e => {
+    return this.libraryEvents().filter((e) => {
       if (filter === 'curateur' && e.origin !== 'curateur') return false;
       if (filter === 'non-assignes' && assigned.has(e.id)) return false;
       if (!search) return true;
@@ -83,14 +98,14 @@ export class CuratorWorkspaceComponent {
   });
 
   // ── Create-event modal ───────────────────────────────────────────────
-  readonly createOpen         = signal(false);
-  readonly createTitle        = signal('');
-  readonly createDate         = signal('');
-  readonly createDescription  = signal('');
-  readonly createImageFile    = signal<File | null>(null);
+  readonly createOpen = signal(false);
+  readonly createTitle = signal('');
+  readonly createDate = signal('');
+  readonly createDescription = signal('');
+  readonly createImageFile = signal<File | null>(null);
   readonly createImagePreview = signal<string | null>(null);
-  readonly createSaving       = signal(false);
-  readonly createError        = signal<string | null>(null);
+  readonly createSaving = signal(false);
+  readonly createError = signal<string | null>(null);
 
   // ── Computed lookup maps ─────────────────────────────────────────────
   readonly recsByMmdd = computed<Map<string, PresidencyRecommendationWithEvent[]>>(() => {
@@ -111,7 +126,7 @@ export class CuratorWorkspaceComponent {
     };
     this.libraryEvents().forEach(add);
     this.editorLibrary().forEach(add);
-    this.recommendations().forEach(r => add((r as any).event ?? null));
+    this.recommendations().forEach((r) => add((r as any).event ?? null));
     return m;
   });
 
@@ -134,17 +149,20 @@ export class CuratorWorkspaceComponent {
   // ── Month accordion ───────────────────────────────────────────────────
 
   toggleMonth(idx: number): void {
-    this.expandedMonths.update(s => {
+    this.expandedMonths.update((s) => {
       const next = new Set(s);
-      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
       return next;
     });
   }
 
-  isExpanded(idx: number): boolean { return this.expandedMonths().has(idx); }
+  isExpanded(idx: number): boolean {
+    return this.expandedMonths().has(idx);
+  }
 
   hasRecommendation(mmdd: string, position: 1 | 2): boolean {
-    return (this.recsByMmdd().get(mmdd) ?? []).some(r => r.position === position);
+    return (this.recsByMmdd().get(mmdd) ?? []).some((r) => r.position === position);
   }
 
   dayState(mmdd: string): 'full' | 'partial' | 'empty' {
@@ -161,8 +179,8 @@ export class CuratorWorkspaceComponent {
     this.editorOpen.set(true);
     this.editorLoading.set(true);
     const recs = this.recsByMmdd().get(mmdd) ?? [];
-    this.editorPos1.set(recs.find(r => r.position === 1)?.event_id ?? null);
-    this.editorPos2.set(recs.find(r => r.position === 2)?.event_id ?? null);
+    this.editorPos1.set(recs.find((r) => r.position === 1)?.event_id ?? null);
+    this.editorPos2.set(recs.find((r) => r.position === 2)?.event_id ?? null);
     const library = await firstValueFrom(this.eventService.listEventsByMmdd(mmdd));
     this.editorLibrary.set(library);
     this.editorLoading.set(false);
@@ -188,18 +206,29 @@ export class CuratorWorkspaceComponent {
 
     const pos1 = this.editorPos1();
     const pos2 = this.editorPos2();
+    // The DB forbids the same event on both positions of one day
+    // (uq_calendar_entry_one_position_per_event at apply time).
+    if (pos1 && pos1 === pos2) {
+      this.editorSaving.set(false);
+      this.toast.error('Le même événement ne peut pas occuper les deux positions du même jour.');
+      return;
+    }
     const ops: Promise<{ success: boolean; error?: string }>[] = [
-      firstValueFrom(pos1
-        ? this.recommendationService.upsertSlot(calId, mmdd, 1, pos1)
-        : this.recommendationService.removeSlot(calId, mmdd, 1)),
-      firstValueFrom(pos2
-        ? this.recommendationService.upsertSlot(calId, mmdd, 2, pos2)
-        : this.recommendationService.removeSlot(calId, mmdd, 2)),
+      firstValueFrom(
+        pos1
+          ? this.recommendationService.upsertSlot(calId, mmdd, 1, pos1)
+          : this.recommendationService.removeSlot(calId, mmdd, 1),
+      ),
+      firstValueFrom(
+        pos2
+          ? this.recommendationService.upsertSlot(calId, mmdd, 2, pos2)
+          : this.recommendationService.removeSlot(calId, mmdd, 2),
+      ),
     ];
 
     const results = await Promise.all(ops);
     this.editorSaving.set(false);
-    const failed = results.find(r => !r.success);
+    const failed = results.find((r) => !r.success);
     if (failed) {
       this.toast.error(failed.error ?? "Erreur lors de l'enregistrement de la recommandation.");
       return;
@@ -249,7 +278,7 @@ export class CuratorWorkspaceComponent {
   async submitCreate(): Promise<void> {
     if (this.createSaving()) return;
     const title = this.createTitle().trim();
-    const date  = this.createDate();
+    const date = this.createDate();
     if (!title || !date) {
       this.createError.set('Le titre et la date historique sont obligatoires.');
       return;
@@ -257,12 +286,14 @@ export class CuratorWorkspaceComponent {
     this.createSaving.set(true);
     this.createError.set(null);
     try {
-      const created = await firstValueFrom(this.eventService.createEvent({
-        event_date: date,
-        title,
-        description: this.createDescription().trim() || undefined,
-        origin: 'curateur',
-      }));
+      const created = await firstValueFrom(
+        this.eventService.createEvent({
+          event_date: date,
+          title,
+          description: this.createDescription().trim() || undefined,
+          origin: 'curateur',
+        }),
+      );
       if (!created.success || !created.id) {
         this.createError.set(created.error ?? "Impossible de créer l'événement.");
         return;
@@ -272,9 +303,14 @@ export class CuratorWorkspaceComponent {
         const compressed = await compressImage(file);
         const upload = await firstValueFrom(this.eventService.uploadImage(created.id, compressed));
         if (upload.path) {
-          await firstValueFrom(this.eventService.updateEvent(created.id, { image_path: upload.path }));
+          await firstValueFrom(
+            this.eventService.updateEvent(created.id, { image_path: upload.path }),
+          );
+          await this.eventService.uploadThumbnailFor(upload.path, file);
         } else {
-          this.toast.warning("Événement créé, mais le téléversement de l'image a échoué. Réessayez depuis la bibliothèque.");
+          this.toast.warning(
+            "Événement créé, mais le téléversement de l'image a échoué. Réessayez depuis la bibliothèque.",
+          );
         }
       }
       this.toast.success(`« ${title} » ajouté à la bibliothèque (Réserve).`);

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { TuiIcon } from '@taiga-ui/core';
@@ -11,6 +11,7 @@ import { formatDateLong } from '../../core/utils/date.utils';
 import { compressImage } from '../../core/utils/image.utils';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-workspace-info',
   standalone: true,
   imports: [TuiIcon],

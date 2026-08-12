@@ -13,6 +13,27 @@ export const MAX_WIDTH  = 800;
 export const MAX_HEIGHT = 600;
 export const MAX_BYTES  = 150 * 1024;
 
+/** Thumbnail budget — the small variant grids load instead of the full
+ *  cover. ~1/10th the weight, so a 20-row list costs ~0.3 MB instead of
+ *  ~3 MB of Storage egress. */
+export const THUMB_MAX_WIDTH  = 240;
+export const THUMB_MAX_HEIGHT = 180;
+export const THUMB_MAX_BYTES  = 30 * 1024;
+
+/** Size/quality budget for one compression pass. */
+export interface CompressPreset {
+  maxWidth: number;
+  maxHeight: number;
+  maxBytes: number;
+}
+
+export const COVER_PRESET: CompressPreset = {
+  maxWidth: MAX_WIDTH, maxHeight: MAX_HEIGHT, maxBytes: MAX_BYTES,
+};
+export const THUMB_PRESET: CompressPreset = {
+  maxWidth: THUMB_MAX_WIDTH, maxHeight: THUMB_MAX_HEIGHT, maxBytes: THUMB_MAX_BYTES,
+};
+
 /** Compute the target dimensions preserving aspect ratio. Never upscales. */
 export function fitWithin(
   width: number,
@@ -29,11 +50,14 @@ export function fitWithin(
 }
 
 /**
- * Compress `file` to fit the 800×600 / 150 Ko budget.
+ * Compress `file` to fit the given preset (default: 800×600 / 150 Ko cover).
  * Returns a new JPEG File, or the original file when compression is
  * unnecessary (already within budget) or impossible (decode failure).
  */
-export async function compressImage(file: File): Promise<File> {
+export async function compressImage(
+  file: File,
+  preset: CompressPreset = COVER_PRESET,
+): Promise<File> {
   // Already small enough AND not oversized? Skip the whole pipeline.
   // We still need the dimensions to decide, so only short-circuit on size.
   try {
@@ -47,9 +71,9 @@ export async function compressImage(file: File): Promise<File> {
     } catch {
       bitmap = await createImageBitmap(file);
     }
-    const { width, height } = fitWithin(bitmap.width, bitmap.height);
-    const alreadyFits = file.size <= MAX_BYTES
-      && bitmap.width <= MAX_WIDTH && bitmap.height <= MAX_HEIGHT;
+    const { width, height } = fitWithin(bitmap.width, bitmap.height, preset.maxWidth, preset.maxHeight);
+    const alreadyFits = file.size <= preset.maxBytes
+      && bitmap.width <= preset.maxWidth && bitmap.height <= preset.maxHeight;
     if (alreadyFits) {
       bitmap.close();
       return file;
@@ -73,12 +97,12 @@ export async function compressImage(file: File): Promise<File> {
     // Step the JPEG quality down until we fit the byte budget.
     for (const quality of [0.85, 0.75, 0.65, 0.55, 0.45, 0.35]) {
       const blob = await canvasToBlob(canvas, quality);
-      if (blob && blob.size <= MAX_BYTES) {
+      if (blob && blob.size <= preset.maxBytes) {
         return blobToFile(blob, file.name);
       }
       // Keep the last attempt around in case even 0.35 overshoots —
-      // a 800×600 JPEG at q0.35 virtually never exceeds 150 Ko, but if
-      // it somehow does we return that smallest attempt anyway.
+      // at these dimensions a q0.35 JPEG virtually never exceeds the budget,
+      // but if it somehow does we return that smallest attempt anyway.
       if (quality === 0.35 && blob) {
         return blobToFile(blob, file.name);
       }
@@ -87,6 +111,15 @@ export async function compressImage(file: File): Promise<File> {
   } catch {
     return file;
   }
+}
+
+/**
+ * Compress `file` into a small thumbnail (240×180 / ≤30 Ko). Grids load
+ * this instead of the full cover; falls back to the original file on
+ * decode failure, exactly like {@link compressImage}.
+ */
+export function compressThumbnail(file: File): Promise<File> {
+  return compressImage(file, THUMB_PRESET);
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {

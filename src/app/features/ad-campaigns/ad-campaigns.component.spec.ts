@@ -17,7 +17,7 @@ function makeCampaign(override: Partial<AdCampaign> = {}): AdCampaign {
     id: 'c1', name: 'MTN Congo', company_id: 'co-mtn',
     company: { id: 'co-mtn', name: 'MTN', type: 'telecom', business_domain: 'Téléphonie mobile' } as any,
     start_date: YESTERDAY, end_date: TOMORROW,
-    position: 'header', active: true,
+    position: 'footer', active: true,
     image_path: '', link_url: null, workspace_id: 'ws-1',
     paid_at: '2026-01-01T00:00:00Z', paid_by: 'u1',
     manager_confirmed_at: '2026-01-01T00:00:00Z', manager_confirmed_by: 'u1',
@@ -142,7 +142,7 @@ describe('AdCampaignsComponent', () => {
   describe('listRows()', () => {
     beforeEach(async () => {
       mockService.listCampaigns.mockReturnValue(of([
-        makeCampaign({ id: 'h1', name: 'Alpha', company_id: 'co-mtn',    company: { id: 'co-mtn',    name: 'MTN',    type: 'telecom' } as any, position: 'header' }),
+        makeCampaign({ id: 'h1', name: 'Alpha', company_id: 'co-mtn',    company: { id: 'co-mtn',    name: 'MTN',    type: 'telecom' } as any, position: 'footer' }),
         makeCampaign({ id: 'f1', name: 'Beta',  company_id: 'co-airtel', company: { id: 'co-airtel', name: 'Airtel', type: 'telecom' } as any, position: 'footer' }),
       ]));
       await component['_reload']();

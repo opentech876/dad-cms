@@ -9,7 +9,7 @@ import { Event as HistoricalEvent } from '../../models';
 export interface PresidencyRecommendation {
   id: string;
   calendar_id: string;
-  mmdd: string;            // 'MM-DD'
+  mmdd: string; // 'MM-DD'
   position: 1 | 2;
   event_id: string;
   workspace_id: string;
@@ -45,12 +45,13 @@ export class RecommendationService {
   private supabase = inject(SupabaseService);
   private workspaceContext = inject(WorkspaceContextService);
 
-  /** All pending+applied recommendations for a calendar, with the joined event. */
+  /** All pending+applied recommendations for a calendar, with the joined
+   *  event's displayed columns (narrowed from events(*) — see listMine). */
   listByCalendar(calendarId: string): Observable<PresidencyRecommendationWithEvent[]> {
     return from(
       this.supabase.client
         .from('presidency_recommendations')
-        .select('*, event:events(*)')
+        .select('*, event:events(id, title, description, image_path, event_date, status)')
         .eq('calendar_id', calendarId)
         .order('mmdd', { ascending: true })
         .order('position', { ascending: true }),
@@ -72,6 +73,53 @@ export class RecommendationService {
     ).pipe(map(({ count, error }: any) => (error ? 0 : (count ?? 0))));
   }
 
+  /** The signed-in curator's own recommendations across all calendars,
+   *  newest first, with the joined event's displayed columns. Narrowed
+   *  from events(*): the curation pages only render id/title/description/
+   *  image/date/status off the join. */
+  listMine(): Observable<PresidencyRecommendationWithEvent[]> {
+    return from(
+      this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
+        this.supabase.client
+          .from('presidency_recommendations')
+          .select('*, event:events(id, title, description, image_path, event_date, status)')
+          .eq('created_by', user?.id ?? '')
+          .order('created_at', { ascending: false }),
+      ),
+    ).pipe(
+      map(({ data, error }: any) =>
+        error || !data ? [] : (data as PresidencyRecommendationWithEvent[]),
+      ),
+    );
+  }
+
+  /** Workspace-wide pending count (RLS-scoped), across all calendars.
+   *  Drives the editorial "Recommandations" badge — those roles apply
+   *  everyone's recommendations, so the whole workspace's total is right. */
+  countAllPending(): Observable<number> {
+    return from(
+      this.supabase.client
+        .from('presidency_recommendations')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending'),
+    ).pipe(map(({ count, error }: any) => (error ? 0 : (count ?? 0))));
+  }
+
+  /** The signed-in curator's OWN pending count. Drives the "Mes
+   *  recommandations" badge — with several curators in a workspace, hers
+   *  must not be inflated by other curators' pending proposals. */
+  countMyPending(): Observable<number> {
+    return from(
+      this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
+        this.supabase.client
+          .from('presidency_recommendations')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending')
+          .eq('created_by', user?.id ?? ''),
+      ),
+    ).pipe(map(({ count, error }: any) => (error ? 0 : (count ?? 0))));
+  }
+
   /** Upsert a recommendation for one (calendar, mmdd, position) slot. */
   upsertSlot(
     calendarId: string,
@@ -82,25 +130,33 @@ export class RecommendationService {
     const wsId = this.workspaceContext.activeWorkspaceId();
     return from(
       this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>
-        this.supabase.client
-          .from('presidency_recommendations')
-          .upsert(
-            {
-              calendar_id: calendarId,
-              mmdd,
-              position,
-              event_id: eventId,
-              workspace_id: wsId,
-              status: 'pending',
-              created_by: user?.id ?? null,
-            },
-            { onConflict: 'calendar_id,mmdd,position' },
-          ),
+        this.supabase.client.from('presidency_recommendations').upsert(
+          {
+            calendar_id: calendarId,
+            mmdd,
+            position,
+            event_id: eventId,
+            workspace_id: wsId,
+            status: 'pending',
+            created_by: user?.id ?? null,
+          },
+          { onConflict: 'calendar_id,mmdd,position' },
+        ),
       ),
     ).pipe(
-      map(({ error }: any) =>
-        error ? { success: false, error: error.message } : { success: true },
-      ),
+      map(({ error }: any) => {
+        if (!error) return { success: true };
+        // 23505: another unique constraint fired (one event per day across
+        // both positions) — surface a readable message, not raw Postgres.
+        if (error.code === '23505') {
+          return {
+            success: false,
+            error:
+              'Cet événement est déjà proposé ou en place sur cette date — choisissez un autre événement ou une autre date.',
+          };
+        }
+        return { success: false, error: error.message };
+      }),
     );
   }
 
@@ -137,7 +193,7 @@ export class RecommendationService {
     for (const rec of recommendations) {
       if (rec.status !== 'pending') continue;
       const existing = existingEntries.find(
-        e => e.mmdd === rec.mmdd && e.position === rec.position,
+        (e) => e.mmdd === rec.mmdd && e.position === rec.position,
       );
       if (existing && existing.event_id !== rec.event_id) {
         conflicts.push({

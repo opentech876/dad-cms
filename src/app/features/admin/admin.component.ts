@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { TuiIcon } from '@taiga-ui/core';
@@ -9,6 +9,7 @@ import { RefreshRouteReuseStrategy } from '../../core/router/refresh-route-reuse
 import { DATE_FMT } from '../../core/utils/date.utils';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-admin',
   standalone: true,
   imports: [TuiIcon, DatePipe, DecimalPipe],

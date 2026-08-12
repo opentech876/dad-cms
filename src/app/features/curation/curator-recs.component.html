@@ -1,0 +1,270 @@
+<div style="display: flex; flex-direction: column; gap: 16px; max-width: 1200px">
+  <!-- Stat strip -->
+  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px">
+    <div class="card" style="padding: 18px">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <div
+          style="
+            font-size: 11.5px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Total soumis
+        </div>
+        <div
+          style="
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          "
+        >
+          <tui-icon icon="@tui.flag" style="font-size: 16px" />
+        </div>
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 8px;
+          line-height: 1;
+        "
+      >
+        {{ counts().all }}
+      </div>
+    </div>
+    <div class="card" style="padding: 18px">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <div
+          style="
+            font-size: 11.5px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          Publiées
+        </div>
+        <div
+          style="
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: var(--success-soft);
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          "
+        >
+          <tui-icon icon="@tui.check" style="font-size: 16px" />
+        </div>
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 8px;
+          line-height: 1;
+        "
+      >
+        {{ counts().applied }}
+      </div>
+    </div>
+    <div class="card" style="padding: 18px">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <div
+          style="
+            font-size: 11.5px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-3);
+            font-weight: 600;
+          "
+        >
+          En attente de publication
+        </div>
+        <div
+          style="
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: var(--warning-soft);
+            color: var(--warning);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          "
+        >
+          <tui-icon icon="@tui.clock" style="font-size: 16px" />
+        </div>
+      </div>
+      <div
+        style="
+          font-family: var(--font-serif);
+          font-size: 34px;
+          font-weight: 600;
+          margin-top: 8px;
+          line-height: 1;
+        "
+      >
+        {{ counts().pending }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter tabs + sort -->
+  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+    <div
+      style="
+        display: flex;
+        gap: 4px;
+        padding: 3px;
+        background: var(--bg-surface-2);
+        border-radius: 8px;
+        border: 1px solid var(--border-1);
+      "
+    >
+      <button
+        class="btn btn-sm"
+        type="button"
+        style="border: none"
+        [style.background]="filter() === 'all' ? 'var(--bg-surface)' : 'transparent'"
+        [style.box-shadow]="filter() === 'all' ? 'var(--shadow-sm)' : 'none'"
+        (click)="setFilter('all')"
+      >
+        Toutes <span style="opacity: 0.6; margin-left: 2px">{{ counts().all }}</span>
+      </button>
+      <button
+        class="btn btn-sm"
+        type="button"
+        style="border: none"
+        [style.background]="filter() === 'pending' ? 'var(--bg-surface)' : 'transparent'"
+        [style.box-shadow]="filter() === 'pending' ? 'var(--shadow-sm)' : 'none'"
+        (click)="setFilter('pending')"
+      >
+        En attente <span style="opacity: 0.6; margin-left: 2px">{{ counts().pending }}</span>
+      </button>
+      <button
+        class="btn btn-sm"
+        type="button"
+        style="border: none"
+        [style.background]="filter() === 'applied' ? 'var(--bg-surface)' : 'transparent'"
+        [style.box-shadow]="filter() === 'applied' ? 'var(--shadow-sm)' : 'none'"
+        (click)="setFilter('applied')"
+      >
+        Publiées <span style="opacity: 0.6; margin-left: 2px">{{ counts().applied }}</span>
+      </button>
+    </div>
+    <div style="flex: 1"></div>
+    <select
+      class="select"
+      style="width: 220px; height: 36px; font-size: 13px"
+      (change)="onSortChange($any($event.target).value)"
+    >
+      <option value="recent" [selected]="sort() === 'recent'">Trier : plus récentes</option>
+      <option value="event-date" [selected]="sort() === 'event-date'">
+        Trier : par date d'événement
+      </option>
+      <option value="status" [selected]="sort() === 'status'">Trier : par statut</option>
+    </select>
+  </div>
+
+  <!-- Rows -->
+  @if (store.loading()) {
+    <div style="padding: 40px; text-align: center; color: var(--fg-3); font-style: italic">
+      Chargement…
+    </div>
+  } @else if (rows().length === 0) {
+    <div class="empty">
+      <div class="empty-icon"><tui-icon icon="@tui.flag" style="font-size: 24px" /></div>
+      <div class="empty-title">Aucune recommandation</div>
+      <p style="font-size: 13px; color: var(--fg-3)">
+        Vos propositions apparaîtront ici avec leur statut de publication.
+      </p>
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Événement recommandé</th>
+            <th style="width: 130px">Date visée</th>
+            <th style="width: 130px">Position</th>
+            <th style="width: 120px">Soumise le</th>
+            <th style="width: 190px">Statut</th>
+            <th style="width: 50px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (rec of rows(); track rec.id) {
+            <tr>
+              <td>
+                <a
+                  [routerLink]="['/curation/mes-recommandations', rec.id]"
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    text-decoration: none;
+                    color: inherit;
+                  "
+                >
+                  <div
+                    style="
+                      width: 44px;
+                      flex: none;
+                      aspect-ratio: 4/3;
+                      border-radius: 6px;
+                      overflow: hidden;
+                    "
+                    [style.background]="
+                      imageUrl(rec)
+                        ? 'url(' + imageUrl(rec) + ') center/cover'
+                        : artFor(rec.event_id)
+                    "
+                  ></div>
+                  <div style="min-width: 0">
+                    <div
+                      style="font-family: var(--font-serif); font-style: italic; font-size: 14px"
+                    >
+                      {{ rec.event?.title ?? '—' }}
+                    </div>
+                  </div>
+                </a>
+              </td>
+              <td style="font-size: 13px">{{ mmddLabel(rec.mmdd) }}</td>
+              <td>
+                <span class="badge">{{ positionShort(rec.position) }}</span>
+              </td>
+              <td style="color: var(--fg-3); font-size: 12.5px">{{ submittedLabel(rec) }}</td>
+              <td>
+                <span [class]="'badge badge-dot ' + STATUS_META[rec.status].badge">{{
+                  STATUS_META[rec.status].label
+                }}</span>
+              </td>
+              <td>
+                <a
+                  [routerLink]="['/curation/mes-recommandations', rec.id]"
+                  class="btn btn-flat btn-icon btn-sm"
+                >
+                  <tui-icon icon="@tui.chevron-right" style="font-size: 14px" />
+                </a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
