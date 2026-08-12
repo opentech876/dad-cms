@@ -652,9 +652,9 @@
         [value]="selectedStatus()"
         (change)="setSelectedStatus($any($event.target).value)"
       >
-        <option value="all">Tous statuts</option>
-        <option value="published">Publiés</option>
-        <option value="draft">Réserves</option>
+        <option value="all" [selected]="selectedStatus() === 'all'">Tous statuts</option>
+        <option value="published" [selected]="selectedStatus() === 'published'">Publiés</option>
+        <option value="draft" [selected]="selectedStatus() === 'draft'">Réserves</option>
       </select>
       <select
         class="select"
@@ -663,10 +663,10 @@
         (change)="setSortBy($any($event.target).value)"
         title="Trier les résultats"
       >
-        <option value="date_asc">Date ↑ (ancien → récent)</option>
-        <option value="date_desc">Date ↓ (récent → ancien)</option>
-        <option value="title_asc">Titre A→Z</option>
-        <option value="title_desc">Titre Z→A</option>
+        <option value="date_asc" [selected]="sortBy() === 'date_asc'">Date ↑ (ancien → récent)</option>
+        <option value="date_desc" [selected]="sortBy() === 'date_desc'">Date ↓ (récent → ancien)</option>
+        <option value="title_asc" [selected]="sortBy() === 'title_asc'">Titre A→Z</option>
+        <option value="title_desc" [selected]="sortBy() === 'title_desc'">Titre Z→A</option>
       </select>
       <div style="flex: 1"></div>
       <button
