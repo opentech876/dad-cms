@@ -31,24 +31,33 @@ END $$;
 -- callable by unauthenticated clients. Most self-gate on role, but least-
 -- privilege says: revoke anon, then re-grant ONLY the mobile-facing RPCs.
 --
--- ⚠ CONFIRM THIS ALLOWLIST AGAINST THE MOBILE APP BEFORE APPLYING. A missing
---   name here = broken mobile call. Derived from CLAUDE.md's mobile RPC list.
+-- Allowlist CONFIRMED against dad-mobile's exhaustive RPC inventory
+-- (Mondésir, 2026-08-12 — see docs/mondesir functions.md). A missing name
+-- here = broken mobile call, so this is derived from the real .rpc() call
+-- sites, not guesswork.
 DO $$
 DECLARE
   r record;
   mobile_allowlist text[] := ARRAY[
-    'get_active_ads',
-    'get_today_content',
+    -- Sync + workspace resolution (app startup, online-return, calendar switch)
+    'get_content_version',
     'sync_calendar',
     'sync_calendar_delta',
     'peek_sync_calendar',
-    'get_calendar_days',
-    'record_ad_campaign_view',
-    'record_ad_campaign_click',
+    'list_workspace_calendars',
+    'get_workspace_id_by_name',
+    'get_first_workspace_for_auth_user',
+    -- Push registration + ad view + diagnostics
     'upsert_push_device',
+    'record_ad_campaign_view',
     'append_device_log',
-    'is_app_initialized'
+    -- Not called by mobile YET but click tracking is planned (the CMS already
+    -- reads clicks); granted now so it works the day mobile ships it.
+    'record_ad_campaign_click'
   ];
+  -- Deliberately EXCLUDED (defined server-side, but NO mobile .rpc() call site
+  -- per the inventory): get_active_ads, get_today_content, get_calendar_days,
+  -- is_app_initialized. Re-grant individually if a backoffice ever needs them.
 BEGIN
   FOR r IN
     SELECT p.oid::regprocedure AS sig
