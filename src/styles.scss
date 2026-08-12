@@ -67,6 +67,13 @@
   --danger: #8a2a23;   --danger-soft: #f3dcd6;
   --info: #2d5a6e;     --info-soft: #d4e2ea;
 
+  /* Semantic TEXT colors — colored text on the matching *-soft backgrounds
+     (badges, chips). Split from the solid fills above so badge text can meet
+     WCAG AA without washing out solid buttons. --warning-fg is darker than
+     --warning because amber-on-cream otherwise fails AA (2.96:1). */
+  --success-fg: #4a6b3a;  --warning-fg: #7e5410;
+  --danger-fg: #8a2a23;   --info-fg: #2d5a6e;
+
   --sidebar-bg: #1f1a14;
   --sidebar-fg: #d9cfb9;
   --sidebar-fg-active: #fbf8f1;
@@ -194,10 +201,10 @@ input, textarea, select { font-family: inherit; }
   border-radius: var(--r-pill); background: var(--bg-surface-2); color: var(--fg-2);
 }
 .badge-accent { background: var(--accent-soft); color: var(--accent); }
-.badge-success { background: var(--success-soft); color: var(--success); }
-.badge-warning { background: var(--warning-soft); color: var(--warning); }
-.badge-danger { background: var(--danger-soft); color: var(--danger); }
-.badge-info { background: var(--info-soft); color: var(--info); }
+.badge-success { background: var(--success-soft); color: var(--success-fg); }
+.badge-warning { background: var(--warning-soft); color: var(--warning-fg); }
+.badge-danger { background: var(--danger-soft); color: var(--danger-fg); }
+.badge-info { background: var(--info-soft); color: var(--info-fg); }
 .badge-dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
 .tag {
@@ -345,8 +352,8 @@ input, textarea, select { font-family: inherit; }
 }
 .role-badge--owner              { background: var(--accent-soft);   color: var(--accent);   border-color: rgba(138,42,35,.2); }
 .role-badge--chef_equipe        { background: var(--accent-2-soft);  color: var(--accent-2); border-color: rgba(184,134,43,.2); }
-.role-badge--editeur            { background: var(--success-soft);   color: var(--success);  border-color: rgba(74,107,58,.2); }
-.role-badge--charge_communication { background: var(--info-soft);   color: var(--info);     border-color: rgba(45,90,110,.2); }
+.role-badge--editeur            { background: var(--success-soft);   color: var(--success-fg); border-color: rgba(74,107,58,.2); }
+.role-badge--charge_communication { background: var(--info-soft);   color: var(--info-fg);    border-color: rgba(45,90,110,.2); }
 
 /* ── Quick action cards ──────────────────────────────────── */
 .quick-actions {
@@ -468,6 +475,8 @@ input, textarea, select { font-family: inherit; }
   --warning:      #9c6b15; --warning-soft: #f0dab8;
   --danger:       #a3231a; --danger-soft:  #f5d6d2;
   --info:         #2c4a5e; --info-soft:    #d4dde4;
+  --success-fg: #3e6433; --warning-fg: #7e5410;
+  --danger-fg:  #a3231a; --info-fg:    #2c4a5e;
   --sidebar-bg:        #14110d;
   --sidebar-fg:        #cfc6b3;
   --sidebar-fg-active: #ffffff;
@@ -507,6 +516,8 @@ input, textarea, select { font-family: inherit; }
   --warning:      #b07a1a; --warning-soft: #f1dcb4;
   --danger:       #8c2e22; --danger-soft:  #f0d2cc;
   --info:         #1f5a5e; --info-soft:    #c9dcdd;
+  --success-fg: #3e6b48; --warning-fg: #7e5410;
+  --danger-fg:  #8c2e22; --info-fg:    #1f5a5e;
   --sidebar-bg:        #18221f;
   --sidebar-fg:        #cfc4ab;
   --sidebar-fg-active: #f5efe1;
@@ -541,6 +552,10 @@ input, textarea, select { font-family: inherit; }
   --warning:      #b07a1a; --warning-soft: rgba(176, 122, 26, 0.22);
   --danger:       #c04840; --danger-soft:  rgba(160, 60, 50, 0.22);
   --info:         #3a7090; --info-soft:    rgba(45, 90, 110, 0.22);
+  // Lightened text tokens — the solid semantic colors above are too dark to
+  // read as badge text on their own *-soft backgrounds in dark mode (2.8–3.6:1).
+  --success-fg: #8cbb72; --warning-fg: #e0b05a;
+  --danger-fg:  #e88079; --info-fg:    #6fb0d0;
   --sidebar-bg:        #0a0805;
   --sidebar-fg:        #8a7e66;
   --sidebar-fg-active: #f0e8d8;
@@ -598,6 +613,10 @@ input, textarea, select { font-family: inherit; }
     --warning:      #b07a1a; --warning-soft: rgba(176, 122, 26, 0.22);
     --danger:       #c04840; --danger-soft:  rgba(160, 60, 50, 0.22);
     --info:         #3a7090; --info-soft:    rgba(45, 90, 110, 0.22);
+    // Lightened text tokens — see [data-mode="dark"] above. Kept in sync here
+    // because the dark palette is (still) duplicated for the system-pref path.
+    --success-fg: #8cbb72; --warning-fg: #e0b05a;
+    --danger-fg:  #e88079; --info-fg:    #6fb0d0;
     --sidebar-bg:        #0a0805;
     --sidebar-fg:        #8a7e66;
     --sidebar-fg-active: #f0e8d8;

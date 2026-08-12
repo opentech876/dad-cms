@@ -1,4 +1,5 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, signal, computed, effect, inject } from '@angular/core';
+import { TUI_DARK_MODE } from '@taiga-ui/core';
 
 export type ThemeId = 'archive' | 'broadsheet' | 'field';
 export type ColorMode = 'light' | 'dark' | 'system';
@@ -16,8 +17,38 @@ export class ThemeService {
   // persisted in localStorage and takes precedence over this default.
   readonly colorMode = signal<ColorMode>(this._load(STORAGE_KEY_MODE,  'light')    as ColorMode);
 
+  // Taiga's dark-mode signal, injected optionally so the service stays usable
+  // and unit-testable without Taiga's providers. Synced below so Taiga
+  // components (date picker, dropdowns, tui-root portals) follow the app.
+  private readonly tuiDarkMode = inject(TUI_DARK_MODE, { optional: true });
+
+  // Tracks the OS/browser dark preference — only consulted when colorMode is
+  // 'system'. Guarded for non-DOM/jsdom environments (matchMedia undefined).
+  private readonly _systemDark = signal(
+    typeof window !== 'undefined' && !!window.matchMedia
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : false,
+  );
+
+  /** The light/dark actually in effect: explicit mode, else system preference. */
+  readonly effectiveDark = computed(() => {
+    const mode = this.colorMode();
+    if (mode === 'dark') return true;
+    if (mode === 'light') return false;
+    return this._systemDark();
+  });
+
   constructor() {
-    effect(() => this._apply(this.theme(), this.colorMode()));
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      window
+        .matchMedia('(prefers-color-scheme: dark)')
+        .addEventListener('change', e => this._systemDark.set(e.matches));
+    }
+    effect(() => {
+      this._apply(this.theme(), this.colorMode());
+      // Keep Taiga's theme in lockstep with the app's effective dark state.
+      this.tuiDarkMode?.set(this.effectiveDark());
+    });
   }
 
   setTheme(t: ThemeId):      void { this.theme.set(t);     localStorage.setItem(STORAGE_KEY_THEME, t); }

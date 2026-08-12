@@ -5,7 +5,22 @@
   <title>Day After Day — CMS</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <script>
+    // Apply the saved theme/mode before first paint so there's no flash of the
+    // default theme while Angular boots. Mirrors ThemeService._apply(); Angular
+    // re-applies the same attributes idempotently once it initializes.
+    (function () {
+      try {
+        var r = document.documentElement;
+        var t = localStorage.getItem('dad-theme');
+        var m = localStorage.getItem('dad-color-mode');
+        if (t && t !== 'archive') r.setAttribute('data-theme', t);
+        if (m && m !== 'system') r.setAttribute('data-mode', m);
+      } catch (e) {}
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
