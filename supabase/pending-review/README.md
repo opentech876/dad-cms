@@ -11,7 +11,8 @@ prefix so the history reflects the real schema.
 | File | Advisor | Risk | Ready? |
 |------|---------|------|--------|
 | `2026-07-13_security_hardening.sql` | `function_search_path_mutable` (S-4) + `anon_security_definer_...` (S-2/S-3) | S-4 low / **S-2 needs allowlist confirmation** | ⚠ S-4 ready; S-2 needs the mobile RPC allowlist confirmed with Mondésir |
-| `2026-07-15_footer_only_ads.sql` | Business rule: one ad at a time, footer only — normalize rows, default + CHECK | **Low** — column kept for mobile compat | ⚠ confirm with mobile dev (2 questions in file header) |
+| `2026-07-15_footer_only_ads.sql` | Business rule: one ad at a time, footer only — normalize rows, default + CHECK | **Low** — column kept for mobile compat | ✅ confirmed with Mondésir (mobile never writes ad_campaigns; tolerates footer-only) |
+| `2026-08-12_s5_bucket_listing_lockdown.sql` | S-5: drop the anon/public SELECT policies on `storage.objects` so anon can't enumerate the (public-flagged) buckets; reads bypass RLS via CDN so unaffected | **Low** — reversible; reads use getPublicUrl only (mobile + CMS verified) | ✅ ready |
 
 ## Applied — now in `supabase/migrations/`
 
