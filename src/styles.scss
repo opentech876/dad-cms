@@ -1,6 +1,22 @@
 /* ============================================================
  * Day After Day — Global Styles
  * Design tokens (archive theme) + component library
+ * ------------------------------------------------------------
+ * THEMING RULES (read before adding any color):
+ *   • Never hardcode a color. Use the tokens below (--fg-*, --bg-*,
+ *     --border-*, --accent, --{semantic}, --{semantic}-soft). They flip
+ *     automatically per theme (archive/broadsheet/field) AND color mode
+ *     (light/dark/system) — a hardcoded hex does not.
+ *   • Colored badges/chips: --{semantic}-soft background + --{semantic} text.
+ *     The solid --{semantic} is for fills/buttons.
+ *   • Reuse the helpers: .text-1/2/3, .text-accent, .fs-*, and the
+ *     .badge/.card/.btn component classes — prefer them over inline
+ *     style="color:…".
+ *   • Every token referenced must be DEFINED here — no phantom vars
+ *     (a var(--x) with no matching --x: declaration silently resolves to
+ *     nothing). If you add a --{name} reference, add its declaration too.
+ *   • The ONLY legitimate hardcoded colors are fixed decorative surfaces
+ *     (the editorial hero gradient) and the settings theme-preview swatches.
  * ============================================================ */
 
 /* ── Design Tokens ────────────────────────────────────────── */
@@ -276,9 +292,11 @@ input, textarea, select { font-family: inherit; }
 .row { display: flex; align-items: center; }
 .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .gap-4 { gap: 16px; } .gap-6 { gap: 24px; }
 .flex-1 { flex: 1; } .flex-none { flex: none; }
-.text-2 { color: var(--fg-2); } .text-3 { color: var(--fg-3); } .text-accent { color: var(--accent); }
+.text-1 { color: var(--fg-1); } .text-2 { color: var(--fg-2); } .text-3 { color: var(--fg-3); }
+.text-accent { color: var(--accent); }
 .serif { font-family: var(--font-serif); } .mono { font-family: var(--font-mono); }
-.fs-sm { font-size: var(--fs-sm); } .fs-md { font-size: var(--fs-md); } .fs-lg { font-size: var(--fs-lg); }
+.fs-xs { font-size: var(--fs-xs); } .fs-sm { font-size: var(--fs-sm); } .fs-md { font-size: var(--fs-md); }
+.fs-lg { font-size: var(--fs-lg); } .fs-xl { font-size: var(--fs-xl); }
 .fw-500 { font-weight: 500; } .fw-600 { font-weight: 600; }
 .divider-v { width: 1px; height: 20px; background: var(--border-2); margin: 0 6px; }
 
