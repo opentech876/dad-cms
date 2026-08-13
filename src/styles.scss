@@ -543,8 +543,13 @@ input, textarea, select { font-family: inherit; }
   --sidebar-accent:    #d29a2c;
 }
 
-/* ── Dark mode base (archive dark accents) ───────────────── */
-[data-mode="dark"] {
+/* ============================================================
+ * Dark palette — SINGLE SOURCE OF TRUTH. Defined once as mixins,
+ * then applied to BOTH an explicit [data-mode="dark"] and system
+ * dark (prefers-color-scheme: dark, unless the user forced light).
+ * Previously these were two ~40-line copies that could silently drift.
+ * ============================================================ */
+@mixin dark-palette {
   color-scheme: dark;
   --bg-app:       #15120d;
   --bg-canvas:    #0e0c08;
@@ -586,16 +591,14 @@ input, textarea, select { font-family: inherit; }
   --shadow-xl: 0 24px 48px -12px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Dark accent overrides per theme ─────────────────────── */
-[data-theme="broadsheet"][data-mode="dark"] {
+@mixin dark-accent-broadsheet {
   --accent:       #e0524a;
   --accent-hover: #ec6960;
   --accent-fg:    #15120d;
   --accent-soft:  rgba(224, 82, 74, 0.18);
   --accent-2:     #6c95ad;
 }
-
-[data-theme="field"][data-mode="dark"] {
+@mixin dark-accent-field {
   --accent:       #4ea6a8;
   --accent-hover: #62b8b9;
   --accent-fg:    #0e0c08;
@@ -603,65 +606,16 @@ input, textarea, select { font-family: inherit; }
   --accent-2:     #e0b455;
 }
 
-/* ── System auto-dark (mode=system, user prefers dark) ───── */
+/* Explicit dark mode. */
+[data-mode="dark"]                          { @include dark-palette; }
+[data-theme="broadsheet"][data-mode="dark"] { @include dark-accent-broadsheet; }
+[data-theme="field"][data-mode="dark"]      { @include dark-accent-field; }
+
+/* System auto-dark: mode=system (no data-mode attr) + user prefers dark. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-mode="light"]) {
-    color-scheme: dark;
-    --bg-app:       #15120d;
-    --bg-canvas:    #0e0c08;
-    --bg-surface:   #1d1812;
-    --bg-surface-2: #2a241b;
-    --bg-sunken:    #18140e;
-    --bg-elev:      #1d1812;
-    --bg-overlay:   rgba(0, 0, 0, 0.6);
-    --fg-1:        #f0e8d8;
-    --fg-2:        #c3b89f;
-    --fg-3:        #8a7e66;
-    --fg-inverse:  #15120d;
-    --border-1:  #322a1f;
-    --border-2:  #4a3f2c;
-    --border-3:  #6a5b40;
-    --accent:       #d8a155;
-    --accent-hover: #e6b466;
-    --accent-soft:  rgba(216, 161, 85, 0.16);
-    --accent-fg:    #15120d;
-    --accent-2:     #b87856;
-    --accent-2-soft: rgba(184, 120, 86, 0.16);
-    --success:      #5a8a48; --success-soft: rgba(74, 107, 58, 0.22);
-    --warning:      #b07a1a; --warning-soft: rgba(176, 122, 26, 0.22);
-    --danger:       #c04840; --danger-soft:  rgba(160, 60, 50, 0.22);
-    --info:         #3a7090; --info-soft:    rgba(45, 90, 110, 0.22);
-    // Lightened text tokens — see [data-mode="dark"] above. Kept in sync here
-    // because the dark palette is (still) duplicated for the system-pref path.
-    --success-fg: #8cbb72; --warning-fg: #e0b05a;
-    --danger-fg:  #e88079; --info-fg:    #6fb0d0;
-    --sidebar-bg:        #0a0805;
-    --sidebar-fg:        #8a7e66;
-    --sidebar-fg-active: #f0e8d8;
-    --sidebar-active-bg: rgba(240, 232, 216, 0.06);
-    --sidebar-accent:    #d8a155;
-    --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.3);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(0, 0, 0, 0.25);
-    --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
-    --shadow-xl: 0 24px 48px -12px rgba(0, 0, 0, 0.7);
-  }
-
-  [data-theme="broadsheet"]:not([data-mode="light"]) {
-    --accent:       #e0524a;
-    --accent-hover: #ec6960;
-    --accent-fg:    #15120d;
-    --accent-soft:  rgba(224, 82, 74, 0.18);
-    --accent-2:     #6c95ad;
-  }
-
-  [data-theme="field"]:not([data-mode="light"]) {
-    --accent:       #4ea6a8;
-    --accent-hover: #62b8b9;
-    --accent-fg:    #0e0c08;
-    --accent-soft:  rgba(78, 166, 168, 0.18);
-    --accent-2:     #e0b455;
-  }
+  :root:not([data-mode="light"])                     { @include dark-palette; }
+  [data-theme="broadsheet"]:not([data-mode="light"]) { @include dark-accent-broadsheet; }
+  [data-theme="field"]:not([data-mode="light"])      { @include dark-accent-field; }
 }
 .quick-access-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 
