@@ -227,4 +227,46 @@ describe('ThemeService', () => {
       expect(service.colorMode()).toBe('dark');
     });
   });
+
+  // ── effectiveDark ─────────────────────────────────────────────────────────
+
+  describe('effectiveDark', () => {
+    it("est true quand le mode est 'dark'", () => {
+      service.setColorMode('dark');
+      expect(service.effectiveDark()).toBe(true);
+    });
+
+    it("est false quand le mode est 'light'", () => {
+      service.setColorMode('light');
+      expect(service.effectiveDark()).toBe(false);
+    });
+
+    describe("mode 'system'", () => {
+      const realMatchMedia = window.matchMedia;
+      afterEach(() => {
+        (window as unknown as { matchMedia: unknown }).matchMedia = realMatchMedia;
+      });
+
+      function serviceWithSystemPref(prefersDark: boolean): ThemeService {
+        (window as unknown as { matchMedia: unknown }).matchMedia = jest.fn().mockReturnValue({
+          matches: prefersDark,
+          addEventListener: jest.fn(),
+          removeEventListener: jest.fn(),
+        });
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({});
+        const svc = TestBed.inject(ThemeService);
+        svc.setColorMode('system');
+        return svc;
+      }
+
+      it('suit la préférence système sombre', () => {
+        expect(serviceWithSystemPref(true).effectiveDark()).toBe(true);
+      });
+
+      it('suit la préférence système claire', () => {
+        expect(serviceWithSystemPref(false).effectiveDark()).toBe(false);
+      });
+    });
+  });
 });
