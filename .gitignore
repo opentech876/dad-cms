@@ -22,7 +22,8 @@ yarn-error.log
 
 # Visual Studio Code
 .vscode/*
-!.vscode/settings.json
+# settings.json holds personal editor prefs (synced via the VS Code account),
+# so it is NOT tracked. tasks/launch/extensions stay as shared project config.
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
