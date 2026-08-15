@@ -63,13 +63,13 @@ export class ProfileComponent implements OnInit {
   );
 
   /**
-   * True when the user is a `system_admin`. Drives the per-section
-   * conditional rendering: sysadmin identity is workspace-agnostic, so the
-   * phone + avatar surfaces are hidden (they'd persist via upsertProfile
-   * which needs a workspace), and name is sourced from / saved to
-   * auth.users.raw_user_meta_data.full_name instead.
+   * True when the user is a `system_admin`. Resolved from the GLOBAL
+   * user_roles row via isSystemAdmin() — not from currentRole$, which is
+   * workspace-scoped and stops reporting 'system_admin' once the sysadmin
+   * enters a workspace. That mismatch made /profil fall into the
+   * workspace-profile branch and show a different name than the sidebar.
    */
-  readonly isSysadmin = computed(() => this.role() === 'system_admin');
+  readonly isSysadmin = signal(false);
 
   async ngOnInit(): Promise<void> {
     // If the system-admin guard sent us here because TOTP isn't enrolled yet,
@@ -82,6 +82,7 @@ export class ProfileComponent implements OnInit {
     this.userId = (user as any).id ?? '';
     this.userEmail.set((user as any).email ?? '');
     this.role.set(await firstValueFrom(this.auth.currentRole$));
+    this.isSysadmin.set(await firstValueFrom(this.auth.isSystemAdmin()));
 
     // Secondary recovery e-mail lives in user_metadata (global per user, not
     // workspace-scoped) so we read it from the auth user object directly.
@@ -89,11 +90,12 @@ export class ProfileComponent implements OnInit {
     this.secondaryEmail.set(metaSecondary);
 
     if (this.isSysadmin()) {
-      // Sysadmin name lives in user_metadata (platform-level identity), not
-      // in profiles (workspace-scoped). Hydrate from there and skip the
-      // workspace-scoped profile lookup entirely.
+      // Resolution order matches every other surface: workspace profile first,
+      // then the platform-level user_metadata name. The sysadmin usually has
+      // no usable profile row, so metadata is what actually answers here.
       const metaFullName = (user as any)?.user_metadata?.full_name ?? '';
-      this.fullName.set(metaFullName);
+      const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
+      this.fullName.set(profile?.full_name?.trim() || metaFullName);
     } else {
       const profile = await firstValueFrom(this.workspaceService.getMyProfile(this.userId));
       if (profile) {

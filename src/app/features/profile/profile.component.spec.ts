@@ -11,7 +11,7 @@ import { ToastService } from '../../core/services/toast.service';
 describe('ProfileComponent', () => {
   let component: ProfileComponent;
   let fixture: ComponentFixture<ProfileComponent>;
-  let mockAuth: { getCurrentUser: jest.Mock; currentRole$: any };
+  let mockAuth: { getCurrentUser: jest.Mock; currentRole$: any; isSystemAdmin: jest.Mock };
   let mockWorkspace: { getMyProfile: jest.Mock; upsertProfile: jest.Mock };
   let mockSupabase: any;
   let mockRouter: { navigate: jest.Mock };
@@ -24,6 +24,7 @@ describe('ProfileComponent', () => {
     mockAuth = {
       getCurrentUser: jest.fn().mockReturnValue(of({ id: 'user-1', email: 'elvis@test.com' })),
       currentRole$: of('owner'),
+      isSystemAdmin: jest.fn().mockReturnValue(of(false)),
     };
     mockWorkspace = {
       getMyProfile: jest.fn().mockReturnValue(of(MOCK_PROFILE)),
@@ -307,6 +308,7 @@ describe('ProfileComponent', () => {
         user_metadata: userMeta,
       }));
       mockAuth.currentRole$ = of('system_admin');
+      mockAuth.isSystemAdmin = jest.fn().mockReturnValue(of(true));
       mockSupabase.client = { auth: { updateUser: jest.fn().mockResolvedValue(updateUserResult) } };
       // Re-instantiate so ngOnInit re-runs with the new mocks
       fixture = TestBed.createComponent(ProfileComponent);
@@ -315,16 +317,17 @@ describe('ProfileComponent', () => {
       await component.ngOnInit();
     }
 
-    it("isSysadmin() retourne true quand currentRole est system_admin", async () => {
+    it("isSysadmin() retourne true quand isSystemAdmin() renvoie true", async () => {
       await makeSysadmin();
       expect(component.isSysadmin()).toBe(true);
     });
 
-    it("hydrate fullName depuis user_metadata.full_name au lieu de getMyProfile", async () => {
+    it("hydrate fullName depuis user_metadata quand le sysadmin n'a pas de profil workspace", async () => {
+      // Le sysadmin n'a en général pas de ligne profiles : getMyProfile renvoie
+      // null, donc le nom affiché vient du user_metadata global.
+      mockWorkspace.getMyProfile.mockReturnValue(of(null));
       await makeSysadmin({ full_name: 'Elvis Destin OLEMBE' });
       expect(component.fullName()).toBe('Elvis Destin OLEMBE');
-      // Le chemin workspace-scoped ne doit PAS être emprunté
-      expect(mockWorkspace.getMyProfile).not.toHaveBeenCalled();
     });
 
     it("saveProfile écrit dans user_metadata via updateUser, pas dans profiles", async () => {

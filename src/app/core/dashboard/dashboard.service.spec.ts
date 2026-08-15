@@ -184,6 +184,7 @@ describe('DashboardService', () => {
       expect(outlook.currentAd).toEqual({
         campaignName: 'Offre étudiant',
         companyName: 'MTN Congo',
+        startDate: isoIn(-2),
         endDate: isoIn(4),
       });
     });
