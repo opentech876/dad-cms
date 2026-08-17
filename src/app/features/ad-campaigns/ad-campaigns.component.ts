@@ -104,7 +104,6 @@ export class AdCampaignsComponent implements OnInit {
     const all = this.campaigns();
     const today = new Date().toISOString().slice(0, 10);
     const active = all.filter(c => c.active && c.start_date <= today && c.end_date >= today);
-    const totalDays = active.reduce((sum, c) => sum + daysBetween(c.start_date, c.end_date), 0);
     const pendingValidation = all.filter(c => !c.deleted_at && !c.validated_at).length;
     const startingSoonUnvalidated = all.filter(c => {
       if (c.deleted_at || c.validated_at) return false;
@@ -115,10 +114,42 @@ export class AdCampaignsComponent implements OnInit {
       active: active.length,
       planifiee: all.filter(c => c.active && c.start_date > today).length,
       terminee: all.filter(c => !c.active || c.end_date < today).length,
-      totalDays,
       pendingValidation,
       startingSoonUnvalidated,
     };
+  });
+
+  readonly currentYear = new Date().getFullYear();
+
+  /** Distinct days of the CURRENT year covered by a validated + active
+   *  campaign — footer runs one ad/day, so this is the sold inventory. Mirrors
+   *  the dashboard AdOutlook.soldDaysYear definition so the two never disagree. */
+  readonly soldDaysYear = computed(() => {
+    const year = this.currentYear;
+    const yStart = `${year}-01-01`;
+    const yEnd = `${year}-12-31`;
+    const sold = new Set<string>();
+    for (const c of this.campaigns()) {
+      if (c.deleted_at || !c.active || !c.validated_at) continue;
+      const start = c.start_date > yStart ? c.start_date : yStart;
+      const end = c.end_date < yEnd ? c.end_date : yEnd;
+      if (start > end) continue;
+      for (let d = new Date(start + 'T00:00:00'); ; d.setDate(d.getDate() + 1)) {
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (iso > end) break;
+        sold.add(iso);
+      }
+    }
+    return sold.size;
+  });
+
+  /** Ad space is sold in 7-day blocks, so weeks — not days — are the
+   *  commercial unit (same convention as the dashboard). */
+  readonly soldWeeksYear = computed(() => Math.round(this.soldDaysYear() / 7));
+  readonly totalWeeksYear = computed(() => {
+    const y = this.currentYear;
+    const days = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
+    return Math.floor(days / 7);
   });
 
   // ── Filters ───────────────────────────────────────────────────────────────
