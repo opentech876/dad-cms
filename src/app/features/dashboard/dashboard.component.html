@@ -225,7 +225,7 @@
             font-weight: 600;
           "
         >
-          Événements publiées
+          Événements publiés
         </div>
         <div
           style="
@@ -237,10 +237,13 @@
             line-height: 1;
           "
         >
-          {{ contentStats().mobileEvents | number }}
+          {{ contentStats().mobileEvents | number
+          }}<span style="font-size: 20px; color: var(--fg-3); font-weight: 500"
+            >&nbsp;/&nbsp;{{ contentStats().libraryEvents | number }}</span
+          >
         </div>
         <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
-          événements visibles dans l'application en {{ currentYear }}
+          événements de la bibliothèque publiés dans le calendrier {{ currentYear }}
         </div>
       </div>
       <div class="card" style="padding: 20px">
@@ -253,7 +256,7 @@
             font-weight: 600;
           "
         >
-          Jours avec une éphéméride
+          Jours couverts dans l'année
         </div>
         <div
           style="
@@ -266,10 +269,13 @@
             color: var(--success);
           "
         >
-          {{ contentStats().filledDays }}
+          {{ contentStats().filledDays
+          }}<span style="font-size: 20px; color: var(--fg-3); font-weight: 500"
+            >&nbsp;/&nbsp;{{ daysInYear() }}</span
+          >
         </div>
         <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
-          {{ yearCoveragePct() }} % de l'année {{ currentYear }} est couverte
+          jours présentant au moins un événement ({{ yearCoveragePct() }} % de {{ currentYear }})
         </div>
       </div>
       <a
@@ -303,7 +309,8 @@
             {{ ad.companyName }}
           </div>
           <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
-            « {{ ad.campaignName }} » — jusqu'au {{ ad.endDate | date: DATE_FMT.long : '' : 'fr' }}
+            « {{ ad.campaignName }} » — du {{ ad.startDate | date: DATE_FMT.long : '' : 'fr' }} au
+            {{ ad.endDate | date: DATE_FMT.long : '' : 'fr' }}
           </div>
         } @else {
           <div
@@ -338,7 +345,7 @@
             font-weight: 600;
           "
         >
-          Jours de publicité vendus
+          Semaines de publicité vendues
         </div>
         <div
           style="
@@ -351,10 +358,13 @@
             color: var(--info);
           "
         >
-          {{ soldDaysYear() }}
+          {{ soldWeeksYear()
+          }}<span style="font-size: 20px; color: var(--fg-3); font-weight: 500"
+            >&nbsp;/&nbsp;{{ totalWeeksYear() }}</span
+          >
         </div>
         <div style="font-size: 12.5px; color: var(--fg-3); margin-top: 6px">
-          sur l'ensemble de l'année {{ currentYear }} →
+          semaines vendues sur l'année {{ currentYear }} →
         </div>
       </a>
     </div>

@@ -68,6 +68,7 @@ export class DashboardComponent implements OnInit {
   /** Everything the mobile app shows this year (published calendar only). */
   readonly contentStats = signal<YearContentStats>({
     mobileEvents: 0,
+    libraryEvents: 0,
     filledDays: 0,
     emptyNext30: [],
   });
@@ -98,12 +99,21 @@ export class DashboardComponent implements OnInit {
   /** True once we know there's an event published for today on mobile. */
   readonly hasFeaturedEvent = computed(() => this.featuredEvent().title.length > 0);
 
-  /** % of the year's days that have at least one event on mobile. */
-  readonly yearCoveragePct = computed(() => {
+  /** Days in the current year — leap-aware, drives every year-scoped ratio. */
+  readonly daysInYear = computed(() => {
     const y = this.currentYear;
-    const daysInYear = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
-    return Math.round((this.contentStats().filledDays / daysInYear) * 100);
+    return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
   });
+
+  /** % of the year's days that have at least one event on mobile. */
+  readonly yearCoveragePct = computed(() =>
+    Math.round((this.contentStats().filledDays / this.daysInYear()) * 100),
+  );
+
+  /** Ad space is sold in 7-day blocks (the campaign editor recommends 7 j,
+   *  caps at 14), so weeks — not days — are the commercial unit here. */
+  readonly soldWeeksYear = computed(() => Math.round(this.soldDaysYear() / 7));
+  readonly totalWeeksYear = computed(() => Math.floor(this.daysInYear() / 7));
 
   readonly currentAd = computed(() => this.adOutlook()?.currentAd ?? null);
   readonly soldDaysYear = computed(() => this.adOutlook()?.soldDaysYear ?? 0);
@@ -185,6 +195,7 @@ export class DashboardComponent implements OnInit {
     const [contentStats, adOutlook, opStats] = await Promise.all([
       this.safe(() => firstValueFrom(this.dashboardService.getYearContentStats(year)), {
         mobileEvents: 0,
+        libraryEvents: 0,
         filledDays: 0,
         emptyNext30: [],
       } as YearContentStats),

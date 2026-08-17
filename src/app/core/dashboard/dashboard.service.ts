@@ -15,6 +15,9 @@ export interface GapDay {
 export interface YearContentStats {
   /** Distinct events assigned in the published calendar of the year. */
   mobileEvents: number;
+  /** Total non-deleted events in the library — the denominator for "how much
+   *  of the library is actually published". */
+  libraryEvents: number;
   /** Distinct days of the year with at least one assigned event. */
   filledDays: number;
   /** Days within the next 30 (current year only) with no event at all. */
@@ -25,6 +28,7 @@ export interface YearContentStats {
 export interface CurrentAd {
   campaignName: string;
   companyName: string;
+  startDate: string; // 'YYYY-MM-DD'
   endDate: string; // 'YYYY-MM-DD'
 }
 
@@ -97,6 +101,13 @@ export class DashboardService {
         if (wsId) calQuery = calQuery.eq('workspace_id', wsId);
         const { data: cal } = await calQuery.maybeSingle();
 
+        let libQuery = db
+          .from('events')
+          .select('id', { count: 'exact', head: true })
+          .is('deleted_at', null);
+        if (wsId) libQuery = libQuery.eq('workspace_id', wsId);
+        const { count: libraryCount } = await libQuery;
+
         const mmddSet = new Set<string>();
         const eventSet = new Set<string>();
         if (cal) {
@@ -122,7 +133,12 @@ export class DashboardService {
           if (!mmddSet.has(mmdd)) emptyNext30.push({ date: this.toISO(d), daysUntil: i });
         }
 
-        return { mobileEvents: eventSet.size, filledDays: mmddSet.size, emptyNext30 };
+        return {
+          mobileEvents: eventSet.size,
+          libraryEvents: libraryCount ?? 0,
+          filledDays: mmddSet.size,
+          emptyNext30,
+        };
       })(),
     );
   }
@@ -177,6 +193,7 @@ export class DashboardService {
           ? {
               campaignName: airing.name,
               companyName: airing.company?.name ?? '—',
+              startDate: airing.start_date,
               endDate: airing.end_date,
             }
           : null;
