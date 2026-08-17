@@ -481,7 +481,10 @@
 
 .sidebar-expand-btn {
   position: absolute;
-  top: 22px;
+  // Anchor to the bottom, aligned with the collapse button that lives in the
+  // user card — so toggling doesn't yank the control from the bottom to the
+  // top of the sidebar.
+  bottom: 18px;
   right: -10px;
   width: 20px;
   height: 20px;
