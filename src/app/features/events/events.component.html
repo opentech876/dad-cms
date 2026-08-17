@@ -27,9 +27,9 @@
               <div class="card-subtitle">Bibliothèque · non lié à un calendrier spécifique</div>
             </div>
             @if (editorStatus() === 'published') {
-              <span class="badge badge-success badge-dot">Publié</span>
+              <span class="badge badge-success badge-dot">Réserve</span>
             } @else {
-              <span class="badge badge-warning badge-dot">Réserve</span>
+              <span class="badge badge-warning badge-dot">Brouillon</span>
             }
           </div>
 
@@ -335,7 +335,7 @@
               [disabled]="editorSaving()"
               (click)="publish()"
             >
-              Publier
+              Enregistrer en réserve
               <tui-icon icon="@tui.check" style="font-size: 14px" />
             </button>
           </div>
@@ -549,10 +549,10 @@
             color: var(--success);
           "
         >
-          {{ stats().published }}
+          {{ stats().publies }}
         </div>
-        <div style="margin-top: 10px">
-          <span class="badge badge-success badge-dot">prêts pour le calendrier</span>
+        <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">
+          placés dans le calendrier publié
         </div>
       </div>
       <div class="card" style="padding: 18px 20px">
@@ -575,13 +575,13 @@
             margin-top: 6px;
             letter-spacing: -0.02em;
             line-height: 1;
-            color: var(--warning);
+            color: var(--info);
           "
         >
-          {{ stats().draft }}
+          {{ stats().reserves }}
         </div>
-        <div style="margin-top: 10px">
-          <span class="badge badge-warning">en cours de rédaction</span>
+        <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">
+          finalisés, en attente de placement
         </div>
       </div>
       <div class="card" style="padding: 18px 20px">
@@ -594,7 +594,7 @@
             font-weight: 600;
           "
         >
-          Sans image
+          Brouillons
         </div>
         <div
           style="
@@ -604,12 +604,14 @@
             margin-top: 6px;
             letter-spacing: -0.02em;
             line-height: 1;
-            color: var(--danger);
+            color: var(--warning);
           "
         >
-          {{ stats().noImage }}
+          {{ stats().brouillons }}
         </div>
-        <div style="margin-top: 10px"><span class="badge badge-danger">à compléter</span></div>
+        <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">
+          événements incomplets, à finaliser
+        </div>
       </div>
     </div>
 
@@ -653,8 +655,8 @@
         (change)="setSelectedStatus($any($event.target).value)"
       >
         <option value="all" [selected]="selectedStatus() === 'all'">Tous statuts</option>
-        <option value="published" [selected]="selectedStatus() === 'published'">Publiés</option>
-        <option value="draft" [selected]="selectedStatus() === 'draft'">Réserves</option>
+        <option value="published" [selected]="selectedStatus() === 'published'">Réserve</option>
+        <option value="draft" [selected]="selectedStatus() === 'draft'">Brouillon</option>
       </select>
       <select
         class="select"
@@ -774,11 +776,12 @@
                   }
                 </td>
                 <td>
-                  @if (row.status === 'published') {
-                    <span class="badge badge-success badge-dot">Publié</span>
-                  }
-                  @if (row.status === 'draft') {
-                    <span class="badge badge-warning badge-dot">Réserve</span>
+                  @if (row.isPublished) {
+                    <span class="badge badge-accent badge-dot">Publié</span>
+                  } @else if (row.status === 'published') {
+                    <span class="badge badge-success badge-dot">Réserve</span>
+                  } @else {
+                    <span class="badge badge-warning badge-dot">Brouillon</span>
                   }
                 </td>
                 <td>
@@ -1101,7 +1104,7 @@
                 </div>
                 <div style="font-size: 13px; color: var(--fg-3); margin-top: 4px">
                   {{ importInserted() }} événement(s) ajouté(s) à la bibliothèque en statut
-                  <em>Réserve</em>.
+                  <em>Brouillon</em>.
                 </div>
                 @if (importSkipped()) {
                   <div style="font-size: 12px; color: var(--fg-3); margin-top: 4px">
