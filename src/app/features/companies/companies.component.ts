@@ -4,28 +4,18 @@ import { FormsModule } from '@angular/forms';
 import { TuiIcon } from '@taiga-ui/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
-import { Company, CompanyType } from '../../models';
+import { Company, CompanyTypeRow } from '../../models';
 import { CompanyService } from '../../core/companies/company.service';
+import { CompanyTypeService } from '../../core/companies/company-type.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { formatDateShort } from '../../core/utils/date.utils';
 
-const COMPANY_TYPE_LABELS: Record<CompanyType, string> = {
-  telecom:      'Télécommunications',
-  banque:       'Banque & Finance',
-  energie:      'Énergie',
-  distribution: 'Distribution',
-  services:     'Services',
-  gouvernement: 'Gouvernement',
-  ong:          'ONG',
-  medias:       'Médias',
-  sante:        'Santé',
-  autre:        'Autre',
-};
-
-const COMPANY_TYPES: CompanyType[] = [
-  'telecom', 'banque', 'energie', 'distribution',
-  'services', 'gouvernement', 'ong', 'medias', 'sante', 'autre',
+/** Fallback categories shown before the managed `company_types` table is
+ *  populated (e.g. pre-migration) so the editor dropdown is never empty. */
+const DEFAULT_TYPE_LABELS = [
+  'Télécommunications', 'Banque & Finance', 'Énergie', 'Distribution',
+  'Services', 'Gouvernement', 'ONG', 'Médias', 'Santé', 'Autre',
 ];
 
 @Component({
@@ -37,11 +27,13 @@ const COMPANY_TYPES: CompanyType[] = [
   styleUrl: './companies.component.scss',
 })
 export class CompaniesComponent implements OnInit {
-  private readonly companyService = inject(CompanyService);
-  private readonly authService    = inject(AuthService);
-  private readonly toast          = inject(ToastService);
+  private readonly companyService     = inject(CompanyService);
+  private readonly companyTypeService = inject(CompanyTypeService);
+  private readonly authService        = inject(AuthService);
+  private readonly toast              = inject(ToastService);
 
   readonly companies = signal<Company[]>([]);
+  readonly types     = signal<CompanyTypeRow[]>([]);
   readonly loading   = signal(true);
 
   /** Only chef_equipe_commerciale (and owner) can create/edit/delete. */
@@ -50,61 +42,54 @@ export class CompaniesComponent implements OnInit {
     { initialValue: false },
   );
 
-  readonly searchQuery   = signal('');
-  readonly filterType    = signal<CompanyType | 'all'>('all');
-  readonly filterDomain  = signal('all');
+  readonly searchQuery = signal('');
+  readonly filterType  = signal<string>('all');
 
   setSearchQuery(q: string): void { this.searchQuery.set(q); }
-  setFilterType(t: string): void  { this.filterType.set(t as any); }
-  setFilterDomain(d: string): void { this.filterDomain.set(d); }
+  setFilterType(t: string): void  { this.filterType.set(t); }
 
-  readonly availableDomains = computed<string[]>(() => {
-    const set = new Set<string>();
-    for (const c of this.companies()) {
-      if (c.business_domain && c.business_domain.trim()) set.add(c.business_domain.trim());
-    }
-    return Array.from(set).sort();
+  /** Category labels for the editor dropdown + type filter — the managed rows
+   *  when present, otherwise the built-in defaults so the UI still works before
+   *  the migration is applied. */
+  readonly typeOptions = computed<string[]>(() => {
+    const rows = this.types();
+    return rows.length ? rows.map(r => r.label) : DEFAULT_TYPE_LABELS;
   });
 
   readonly filteredCompanies = computed<Company[]>(() => {
-    const q     = this.searchQuery().toLowerCase().trim();
-    const type  = this.filterType();
-    const dom   = this.filterDomain();
+    const q    = this.searchQuery().toLowerCase().trim();
+    const type = this.filterType();
     return this.companies().filter(c => {
-      if (q && !c.name.toLowerCase().includes(q) && !(c.business_domain ?? '').toLowerCase().includes(q)) return false;
+      if (q && !c.name.toLowerCase().includes(q) && !(c.type ?? '').toLowerCase().includes(q)) return false;
       if (type !== 'all' && c.type !== type) return false;
-      if (dom !== 'all' && c.business_domain !== dom) return false;
       return true;
     });
   });
 
-  readonly companyTypes = COMPANY_TYPES;
-  readonly companyTypeLabels = COMPANY_TYPE_LABELS;
-  typeLabel(t: CompanyType): string { return COMPANY_TYPE_LABELS[t] ?? t; }
   formatDate(iso: string): string { return formatDateShort(iso); }
 
-  // ── Editor (modal) ────────────────────────────────────────────────────────
+  // ── Company editor (modal) ──────────────────────────────────────────────────
 
-  readonly editorOpen     = signal(false);
-  readonly editorId       = signal<string | null>(null);
-  readonly editorName     = signal('');
-  readonly editorType     = signal<CompanyType>('autre');
-  readonly editorDomain   = signal('');
-  readonly editorWebsite  = signal('');
-  readonly editorEmail    = signal('');
-  readonly editorPhone    = signal('');
-  readonly editorNotes    = signal('');
-  readonly editorSaving   = signal(false);
+  readonly editorOpen    = signal(false);
+  readonly editorId      = signal<string | null>(null);
+  readonly editorName    = signal('');
+  readonly editorType    = signal<string>('');
+  readonly editorWebsite = signal('');
+  readonly editorEmail   = signal('');
+  readonly editorPhone   = signal('');
+  readonly editorNotes   = signal('');
+  readonly editorSaving  = signal(false);
 
-  readonly editorValid = computed(() => this.editorName().trim().length >= 2);
+  readonly editorValid = computed(
+    () => this.editorName().trim().length >= 2 && this.editorType().trim().length > 0,
+  );
 
   openEditor(id?: string): void {
     if (!this.canWrite()) return;
     const c = id ? this.companies().find(co => co.id === id) : undefined;
     this.editorId.set(c?.id ?? null);
     this.editorName.set(c?.name ?? '');
-    this.editorType.set(c?.type ?? 'autre');
-    this.editorDomain.set(c?.business_domain ?? '');
+    this.editorType.set(c?.type ?? this.typeOptions()[0] ?? '');
     this.editorWebsite.set(c?.website ?? '');
     this.editorEmail.set(c?.contact_email ?? '');
     this.editorPhone.set(c?.contact_phone ?? '');
@@ -119,8 +104,7 @@ export class CompaniesComponent implements OnInit {
     this.editorSaving.set(true);
     const payload = {
       name: this.editorName().trim(),
-      type: this.editorType(),
-      business_domain: this.editorDomain().trim() || null,
+      type: this.editorType().trim(),
       website: this.editorWebsite().trim() || null,
       contact_email: this.editorEmail().trim() || null,
       contact_phone: this.editorPhone().trim() || null,
@@ -155,14 +139,80 @@ export class CompaniesComponent implements OnInit {
     await this.reload();
   }
 
+  // ── Types manager (modal) ───────────────────────────────────────────────────
+
+  readonly typesManagerOpen = signal(false);
+  readonly newTypeLabel     = signal('');
+  readonly typeBusy         = signal(false);
+
+  openTypesManager(): void {
+    if (!this.canWrite()) return;
+    this.newTypeLabel.set('');
+    this.typesManagerOpen.set(true);
+  }
+  closeTypesManager(): void { this.typesManagerOpen.set(false); }
+
+  async addType(): Promise<void> {
+    const label = this.newTypeLabel().trim();
+    if (!label || this.typeBusy()) return;
+    this.typeBusy.set(true);
+    const res = await firstValueFrom(this.companyTypeService.createType(label));
+    this.typeBusy.set(false);
+    if (!res.success) {
+      this.toast.error(res.error === 'duplicate_label' ? 'Ce type existe déjà.' : (res.error ?? "Échec de l'ajout."));
+      return;
+    }
+    this.newTypeLabel.set('');
+    await this.reloadTypes();
+  }
+
+  async renameType(row: CompanyTypeRow): Promise<void> {
+    const label = (prompt('Nouveau nom du type :', row.label) ?? '').trim();
+    if (!label || label === row.label || this.typeBusy()) return;
+    this.typeBusy.set(true);
+    const res = await firstValueFrom(this.companyTypeService.renameType(row.id, label));
+    this.typeBusy.set(false);
+    if (!res.success) {
+      this.toast.error(res.error === 'duplicate_label' ? 'Ce type existe déjà.' : (res.error ?? 'Échec du renommage.'));
+      return;
+    }
+    this.toast.warning(
+      "Type renommé. Les compagnies déjà classées gardent l'ancien libellé jusqu'à leur prochaine modification.",
+    );
+    await this.reloadTypes();
+  }
+
+  async removeType(row: CompanyTypeRow): Promise<void> {
+    if (this.typeBusy()) return;
+    if (!confirm(`Supprimer le type « ${row.label} » ? Les compagnies déjà classées conservent ce libellé.`)) return;
+    this.typeBusy.set(true);
+    const res = await firstValueFrom(this.companyTypeService.deleteType(row.id));
+    this.typeBusy.set(false);
+    if (!res.success) {
+      this.toast.error(res.error ?? 'Impossible de supprimer.');
+      return;
+    }
+    await this.reloadTypes();
+  }
+
+  // ── Data ────────────────────────────────────────────────────────────────────
+
   async ngOnInit(): Promise<void> {
     await this.reload();
   }
 
   private async reload(): Promise<void> {
     this.loading.set(true);
-    const list = await firstValueFrom(this.companyService.listCompanies());
+    const [list, types] = await Promise.all([
+      firstValueFrom(this.companyService.listCompanies()),
+      firstValueFrom(this.companyTypeService.listTypes()),
+    ]);
     this.companies.set(list);
+    this.types.set(types);
     this.loading.set(false);
+  }
+
+  private async reloadTypes(): Promise<void> {
+    this.types.set(await firstValueFrom(this.companyTypeService.listTypes()));
   }
 }

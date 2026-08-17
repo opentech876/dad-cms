@@ -19,7 +19,6 @@ interface CampaignRow {
   name: string;
   companyId: string;
   companyName: string;
-  businessDomain: string | null;
   startDate: string;
   endDate: string;
   createdAt: string;
@@ -73,15 +72,6 @@ export class AdCampaignsComponent implements OnInit {
     const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
     return Math.round((start - today) / 86_400_000);
   }
-
-  /** Distinct business domains across companies — fuels the domain filter. */
-  readonly availableDomains = computed<string[]>(() => {
-    const set = new Set<string>();
-    for (const c of this.companies()) {
-      if (c.business_domain && c.business_domain.trim()) set.add(c.business_domain.trim());
-    }
-    return Array.from(set).sort();
-  });
 
   async ngOnInit(): Promise<void> {
     await this._reload();
@@ -157,7 +147,6 @@ export class AdCampaignsComponent implements OnInit {
   readonly searchQuery          = signal('');
   readonly selectedStatus       = signal('all');
   readonly filterCompanyId      = signal('all');
-  readonly filterDomain         = signal('all');
   readonly filterMonth          = signal('all'); // '01'..'12' or 'all'
   readonly filterYear           = signal('all'); // '2025', '2026' or 'all'
   readonly filterValidation     = signal<'all' | CampaignValidationState>('all');
@@ -171,7 +160,6 @@ export class AdCampaignsComponent implements OnInit {
   setSearchQuery(q: string): void          { this.searchQuery.set(q);          this.currentPage.set(0); }
   setSelectedStatus(s: string): void       { this.selectedStatus.set(s);       this.currentPage.set(0); }
   setFilterCompanyId(id: string): void     { this.filterCompanyId.set(id);     this.currentPage.set(0); }
-  setFilterDomain(d: string): void         { this.filterDomain.set(d);         this.currentPage.set(0); }
   setFilterMonth(m: string): void          { this.filterMonth.set(m);          this.currentPage.set(0); }
   setFilterYear(y: string): void           { this.filterYear.set(y);           this.currentPage.set(0); }
   setFilterValidation(v: string): void     { this.filterValidation.set(v as any); this.currentPage.set(0); }
@@ -206,7 +194,6 @@ export class AdCampaignsComponent implements OnInit {
     const q          = this.searchQuery().toLowerCase().trim();
     const st         = this.selectedStatus();
     const companyId  = this.filterCompanyId();
-    const domain     = this.filterDomain();
     const month      = this.filterMonth();
     const year       = this.filterYear();
     const valFilter  = this.filterValidation();
@@ -217,11 +204,9 @@ export class AdCampaignsComponent implements OnInit {
     return this.campaigns()
       .filter(c => {
         const companyName = c.company?.name ?? '';
-        const companyDomain = c.company?.business_domain ?? '';
         if (st !== 'all' && campaignStatus(c) !== st) return false;
         if (q && !c.name.toLowerCase().includes(q) && !companyName.toLowerCase().includes(q)) return false;
         if (companyId !== 'all' && c.company_id !== companyId) return false;
-        if (domain !== 'all' && companyDomain !== domain) return false;
         if (valFilter !== 'all' && campaignValidationState(c) !== valFilter) return false;
         // Month/year filters: a campaign matches if its period intersects the chosen YYYY-MM bucket.
         if (year !== 'all' || month !== 'all') {
@@ -242,7 +227,6 @@ export class AdCampaignsComponent implements OnInit {
         name: c.name,
         companyId: c.company_id,
         companyName: c.company?.name ?? '—',
-        businessDomain: c.company?.business_domain ?? null,
         startDate: c.start_date,
         endDate: c.end_date,
         createdAt: c.created_at.slice(0, 10),

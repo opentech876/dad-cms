@@ -7,17 +7,20 @@ export type AppRole =
   | 'chef_equipe_commerciale'
   | 'system_admin';
 
-export type CompanyType =
-  | 'telecom'
-  | 'banque'
-  | 'energie'
-  | 'distribution'
-  | 'services'
-  | 'gouvernement'
-  | 'ong'
-  | 'medias'
-  | 'sante'
-  | 'autre';
+/** A company's advertiser category — now a free label chosen from the managed,
+ *  workspace-scoped `company_types` list (was a fixed enum). Kept as a `string`
+ *  alias so existing imports keep working. */
+export type CompanyType = string;
+
+/** A row of the user-managed `company_types` lookup. */
+export interface CompanyTypeRow {
+  id: string;
+  workspace_id: string;
+  label: string;
+  sort_order: number;
+  created_at: string;
+  deleted_at: string | null;
+}
 export type EventPosition = 1 | 2;
 /** Business rule: one ad at a time, footer slot only. The DB column still
  *  exists for mobile compatibility but every row is 'footer'. */
@@ -143,7 +146,6 @@ export interface Company {
   workspace_id: string;
   name: string;
   type: CompanyType;
-  business_domain: string | null;
   website: string | null;
   contact_email: string | null;
   contact_phone: string | null;
@@ -160,7 +162,6 @@ export interface Company {
 export interface CreateCompanyDto {
   name: string;
   type: CompanyType;
-  business_domain?: string | null;
   website?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
