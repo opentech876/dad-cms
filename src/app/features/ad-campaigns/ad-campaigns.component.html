@@ -598,7 +598,7 @@
             font-weight: 600;
           "
         >
-          Jours couverts
+          Semaines vendues
         </div>
         <div
           style="
@@ -611,10 +611,13 @@
             color: var(--accent);
           "
         >
-          {{ stats().totalDays }}
+          {{ soldWeeksYear()
+          }}<span style="font-size: 20px; color: var(--fg-3); font-weight: 500"
+            >&nbsp;/&nbsp;{{ totalWeeksYear() }}</span
+          >
         </div>
         <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">
-          campagnes actives uniquement
+          semaines de {{ currentYear }} couvertes par une campagne validée
         </div>
       </div>
       <div
@@ -631,7 +634,7 @@
             font-weight: 600;
           "
         >
-          Validations en attente
+          À valider
         </div>
         <div
           style="
@@ -648,9 +651,9 @@
         </div>
         <div style="margin-top: 10px; font-size: 12px; color: var(--fg-3)">
           @if (stats().pendingValidation > 0) {
-            <span style="color: var(--warning); font-weight: 600">à valider →</span>
+            <span style="color: var(--warning); font-weight: 600">à payer + faire confirmer →</span>
           } @else {
-            tout est à jour
+            payées + confirmées, tout est à jour
           }
         </div>
       </div>
