@@ -203,4 +203,49 @@ describe('date.utils', () => {
       expect(out).toContain('decembre');
     });
   });
+
+  describe('cas limites de formatage', () => {
+    it('formatDateLong: null → "", malformé → tel quel, valide', () => {
+      expect(formatDateLong(null)).toBe('');
+      expect(formatDateLong('xx')).toBe('xx');
+      expect(formatDateLong('2026-08-15')).toBe('15 août 2026');
+    });
+
+    it('formatDateShort: undefined → "", malformé → tel quel', () => {
+      expect(formatDateShort(undefined)).toBe('');
+      expect(formatDateShort('xx')).toBe('xx');
+    });
+
+    it('formatDateTime: null → "", invalide → tel quel, valide', () => {
+      expect(formatDateTime(null)).toBe('');
+      expect(formatDateTime('pas-une-date')).toBe('pas-une-date');
+      expect(formatDateTime('2026-08-15T14:30:00')).toMatch(/15\/08\/2026 \d{2}h\d{2}/);
+    });
+
+    it('formatRelativeFr couvre tous les paliers', () => {
+      const now = new Date('2026-08-15T12:00:00');
+      expect(formatRelativeFr(null, now)).toBe('');
+      expect(formatRelativeFr('pas-une-date', now)).toBe('pas-une-date');
+      expect(formatRelativeFr('2026-08-15T11:59:30', now)).toBe("À l'instant");
+      expect(formatRelativeFr('2026-08-15T11:30:00', now)).toBe('il y a 30 min');
+      expect(formatRelativeFr('2026-08-15T09:00:00', now)).toBe('il y a 3 h');
+      expect(formatRelativeFr('2026-08-14T12:00:00', now)).toBe('hier');
+      expect(formatRelativeFr('2026-08-11T12:00:00', now)).toBe('il y a 4 j');
+      expect(formatRelativeFr('2026-08-01T12:00:00', now)).toBe('01/08/2026');
+    });
+
+    it('formatWeekdayLong: chaîne / Date / null / malformé / invalide', () => {
+      expect(formatWeekdayLong('2026-08-15')).toContain('août');
+      expect(formatWeekdayLong(new Date(2026, 7, 15))).toContain('août');
+      expect(formatWeekdayLong(null)).toBe('');
+      expect(formatWeekdayLong('xx')).toBe('');
+      expect(formatWeekdayLong(new Date('invalid'))).toBe('');
+    });
+
+    it('formatDayMonthLong: null / malformé / valide', () => {
+      expect(formatDayMonthLong(null)).toBe('');
+      expect(formatDayMonthLong('xx')).toBe('xx');
+      expect(formatDayMonthLong('2026-08-15')).toBe('15 août');
+    });
+  });
 });

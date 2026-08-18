@@ -77,4 +77,86 @@ describe('image.utils', () => {
       expect(out).toBe(file);
     });
   });
+
+  describe('compressImage — pipeline (canvas mockée)', () => {
+    let origCreateBitmap: any;
+    let origCreateElement: any;
+
+    function mockCanvas(blobSize: number, hasCtx = true): any {
+      const ctx = hasCtx ? { fillStyle: '', fillRect: jest.fn(), drawImage: jest.fn() } : null;
+      return {
+        width: 0,
+        height: 0,
+        getContext: () => ctx,
+        toBlob: (cb: (b: Blob | null) => void) =>
+          cb(blobSize >= 0 ? new Blob([new Uint8Array(blobSize)], { type: 'image/jpeg' }) : null),
+      };
+    }
+
+    function setup(bitmap: { width: number; height: number }, canvas: any) {
+      (global as any).createImageBitmap = jest.fn().mockResolvedValue({ ...bitmap, close: jest.fn() });
+      document.createElement = jest.fn((tag: string) =>
+        tag === 'canvas' ? canvas : origCreateElement.call(document, tag),
+      ) as any;
+    }
+
+    beforeEach(() => {
+      origCreateBitmap = (global as any).createImageBitmap;
+      origCreateElement = document.createElement;
+    });
+    afterEach(() => {
+      (global as any).createImageBitmap = origCreateBitmap;
+      document.createElement = origCreateElement;
+    });
+
+    const oversized = () => new File([new Uint8Array(300 * 1024)], 'photo.png', { type: 'image/png' });
+
+    it('renvoie le fichier tel quel si déjà dans le budget', async () => {
+      const file = new File([new Uint8Array(1000)], 'x.jpg', { type: 'image/jpeg' });
+      setup({ width: 400, height: 300 }, mockCanvas(500));
+      expect(await compressImage(file)).toBe(file);
+    });
+
+    it('renvoie le fichier si le contexte 2D est indisponible', async () => {
+      const file = oversized();
+      setup({ width: 1600, height: 1200 }, mockCanvas(500, false));
+      expect(await compressImage(file)).toBe(file);
+    });
+
+    it('compresse et renvoie un nouveau JPEG quand ça dépasse le budget', async () => {
+      const file = oversized();
+      setup({ width: 1600, height: 1200 }, mockCanvas(50 * 1024));
+      const out = await compressImage(file);
+      expect(out).not.toBe(file);
+      expect(out.name).toBe('photo.jpg');
+      expect(out.type).toBe('image/jpeg');
+    });
+
+    it('retombe sur createImageBitmap sans options si la 1ère forme échoue', async () => {
+      const file = oversized();
+      (global as any).createImageBitmap = jest.fn()
+        .mockRejectedValueOnce(new Error('options rejetées'))
+        .mockResolvedValueOnce({ width: 1600, height: 1200, close: jest.fn() });
+      document.createElement = jest.fn((tag: string) =>
+        tag === 'canvas' ? mockCanvas(50 * 1024) : origCreateElement.call(document, tag),
+      ) as any;
+      const out = await compressImage(file);
+      expect((global as any).createImageBitmap).toHaveBeenCalledTimes(2);
+      expect(out).not.toBe(file);
+    });
+
+    it('renvoie la dernière tentative même si tout dépasse le budget', async () => {
+      const file = oversized();
+      setup({ width: 1600, height: 1200 }, mockCanvas(500 * 1024));
+      const out = await compressImage(file);
+      expect(out).not.toBe(file);
+      expect(out.type).toBe('image/jpeg');
+    });
+
+    it('renvoie le fichier original si toBlob échoue (null)', async () => {
+      const file = oversized();
+      setup({ width: 1600, height: 1200 }, mockCanvas(-1));
+      expect(await compressImage(file)).toBe(file);
+    });
+  });
 });
