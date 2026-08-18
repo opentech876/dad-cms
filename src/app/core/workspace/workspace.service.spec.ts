@@ -365,5 +365,159 @@ describe('WorkspaceService', () => {
         expect.objectContaining({ onConflict: 'user_id,workspace_id' }),
       );
     });
+
+    it('ne fait rien (void) sans workspace actif', async () => {
+      const ctx = TestBed.inject(WorkspaceContextService) as any;
+      ctx.activeWorkspaceId.mockReturnValueOnce(null);
+      await expect(firstValueFrom(service.saveAppearance('u1', 'field', 'dark'))).resolves.toBeUndefined();
+    });
+  });
+
+  // ── getWorkspaces() ─────────────────────────────────────────────────────────
+
+  describe('getWorkspaces()', () => {
+    it('retourne les workspaces', async () => {
+      mockSupabase.client = buildClient(1, [mockWorkspace]);
+      const res = await firstValueFrom(service.getWorkspaces());
+      expect(res.length).toBe(1);
+      expect(res[0].id).toBe('ws-1');
+    });
+
+    it('retourne [] quand data est null', async () => {
+      mockSupabase.client = { from: () => ({ select: () => Promise.resolve({ data: null, error: null }) }) } as any;
+      const res = await firstValueFrom(service.getWorkspaces());
+      expect(res).toEqual([]);
+    });
+  });
+
+  // ── upsertProfile() ─────────────────────────────────────────────────────────
+
+  describe('upsertProfile()', () => {
+    it('upsert profiles avec onConflict et retourne success', async () => {
+      const upsertSpy = jest.fn().mockResolvedValue({ error: null });
+      mockSupabase.client = { from: () => ({ upsert: upsertSpy }) } as any;
+      const res = await firstValueFrom(service.upsertProfile('u1', 'Alice', '+242', 'http://a.png'));
+      expect(res.success).toBe(true);
+      expect(upsertSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ user_id: 'u1', workspace_id: 'ws-active', full_name: 'Alice', phone: '+242', avatar_url: 'http://a.png' }),
+        expect.objectContaining({ onConflict: 'user_id,workspace_id' }),
+      );
+    });
+
+    it('retourne une erreur sans workspace actif', async () => {
+      const ctx = TestBed.inject(WorkspaceContextService) as any;
+      ctx.activeWorkspaceId.mockReturnValueOnce(null);
+      const res = await firstValueFrom(service.upsertProfile('u1', 'Alice', '+242'));
+      expect(res.success).toBe(false);
+    });
+
+    it('remonte l\'erreur DB', async () => {
+      mockSupabase.client = { from: () => ({ upsert: jest.fn().mockResolvedValue({ error: { message: 'boom' } }) }) } as any;
+      const res = await firstValueFrom(service.upsertProfile('u1', 'Alice', '+242'));
+      expect(res).toEqual({ success: false, error: 'boom' });
+    });
+  });
+
+  // ── getMyProfile() sans workspace ───────────────────────────────────────────
+
+  describe('getMyProfile() sans workspace', () => {
+    it('retourne null sans workspace actif', async () => {
+      const ctx = TestBed.inject(WorkspaceContextService) as any;
+      ctx.activeWorkspaceId.mockReturnValueOnce(null);
+      const res = await firstValueFrom(service.getMyProfile('u1'));
+      expect(res).toBeNull();
+    });
+  });
+
+  // ── updateWorkspace() ───────────────────────────────────────────────────────
+
+  describe('updateWorkspace()', () => {
+    function clientWithUpdate(error: any) {
+      return {
+        auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u-1' } } }) },
+        from: () => ({ update: () => ({ eq: () => Promise.resolve({ error }) }) }),
+      } as any;
+    }
+    it('retourne success', async () => {
+      mockSupabase.client = clientWithUpdate(null);
+      const res = await firstValueFrom(service.updateWorkspace('ws-1', 'Nouveau'));
+      expect(res.success).toBe(true);
+    });
+    it('remonte l\'erreur', async () => {
+      mockSupabase.client = clientWithUpdate({ message: 'nope' });
+      const res = await firstValueFrom(service.updateWorkspace('ws-1', 'Nouveau'));
+      expect(res).toEqual({ success: false, error: 'nope' });
+    });
+  });
+
+  // ── uploadAvatar() ──────────────────────────────────────────────────────────
+
+  describe('uploadAvatar()', () => {
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    function storageClient(opts: { uploadError?: any; dbError?: any }) {
+      return {
+        storage: {
+          from: () => ({
+            upload: jest.fn().mockResolvedValue({ data: { path: 'u1/ws/a.png' }, error: opts.uploadError ?? null }),
+            getPublicUrl: () => ({ data: { publicUrl: 'http://cdn/a.png' } }),
+          }),
+        },
+        from: () => ({ upsert: jest.fn().mockResolvedValue({ error: opts.dbError ?? null }) }),
+      } as any;
+    }
+    it('retourne success + avatarUrl', async () => {
+      mockSupabase.client = storageClient({});
+      const res = await firstValueFrom(service.uploadAvatar('u1', file));
+      expect(res).toEqual({ success: true, avatarUrl: 'http://cdn/a.png' });
+    });
+    it('erreur si upload échoue', async () => {
+      mockSupabase.client = storageClient({ uploadError: { message: 'up fail' } });
+      const res = await firstValueFrom(service.uploadAvatar('u1', file));
+      expect(res).toEqual({ success: false, error: 'up fail' });
+    });
+    it('erreur si écriture profil échoue', async () => {
+      mockSupabase.client = storageClient({ dbError: { message: 'db fail' } });
+      const res = await firstValueFrom(service.uploadAvatar('u1', file));
+      expect(res).toEqual({ success: false, error: 'db fail' });
+    });
+    it('erreur sans workspace actif', async () => {
+      const ctx = TestBed.inject(WorkspaceContextService) as any;
+      ctx.activeWorkspaceId.mockReturnValueOnce(null);
+      const res = await firstValueFrom(service.uploadAvatar('u1', file));
+      expect(res.success).toBe(false);
+    });
+  });
+
+  // ── uploadLogo() ────────────────────────────────────────────────────────────
+
+  describe('uploadLogo()', () => {
+    const file = new File(['x'], 'l.png', { type: 'image/png' });
+    function logoClient(opts: { uploadError?: any; dbError?: any }) {
+      return {
+        auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u-1' } } }) },
+        storage: {
+          from: () => ({
+            upload: jest.fn().mockResolvedValue({ data: { path: 'ws-1/logo.png' }, error: opts.uploadError ?? null }),
+            getPublicUrl: () => ({ data: { publicUrl: 'http://cdn/logo.png' } }),
+          }),
+        },
+        from: () => ({ update: () => ({ eq: () => Promise.resolve({ error: opts.dbError ?? null }) }) }),
+      } as any;
+    }
+    it('retourne success + logoUrl', async () => {
+      mockSupabase.client = logoClient({});
+      const res = await firstValueFrom(service.uploadLogo('ws-1', file));
+      expect(res).toEqual({ success: true, logoUrl: 'http://cdn/logo.png' });
+    });
+    it('erreur upload', async () => {
+      mockSupabase.client = logoClient({ uploadError: { message: 'up' } });
+      const res = await firstValueFrom(service.uploadLogo('ws-1', file));
+      expect(res).toEqual({ success: false, error: 'up' });
+    });
+    it('erreur db', async () => {
+      mockSupabase.client = logoClient({ dbError: { message: 'db' } });
+      const res = await firstValueFrom(service.uploadLogo('ws-1', file));
+      expect(res).toEqual({ success: false, error: 'db' });
+    });
   });
 });
