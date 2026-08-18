@@ -10,6 +10,9 @@ const config: Config = {
   collectCoverageFrom: [
     'src/app/**/*.ts',
     '!src/app/**/*.spec.ts',
+    // Declarative bootstrap/wiring — no logic worth unit-testing.
+    '!src/app/app.config.ts',
+    '!src/app/app.routes.ts',
   ],
   coverageThreshold: {
     global: { statements: 70, branches: 70, functions: 70, lines: 70 },

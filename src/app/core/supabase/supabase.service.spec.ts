@@ -39,9 +39,22 @@ describe('SupabaseService', () => {
         signInWithPassword: signInWithPasswordSpy,
         updateUser: updateUserSpy,
         onAuthStateChange: onAuthStateChangeSpy,
+        signOut: jest.fn().mockResolvedValue({ error: null }),
+        resetPasswordForEmail: jest.fn().mockResolvedValue({ data: {}, error: null }),
+        mfa: {
+          enroll: jest.fn().mockResolvedValue({ data: { id: 'f1' }, error: null }),
+          challenge: jest.fn().mockResolvedValue({ data: { id: 'ch1' }, error: null }),
+          verify: jest.fn().mockResolvedValue({ data: { access_token: 'x' }, error: null }),
+          unenroll: jest.fn().mockResolvedValue({ data: {}, error: null }),
+          listFactors: jest.fn().mockResolvedValue({ data: { totp: [] }, error: null }),
+          getAuthenticatorAssuranceLevel: jest.fn().mockResolvedValue({ data: { currentLevel: 'aal1', nextLevel: 'aal2' }, error: null }),
+        },
       },
       rpc: rpcSpy,
-      functions: { invoke: jest.fn().mockResolvedValue({ data: null, error: null }) },
+      functions: { invoke: jest.fn().mockResolvedValue({ data: { ok: true }, error: null }) },
+      from: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue({ data: [{ role: 'owner' }] }) }),
+      }),
     };
   });
 
@@ -142,6 +155,109 @@ describe('SupabaseService', () => {
     it('retourne true après markPasswordSet()', async () => {
       service.markPasswordSet();
       expect(await service.hasPasswordSet()).toBe(true);
+    });
+  });
+
+  // ── auth wrappers divers ────────────────────────────────────────────────────
+
+  describe('wrappers auth', () => {
+    it('signOut appelle auth.signOut', async () => {
+      await service.signOut();
+      expect((service as any).supabase.auth.signOut).toHaveBeenCalled();
+    });
+    it('resetPasswordForEmail passe le redirectTo', async () => {
+      await service.resetPasswordForEmail('a@b.cg');
+      expect((service as any).supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+        'a@b.cg', expect.objectContaining({ redirectTo: expect.stringContaining('/reinitialiser-mot-de-passe') }),
+      );
+    });
+    it('updateEmail passe email + emailRedirectTo', async () => {
+      await service.updateEmail('new@b.cg');
+      expect(updateUserSpy).toHaveBeenCalledWith(
+        { email: 'new@b.cg' }, expect.objectContaining({ emailRedirectTo: expect.stringContaining('/email-confirme') }),
+      );
+    });
+    it('updateSecondaryEmail écrit secondary_email', async () => {
+      await service.updateSecondaryEmail('sec@b.cg');
+      expect(updateUserSpy).toHaveBeenCalledWith({ data: { secondary_email: 'sec@b.cg' } });
+    });
+    it('updateSecondaryEmail null → null', async () => {
+      await service.updateSecondaryEmail(null);
+      expect(updateUserSpy).toHaveBeenCalledWith({ data: { secondary_email: null } });
+    });
+  });
+
+  // ── MFA ─────────────────────────────────────────────────────────────────────
+
+  describe('MFA', () => {
+    it('enrollTotp passe le friendlyName fourni', async () => {
+      await service.enrollTotp('Mon app');
+      expect((service as any).supabase.auth.mfa.enroll).toHaveBeenCalledWith(
+        expect.objectContaining({ factorType: 'totp', friendlyName: 'Mon app' }),
+      );
+    });
+    it('enrollTotp utilise le défaut', async () => {
+      await service.enrollTotp();
+      expect((service as any).supabase.auth.mfa.enroll).toHaveBeenCalledWith(
+        expect.objectContaining({ friendlyName: 'Authenticator' }),
+      );
+    });
+    it('verifyTotpEnrollment: challenge puis verify', async () => {
+      await service.verifyTotpEnrollment('f1', '123456');
+      expect((service as any).supabase.auth.mfa.challenge).toHaveBeenCalledWith({ factorId: 'f1' });
+      expect((service as any).supabase.auth.mfa.verify).toHaveBeenCalledWith({ factorId: 'f1', challengeId: 'ch1', code: '123456' });
+    });
+    it('verifyTotpEnrollment: retourne une erreur si le challenge échoue', async () => {
+      (service as any).supabase.auth.mfa.challenge.mockResolvedValueOnce({ data: null, error: { message: 'x' } });
+      const res = await service.verifyTotpEnrollment('f1', '123456');
+      expect(res.error).toBeTruthy();
+      expect((service as any).supabase.auth.mfa.verify).not.toHaveBeenCalled();
+    });
+    it('challenge/verifyChallenge/unenroll/listFactors/assuranceLevel', async () => {
+      await service.challengeTotp('f1');
+      await service.verifyTotpChallenge('f1', 'ch1', '123');
+      await service.unenrollTotp('f1');
+      await service.listMfaFactors();
+      await service.getMfaAssuranceLevel();
+      expect((service as any).supabase.auth.mfa.unenroll).toHaveBeenCalledWith({ factorId: 'f1' });
+      expect((service as any).supabase.auth.mfa.listFactors).toHaveBeenCalled();
+      expect((service as any).supabase.auth.mfa.getAuthenticatorAssuranceLevel).toHaveBeenCalled();
+    });
+  });
+
+  // ── hasWorkspaceRole() + invoke() ───────────────────────────────────────────
+
+  describe('hasWorkspaceRole()', () => {
+    it('true quand au moins un rôle', async () => {
+      expect(await service.hasWorkspaceRole()).toBe(true);
+    });
+    it('false quand aucun rôle', async () => {
+      (service as any).supabase.from = jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue({ data: [] }) }),
+      });
+      expect(await service.hasWorkspaceRole()).toBe(false);
+    });
+  });
+
+  describe('invoke()', () => {
+    it('retourne le résultat de functions.invoke', async () => {
+      const res = await service.invoke('fn', { a: 1 });
+      expect((service as any).supabase.functions.invoke).toHaveBeenCalledWith('fn', { body: { a: 1 } });
+      expect(res.data).toEqual({ ok: true });
+    });
+    it("remplace le message d'erreur par le corps JSON métier", async () => {
+      (service as any).supabase.functions.invoke = jest.fn().mockResolvedValue({
+        data: null, error: { message: 'orig', context: { json: () => Promise.resolve({ error: 'détail métier' }) } },
+      });
+      const res = await service.invoke('fn');
+      expect(res.error.message).toBe('détail métier');
+    });
+    it('ignore une erreur de parsing du corps', async () => {
+      (service as any).supabase.functions.invoke = jest.fn().mockResolvedValue({
+        data: null, error: { message: 'orig', context: { json: () => Promise.reject(new Error('not json')) } },
+      });
+      const res = await service.invoke('fn');
+      expect(res.error.message).toBe('orig');
     });
   });
 });
