@@ -195,5 +195,18 @@ describe('CompaniesComponent', () => {
       await component.removeType(FAKE_TYPES[2] as any);
       expect(mockCompanyType.deleteType).toHaveBeenCalledWith('t3');
     });
+
+    it('openTypesManager()/closeTypesManager() basculent le modal', () => {
+      component.openTypesManager();
+      expect(component.typesManagerOpen()).toBe(true);
+      component.closeTypesManager();
+      expect(component.typesManagerOpen()).toBe(false);
+    });
+
+    it('renameType() renomme via prompt puis recharge la liste', async () => {
+      window.prompt = jest.fn(() => 'Télécom');
+      await component.renameType(FAKE_TYPES[0] as any);
+      expect(mockCompanyType.renameType).toHaveBeenCalledWith('t1', 'Télécom');
+    });
   });
 });
