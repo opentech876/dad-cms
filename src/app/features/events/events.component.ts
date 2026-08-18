@@ -28,6 +28,8 @@ interface EventRow {
   title: string;
   excerpt: string | null;
   status: 'draft' | 'published';
+  /** Assigned to the published calendar (i.e. actually "Publié"). */
+  isPublished: boolean;
   hasImage: boolean;
   imagePath: string | null;
 }
@@ -90,6 +92,11 @@ export class EventsComponent implements OnInit {
   readonly calendars = signal<CalendarSummary[]>([]);
   readonly loading   = signal(false);
 
+  /** Event ids assigned in the SINGLE published calendar. An event is "Publié"
+   *  (live for mobile) when it's in this set — publication is relative to the
+   *  published calendar, never a global flag. Empty when nothing is published. */
+  readonly publishedEventIds = signal<Set<string>>(new Set());
+
   readonly positions: EventPosition[] = [1, 2];
 
   async ngOnInit(): Promise<void> {
@@ -106,6 +113,17 @@ export class EventsComponent implements OnInit {
   private async _reloadCalendars(): Promise<void> {
     const cals = await firstValueFrom(this.calendarService.listCalendars());
     this.calendars.set(cals);
+    // Publication is relative to the one published calendar — load its assigned
+    // event ids so the list/cards can flag which events are actually "Publié".
+    const published = cals.find(c => c.status === 'published');
+    if (published) {
+      const entries = await firstValueFrom(
+        this.calendarEntryService.getEntriesForCalendar(published.id),
+      );
+      this.publishedEventIds.set(new Set(entries.map(e => e.event_id)));
+    } else {
+      this.publishedEventIds.set(new Set());
+    }
   }
 
   // ── Filters + sort ───────────────────────────────────────────────────────────
@@ -129,6 +147,7 @@ export class EventsComponent implements OnInit {
     const yr     = this.selectedYear();
     const status = this.selectedStatus();
     const sort   = this.sortBy();
+    const onCal  = this.publishedEventIds();
 
     const filtered = this.events().filter(e => {
       const year = new Date(e.event_date + 'T00:00:00').getFullYear();
@@ -162,6 +181,7 @@ export class EventsComponent implements OnInit {
       title:    e.title,
       excerpt:  e.description ? e.description.slice(0, 70) + (e.description.length > 70 ? '…' : '') : null,
       status:   e.status,
+      isPublished: onCal.has(e.id),
       hasImage: !!e.image_path,
       imagePath: e.image_path ?? null,
     }));
@@ -169,11 +189,16 @@ export class EventsComponent implements OnInit {
 
   readonly stats = computed(() => {
     const all = this.events();
+    const onCal = this.publishedEventIds();
     return {
-      total:     all.length,
-      published: all.filter(e => e.status === 'published').length,
-      draft:     all.filter(e => e.status === 'draft').length,
-      noImage:   all.filter(e => !e.image_path).length,
+      total:      all.length,
+      // Publié = assigned to the published calendar (live for mobile).
+      publies:    all.filter(e => onCal.has(e.id)).length,
+      // Réserve = finalized in the library but not yet placed on the calendar.
+      reserves:   all.filter(e => e.status === 'published' && !onCal.has(e.id)).length,
+      // Brouillon = still a draft (incomplete).
+      brouillons: all.filter(e => e.status === 'draft').length,
+      noImage:    all.filter(e => !e.image_path).length,
     };
   });
 

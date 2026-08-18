@@ -76,24 +76,16 @@ describe('CompanyService', () => {
     });
   });
 
-  describe('listDomains()', () => {
-    it('retourne la liste distincte triée des business_domain non-vides', async () => {
-      const result = await firstValueFrom(service.listDomains());
-      expect(result).toEqual(['Banque retail', 'Téléphonie mobile']);
-    });
-  });
-
   describe('createCompany()', () => {
     it("insère avec workspace_id, created_by et le type fourni", async () => {
       const res = await firstValueFrom(service.createCompany({
-        name: '  TotalEnergies  ', type: 'energie', business_domain: 'Hydrocarbures',
+        name: '  TotalEnergies  ', type: 'Énergie',
       }));
       expect(res.success).toBe(true);
       expect(insertSpy).toHaveBeenCalledWith(expect.objectContaining({
         workspace_id: 'ws-1',
         name: 'TotalEnergies',
-        type: 'energie',
-        business_domain: 'Hydrocarbures',
+        type: 'Énergie',
         created_by: 'u-1',
       }));
     });

@@ -46,6 +46,7 @@ describe('EventsComponent', () => {
   let mockCalendarService: { listCalendars: jest.Mock };
   let mockCalendarEntryService: {
     getEntriesByMmdd: jest.Mock;
+    getEntriesForCalendar: jest.Mock;
     assignEvent: jest.Mock;
     unassignSlot: jest.Mock;
   };
@@ -70,9 +71,10 @@ describe('EventsComponent', () => {
       listCalendars: jest.fn().mockReturnValue(of(fakeCalendars)),
     };
     mockCalendarEntryService = {
-      getEntriesByMmdd: jest.fn().mockReturnValue(of([])),
-      assignEvent:      jest.fn().mockReturnValue(of({ success: true })),
-      unassignSlot:     jest.fn().mockReturnValue(of({ success: true })),
+      getEntriesByMmdd:      jest.fn().mockReturnValue(of([])),
+      getEntriesForCalendar: jest.fn().mockReturnValue(of([])),
+      assignEvent:           jest.fn().mockReturnValue(of({ success: true })),
+      unassignSlot:          jest.fn().mockReturnValue(of({ success: true })),
     };
 
     await TestBed.configureTestingModule({
@@ -391,10 +393,18 @@ describe('EventsComponent', () => {
       expect(component.stats().total).toBe(2);
     });
 
-    it('compte correctement les événements publiés et en brouillon', () => {
-      // fakeEvents: evt-1 = published, evt-2 = draft
-      expect(component.stats().published).toBe(1);
-      expect(component.stats().draft).toBe(1);
+    it('réserves = finalisés (published) non placés ; brouillons = draft', () => {
+      // fakeEvents: evt-1 = published, evt-2 = draft ; rien sur le calendrier publié
+      expect(component.stats().reserves).toBe(1);
+      expect(component.stats().brouillons).toBe(1);
+      expect(component.stats().publies).toBe(0);
+    });
+
+    it('publiés = événements assignés au calendrier publié (retire du décompte réserve)', async () => {
+      mockCalendarEntryService.getEntriesForCalendar.mockReturnValue(of([{ event_id: 'evt-1' }]));
+      await component['_reloadCalendars']();
+      expect(component.stats().publies).toBe(1);
+      expect(component.stats().reserves).toBe(0);
     });
 
     it('compte les événements sans image', () => {

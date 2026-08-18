@@ -12,10 +12,16 @@
         </p>
       </div>
       @if (canWrite()) {
-        <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
-          <tui-icon icon="@tui.plus" style="font-size: 14px" />
-          Nouvelle compagnie
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" type="button" (click)="openTypesManager()">
+            <tui-icon icon="@tui.tag" style="font-size: 14px" />
+            Gérer les types
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="openEditor()">
+            <tui-icon icon="@tui.plus" style="font-size: 14px" />
+            Nouvelle compagnie
+          </button>
+        </div>
       }
     </div>
   </div>
@@ -24,23 +30,16 @@
   <div class="card" style="padding: 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
     <input
       class="input"
-      placeholder="Nom, domaine d'activité…"
+      placeholder="Nom, type…"
       [value]="searchQuery()"
       (input)="setSearchQuery($any($event.target).value)"
       style="height: 36px; font-size: 13px; flex: 1; min-width: 240px;"
     />
-    <select class="select" style="width: 200px; height: 36px; font-size: 13px;"
+    <select class="select" style="width: 220px; height: 36px; font-size: 13px;"
             (change)="setFilterType($any($event.target).value)">
       <option value="all" [selected]="filterType() === 'all'">Tous types</option>
-      @for (t of companyTypes; track t) {
-        <option [value]="t" [selected]="filterType() === t">{{ typeLabel(t) }}</option>
-      }
-    </select>
-    <select class="select" style="width: 200px; height: 36px; font-size: 13px;"
-            (change)="setFilterDomain($any($event.target).value)">
-      <option value="all" [selected]="filterDomain() === 'all'">Tous domaines</option>
-      @for (d of availableDomains(); track d) {
-        <option [value]="d" [selected]="filterDomain() === d">{{ d }}</option>
+      @for (t of typeOptions(); track t) {
+        <option [value]="t" [selected]="filterType() === t">{{ t }}</option>
       }
     </select>
   </div>
@@ -73,7 +72,6 @@
           <tr>
             <th>Nom</th>
             <th style="width: 180px;">Type</th>
-            <th style="width: 200px;">Domaine</th>
             <th style="width: 200px;">Contact</th>
             <th style="width: 130px;">Ajoutée le</th>
             @if (canWrite()) { <th style="width: 80px;"></th> }
@@ -90,10 +88,7 @@
                 }
               </td>
               <td>
-                <span class="badge">{{ typeLabel(co.type) }}</span>
-              </td>
-              <td style="font-size: 13px; color: var(--fg-2);">
-                {{ co.business_domain || '—' }}
+                <span class="badge">{{ co.type }}</span>
               </td>
               <td style="font-size: 12.5px; color: var(--fg-2); line-height: 1.4;">
                 @if (co.contact_email) {
@@ -154,18 +149,10 @@
           <label class="field-label">Type *</label>
           <select class="select"
                   (change)="editorType.set($any($event.target).value)">
-            @for (t of companyTypes; track t) {
-              <option [value]="t" [selected]="editorType() === t">{{ typeLabel(t) }}</option>
+            @for (t of typeOptions(); track t) {
+              <option [value]="t" [selected]="editorType() === t">{{ t }}</option>
             }
           </select>
-        </div>
-        <div class="field">
-          <label class="field-label">Domaine d'activité</label>
-          <input class="input"
-                 [value]="editorDomain()"
-                 (input)="editorDomain.set($any($event.target).value)"
-                 placeholder="Téléphonie mobile" />
-          <span class="field-hint">Description courte du secteur (utilisée comme filtre).</span>
         </div>
         <div class="field">
           <label class="field-label">Site web</label>
@@ -206,6 +193,64 @@
           @if (editorSaving()) { <span class="spinner"></span> }
           {{ editorId() ? 'Enregistrer' : 'Créer' }}
         </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Types manager modal ── -->
+@if (typesManagerOpen()) {
+  <div class="modal-backdrop" (click)="closeTypesManager()">
+    <div class="modal" style="max-width: 460px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin: 0; font-size: 16px;">Types d'annonceurs</h3>
+        <button class="btn btn-flat btn-sm" type="button" (click)="closeTypesManager()" aria-label="Fermer">
+          <tui-icon icon="@tui.x" style="font-size: 14px;" />
+        </button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+        <p style="margin: 0; font-size: 12.5px; color: var(--fg-3);">
+          Catégories proposées à la création d'une compagnie. Renommer un type ne
+          modifie pas les compagnies déjà classées.
+        </p>
+        <div style="display: flex; gap: 8px;">
+          <input class="input" style="flex: 1; height: 36px; font-size: 13px;"
+                 placeholder="Nouveau type…"
+                 [value]="newTypeLabel()"
+                 (input)="newTypeLabel.set($any($event.target).value)"
+                 (keyup.enter)="addType()" />
+          <button class="btn btn-primary btn-sm" type="button"
+                  [disabled]="!newTypeLabel().trim() || typeBusy()"
+                  (click)="addType()">
+            <tui-icon icon="@tui.plus" style="font-size: 14px" />
+            Ajouter
+          </button>
+        </div>
+        @if (types().length === 0) {
+          <p style="margin: 0; font-size: 12.5px; color: var(--fg-3); font-style: italic;">
+            Aucun type géré pour le moment. Ajoutez-en un ci-dessus.
+          </p>
+        } @else {
+          <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px;">
+            @for (t of types(); track t.id) {
+              <li style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border-1); border-radius: 6px;">
+                <span style="flex: 1; font-size: 13px;">{{ t.label }}</span>
+                <button class="btn btn-flat btn-icon btn-sm" type="button"
+                        [disabled]="typeBusy()" (click)="renameType(t)" title="Renommer">
+                  <tui-icon icon="@tui.pencil" style="font-size: 13px;" />
+                </button>
+                <button class="btn btn-flat btn-icon btn-sm" type="button"
+                        style="color: var(--danger);"
+                        [disabled]="typeBusy()" (click)="removeType(t)" title="Supprimer">
+                  <tui-icon icon="@tui.trash-2" style="font-size: 13px;" />
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" type="button" (click)="closeTypesManager()">Fermer</button>
       </div>
     </div>
   </div>

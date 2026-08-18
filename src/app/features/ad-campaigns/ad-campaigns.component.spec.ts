@@ -137,6 +137,34 @@ describe('AdCampaignsComponent', () => {
     });
   });
 
+  // ── weeks sold this year (KPI card 4) ──────────────────────────────────────
+
+  describe('soldWeeksYear() / totalWeeksYear()', () => {
+    const YEAR = new Date().getFullYear();
+
+    it("compte les semaines couvertes par les campagnes validées + actives de l'année", async () => {
+      mockService.listCampaigns.mockReturnValue(of([
+        makeCampaign({ id: 'a', start_date: `${YEAR}-03-01`, end_date: `${YEAR}-03-14` }), // 14 j → 2 sem
+        makeCampaign({ id: 'b', start_date: `${YEAR}-06-01`, end_date: `${YEAR}-06-07` }), // 7 j  → 1 sem
+      ]));
+      await component['_reload']();
+      // 21 jours distincts → round(21 / 7) = 3
+      expect(component.soldWeeksYear()).toBe(3);
+    });
+
+    it('ignore les campagnes non validées', async () => {
+      mockService.listCampaigns.mockReturnValue(of([
+        makeCampaign({ start_date: `${YEAR}-03-01`, end_date: `${YEAR}-03-14`, validated_at: null }),
+      ]));
+      await component['_reload']();
+      expect(component.soldWeeksYear()).toBe(0);
+    });
+
+    it('totalWeeksYear vaut 52 (365/366 jours ÷ 7, arrondi bas)', () => {
+      expect(component.totalWeeksYear()).toBe(52);
+    });
+  });
+
   // ── listRows filtering ─────────────────────────────────────────────────────
 
   describe('listRows()', () => {

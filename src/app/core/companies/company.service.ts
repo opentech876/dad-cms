@@ -24,19 +24,6 @@ export class CompanyService {
     );
   }
 
-  /** Distinct non-empty `business_domain` values across the active workspace. */
-  listDomains(): Observable<string[]> {
-    return this.listCompanies().pipe(
-      map(companies => {
-        const set = new Set<string>();
-        for (const c of companies) {
-          if (c.business_domain && c.business_domain.trim()) set.add(c.business_domain.trim());
-        }
-        return Array.from(set).sort();
-      }),
-    );
-  }
-
   createCompany(dto: CreateCompanyDto): Observable<{ success: boolean; id?: string; error?: string }> {
     const wsId = this.workspaceContext.activeWorkspaceId();
     return from(
@@ -47,7 +34,6 @@ export class CompanyService {
             workspace_id: wsId,
             name: dto.name.trim(),
             type: dto.type,
-            business_domain: dto.business_domain ?? null,
             website: dto.website ?? null,
             contact_email: dto.contact_email ?? null,
             contact_phone: dto.contact_phone ?? null,
@@ -69,7 +55,7 @@ export class CompanyService {
 
   updateCompany(
     id: string,
-    patch: Partial<Pick<Company, 'name' | 'type' | 'business_domain' | 'website' | 'contact_email' | 'contact_phone' | 'notes' | 'logo_url'>>,
+    patch: Partial<Pick<Company, 'name' | 'type' | 'website' | 'contact_email' | 'contact_phone' | 'notes' | 'logo_url'>>,
   ): Observable<{ success: boolean; error?: string }> {
     return from(
       this.supabase.client.auth.getUser().then(({ data: { user } }: any) =>

@@ -19,7 +19,6 @@ interface CampaignRow {
   name: string;
   companyId: string;
   companyName: string;
-  businessDomain: string | null;
   startDate: string;
   endDate: string;
   createdAt: string;
@@ -74,15 +73,6 @@ export class AdCampaignsComponent implements OnInit {
     return Math.round((start - today) / 86_400_000);
   }
 
-  /** Distinct business domains across companies — fuels the domain filter. */
-  readonly availableDomains = computed<string[]>(() => {
-    const set = new Set<string>();
-    for (const c of this.companies()) {
-      if (c.business_domain && c.business_domain.trim()) set.add(c.business_domain.trim());
-    }
-    return Array.from(set).sort();
-  });
-
   async ngOnInit(): Promise<void> {
     await this._reload();
   }
@@ -104,7 +94,6 @@ export class AdCampaignsComponent implements OnInit {
     const all = this.campaigns();
     const today = new Date().toISOString().slice(0, 10);
     const active = all.filter(c => c.active && c.start_date <= today && c.end_date >= today);
-    const totalDays = active.reduce((sum, c) => sum + daysBetween(c.start_date, c.end_date), 0);
     const pendingValidation = all.filter(c => !c.deleted_at && !c.validated_at).length;
     const startingSoonUnvalidated = all.filter(c => {
       if (c.deleted_at || c.validated_at) return false;
@@ -115,10 +104,42 @@ export class AdCampaignsComponent implements OnInit {
       active: active.length,
       planifiee: all.filter(c => c.active && c.start_date > today).length,
       terminee: all.filter(c => !c.active || c.end_date < today).length,
-      totalDays,
       pendingValidation,
       startingSoonUnvalidated,
     };
+  });
+
+  readonly currentYear = new Date().getFullYear();
+
+  /** Distinct days of the CURRENT year covered by a validated + active
+   *  campaign — footer runs one ad/day, so this is the sold inventory. Mirrors
+   *  the dashboard AdOutlook.soldDaysYear definition so the two never disagree. */
+  readonly soldDaysYear = computed(() => {
+    const year = this.currentYear;
+    const yStart = `${year}-01-01`;
+    const yEnd = `${year}-12-31`;
+    const sold = new Set<string>();
+    for (const c of this.campaigns()) {
+      if (c.deleted_at || !c.active || !c.validated_at) continue;
+      const start = c.start_date > yStart ? c.start_date : yStart;
+      const end = c.end_date < yEnd ? c.end_date : yEnd;
+      if (start > end) continue;
+      for (let d = new Date(start + 'T00:00:00'); ; d.setDate(d.getDate() + 1)) {
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (iso > end) break;
+        sold.add(iso);
+      }
+    }
+    return sold.size;
+  });
+
+  /** Ad space is sold in 7-day blocks, so weeks — not days — are the
+   *  commercial unit (same convention as the dashboard). */
+  readonly soldWeeksYear = computed(() => Math.round(this.soldDaysYear() / 7));
+  readonly totalWeeksYear = computed(() => {
+    const y = this.currentYear;
+    const days = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
+    return Math.floor(days / 7);
   });
 
   // ── Filters ───────────────────────────────────────────────────────────────
@@ -126,7 +147,6 @@ export class AdCampaignsComponent implements OnInit {
   readonly searchQuery          = signal('');
   readonly selectedStatus       = signal('all');
   readonly filterCompanyId      = signal('all');
-  readonly filterDomain         = signal('all');
   readonly filterMonth          = signal('all'); // '01'..'12' or 'all'
   readonly filterYear           = signal('all'); // '2025', '2026' or 'all'
   readonly filterValidation     = signal<'all' | CampaignValidationState>('all');
@@ -140,7 +160,6 @@ export class AdCampaignsComponent implements OnInit {
   setSearchQuery(q: string): void          { this.searchQuery.set(q);          this.currentPage.set(0); }
   setSelectedStatus(s: string): void       { this.selectedStatus.set(s);       this.currentPage.set(0); }
   setFilterCompanyId(id: string): void     { this.filterCompanyId.set(id);     this.currentPage.set(0); }
-  setFilterDomain(d: string): void         { this.filterDomain.set(d);         this.currentPage.set(0); }
   setFilterMonth(m: string): void          { this.filterMonth.set(m);          this.currentPage.set(0); }
   setFilterYear(y: string): void           { this.filterYear.set(y);           this.currentPage.set(0); }
   setFilterValidation(v: string): void     { this.filterValidation.set(v as any); this.currentPage.set(0); }
@@ -175,7 +194,6 @@ export class AdCampaignsComponent implements OnInit {
     const q          = this.searchQuery().toLowerCase().trim();
     const st         = this.selectedStatus();
     const companyId  = this.filterCompanyId();
-    const domain     = this.filterDomain();
     const month      = this.filterMonth();
     const year       = this.filterYear();
     const valFilter  = this.filterValidation();
@@ -186,11 +204,9 @@ export class AdCampaignsComponent implements OnInit {
     return this.campaigns()
       .filter(c => {
         const companyName = c.company?.name ?? '';
-        const companyDomain = c.company?.business_domain ?? '';
         if (st !== 'all' && campaignStatus(c) !== st) return false;
         if (q && !c.name.toLowerCase().includes(q) && !companyName.toLowerCase().includes(q)) return false;
         if (companyId !== 'all' && c.company_id !== companyId) return false;
-        if (domain !== 'all' && companyDomain !== domain) return false;
         if (valFilter !== 'all' && campaignValidationState(c) !== valFilter) return false;
         // Month/year filters: a campaign matches if its period intersects the chosen YYYY-MM bucket.
         if (year !== 'all' || month !== 'all') {
@@ -211,7 +227,6 @@ export class AdCampaignsComponent implements OnInit {
         name: c.name,
         companyId: c.company_id,
         companyName: c.company?.name ?? '—',
-        businessDomain: c.company?.business_domain ?? null,
         startDate: c.start_date,
         endDate: c.end_date,
         createdAt: c.created_at.slice(0, 10),
