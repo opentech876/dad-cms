@@ -31,9 +31,9 @@ export class SettingsComponent implements OnInit {
   }
 
   readonly themes: { id: ThemeId; label: string; desc: string }[] = [
-    { id: 'archive',    label: 'Archive',    desc: 'Ivoire crème, serif classique' },
-    { id: 'broadsheet', label: 'Broadsheet', desc: 'Blanc pur, typographie journal' },
-    { id: 'field',      label: 'Terrain',    desc: 'Kaki foncé, contraste élevé' },
+    { id: 'archive',    label: 'Archive',    desc: 'Ivoire crème, accent bordeaux & ocre' },
+    { id: 'broadsheet', label: 'Broadsheet', desc: 'Surfaces blanches, accent rouge & bleu' },
+    { id: 'field',      label: 'Terrain',    desc: 'Kraft & vert forêt, accent sarcelle' },
   ];
 
   readonly colorModes: { id: ColorMode; label: string; icon: string }[] = [
