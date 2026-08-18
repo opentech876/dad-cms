@@ -140,4 +140,18 @@ describe('SearchService', () => {
     await firstValueFrom(service.search('indep', 25));
     expect(fromCalls.every(c => c.limit === 25)).toBe(true);
   });
+
+  it('subtitle undefined quand les champs optionnels manquent', async () => {
+    setup({
+      events:       [{ id: 'e1', title: 'X' }],
+      ad_campaigns: [{ id: 'c1', name: 'Y' }],
+      companies:    [{ id: 'co1', name: 'Z' }],
+      calendars:    [{ id: 'ca1', name: 'W' }],
+    });
+    const r = await firstValueFrom(service.search('x'));
+    expect(r.events[0].subtitle).toBeUndefined();
+    expect(r.campaigns[0].subtitle).toBeUndefined();
+    expect(r.companies[0].subtitle).toBeUndefined();
+    expect(r.calendars[0].subtitle).toBeUndefined();
+  });
 });
