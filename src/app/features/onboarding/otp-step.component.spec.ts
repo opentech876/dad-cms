@@ -182,4 +182,34 @@ describe('OtpStepComponent', () => {
       expect(event.preventDefault).toHaveBeenCalled();
     });
   });
+
+  // ─── onInput() / onKeydown() ───────────────────────────────────────────────
+
+  describe('onInput() / onKeydown()', () => {
+    it('place le chiffre saisi et avance le focus', () => {
+      component.onInput(0, { target: { value: '5' } } as any);
+      expect(component.digits()[0]).toBe('5');
+    });
+
+    it('ignore une lettre (aucun chiffre retenu)', () => {
+      component.onInput(1, { target: { value: 'a' } } as any);
+      expect(component.digits()[1]).toBe('');
+    });
+
+    it('déclenche la vérification quand le dernier champ complète le code', async () => {
+      component.digits.set(['1', '2', '3', '4', '5', '']);
+      component.onInput(5, { target: { value: '6' } } as any);
+      await fixture.whenStable();
+      expect(verifyOtpSpy).toHaveBeenCalledWith('test@exemple.com', '123456', 'email');
+    });
+
+    it('Backspace sur un champ vide recule le focus sans erreur', () => {
+      component.digits.set(['1', '', '', '', '', '']);
+      expect(() => component.onKeydown(2, { key: 'Backspace' } as any)).not.toThrow();
+    });
+
+    it('ignore les autres touches', () => {
+      expect(() => component.onKeydown(0, { key: 'a' } as any)).not.toThrow();
+    });
+  });
 });

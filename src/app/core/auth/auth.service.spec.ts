@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { AuthService } from './auth.service';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -257,6 +257,30 @@ describe('AuthService', () => {
       service.signOut().subscribe(() => {
         expect(mockSupabase.signOut).toHaveBeenCalled();
         expect(router.navigate).toHaveBeenCalledWith(['/login']);
+        done();
+      });
+    });
+  });
+
+  describe('accès session / utilisateur / plateforme', () => {
+    it('getCurrentUser expose currentUser$', (done) => {
+      service.getCurrentUser().subscribe((u) => {
+        expect(u).toBeNull();
+        done();
+      });
+    });
+
+    it('getCurrentSession expose currentSession$', (done) => {
+      mockSupabase.currentSession$ = of(null);
+      service.getCurrentSession().subscribe((s) => {
+        expect(s).toBeNull();
+        done();
+      });
+    });
+
+    it('isSystemAdmin renvoie false sans utilisateur connecté', (done) => {
+      service.isSystemAdmin().subscribe((v) => {
+        expect(v).toBe(false);
         done();
       });
     });
