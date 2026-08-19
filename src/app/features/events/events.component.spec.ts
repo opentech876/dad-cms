@@ -842,4 +842,87 @@ describe('EventsComponent', () => {
       expect(img.src).toBe(after);
     });
   });
+
+  describe('import Excel — modal + parsing', () => {
+    it('openImportModal réinitialise l\'état et closeImportModal ferme', () => {
+      component.openImportModal();
+      expect(component.showImportModal()).toBe(true);
+      expect(component.importStatus()).toBe('idle');
+      component.closeImportModal();
+      expect(component.showImportModal()).toBe(false);
+    });
+
+    it('onImportFileChange ignore l\'absence de fichier', () => {
+      expect(() => component.onImportFileChange({ target: { files: [] } })).not.toThrow();
+    });
+
+    describe('_parseDateCell', () => {
+      const parse = (v: unknown) => (component as any)._parseDateCell(v);
+
+      it('null/undefined/vide → null', () => {
+        expect(parse(null)).toBeNull();
+        expect(parse(undefined)).toBeNull();
+        expect(parse('')).toBeNull();
+      });
+
+      it('objet Date valide → ISO, Date invalide → null', () => {
+        expect(parse(new Date('1960-08-15T00:00:00Z'))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(parse(new Date('pas-une-date'))).toBeNull();
+      });
+
+      it('numéro de série Excel → ISO ; Infinity → null', () => {
+        expect(parse(25569)).toMatch(/^\d{4}-\d{2}-\d{2}$/); // 1970-01-01
+        expect(parse(Infinity)).toBeNull();
+      });
+
+      it('chaîne ISO valide/invalide', () => {
+        expect(parse('1960-08-15')).toBe('1960-08-15');
+        expect(parse('1960-13-15')).toBeNull();
+      });
+
+      it('format jj/mm/aaaa avec année sur 2 chiffres', () => {
+        expect(parse('15/08/1960')).toBe('1960-08-15');
+        expect(parse('15/08/60')).toBe('1960-08-15');
+        expect(parse('15/08/30')).toBe('2030-08-15');
+        expect(parse('15/13/1960')).toBeNull();
+        expect(parse('bonjour')).toBeNull();
+      });
+    });
+
+    describe('_parseImportRows', () => {
+      const run = (rows: unknown[][]) => (component as any)._parseImportRows(rows);
+
+      it('tableau vide → résultat vide', () => {
+        expect(run([]).valid).toEqual([]);
+      });
+
+      it('en-têtes reconnus + ligne valide → 1 événement, colonne inconnue ignorée', () => {
+        const res = run([
+          ['Date', 'Titre', 'Description', 'Remarques'],
+          ['1960-08-15', 'Indépendance', 'Le Congo devient indépendant.', 'x'],
+        ]);
+        expect(res.valid).toHaveLength(1);
+        expect(res.valid[0].title).toBe('Indépendance');
+        expect(res.ignored.map((i: any) => i.header)).toContain('Remarques');
+      });
+
+      it('date invalide → comptée dans skippedBadDate', () => {
+        const res = run([
+          ['Date', 'Titre'],
+          ['pas-une-date', 'Titre'],
+        ]);
+        expect(res.skippedBadDate).toBe(1);
+        expect(res.valid).toHaveLength(0);
+      });
+
+      it('mode sans en-tête → colonnes positionnelles', () => {
+        const res = run([
+          ['aaa', 'bbb', 'ccc'],
+          ['1960-08-15', 'Texte descriptif suffisant', ''],
+        ]);
+        expect(res.valid).toHaveLength(1);
+        expect(res.skippedBadDate).toBe(1); // la ligne 'aaa' n'a pas de date valide
+      });
+    });
+  });
 });
