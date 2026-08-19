@@ -184,4 +184,83 @@ describe('ProposeModalComponent', () => {
       expect(component.error()).toBe('boom');
     });
   });
+
+  describe('helpers d\'affichage + interactions', () => {
+    beforeEach(() => {
+      (global as any).URL.createObjectURL = jest.fn(() => 'blob:x');
+      (global as any).URL.revokeObjectURL = jest.fn();
+    });
+
+    it('replaceTitleFor renvoie null quand le créneau est libre', () => {
+      expect(component.replaceTitleFor(1)).toBeNull();
+      expect(component.replaceTitleFor(2)).toBeNull();
+    });
+
+    it('positionLabel et artFor délèguent aux utilitaires', () => {
+      expect(component.positionLabel(1)).toBeTruthy();
+      expect(component.artFor('seed')).toContain('linear-gradient');
+    });
+
+    it('imageUrl renvoie une URL ou null', () => {
+      expect(component.imageUrl({ image_path: 'e/c.jpg' } as any)).toBe('url/e/c.jpg');
+      expect(component.imageUrl({} as any)).toBeNull();
+      expect(component.imageUrl(null)).toBeNull();
+    });
+
+    it('eventYear extrait l\'année ou renvoie une chaîne vide', () => {
+      expect(component.eventYear({ event_date: '1963-08-15' } as any)).toBe('1963');
+      expect(component.eventYear({} as any)).toBe('');
+    });
+
+    it('setTab change l\'onglet et efface l\'erreur', () => {
+      component.error.set('x');
+      component.setTab('create');
+      expect(component.tab()).toBe('create');
+      expect(component.error()).toBeNull();
+    });
+
+    it('pickLibrary sélectionne un événement et passe en réutilisation', () => {
+      component.pickLibrary('ev-9');
+      expect(component.tab()).toBe('reuse');
+      expect(component.pickedLibId()).toBe('ev-9');
+    });
+
+    it('clearPicked réinitialise la sélection', () => {
+      component.pickLibrary('ev-9');
+      component.clearPicked();
+      expect(component.pickedLibId()).toBeNull();
+    });
+
+    it('onImageChange stocke le fichier et crée un aperçu', () => {
+      const file = new File(['x'], 'p.jpg', { type: 'image/jpeg' });
+      component.onImageChange({ target: { files: [file] } } as any);
+      expect(component.imageFile()).toBe(file);
+      expect(component.imagePreview()).toBe('blob:x');
+    });
+
+    it('onImageChange ignore l\'absence de fichier', () => {
+      component.onImageChange({ target: { files: [] } } as any);
+      expect(component.imageFile()).toBeNull();
+    });
+
+    it('close révoque l\'aperçu quand on n\'est pas en sauvegarde', () => {
+      const file = new File(['x'], 'p.jpg', { type: 'image/jpeg' });
+      component.onImageChange({ target: { files: [file] } } as any);
+      component.close();
+      expect(component.imagePreview()).toBeNull();
+    });
+
+    it('close ne fait rien pendant une sauvegarde', () => {
+      component.saving.set(true);
+      component.onImageChange({ target: { files: [new File(['x'], 'p.jpg')] } } as any);
+      component.close();
+      expect(component.imagePreview()).toBe('blob:x');
+    });
+
+    it('ngOnDestroy révoque l\'aperçu restant', () => {
+      component.onImageChange({ target: { files: [new File(['x'], 'p.jpg')] } } as any);
+      component.ngOnDestroy();
+      expect((global as any).URL.revokeObjectURL).toHaveBeenCalled();
+    });
+  });
 });
