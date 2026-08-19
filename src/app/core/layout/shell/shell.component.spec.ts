@@ -985,4 +985,49 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(component.pendingRecs()).toBe(9);
     });
   });
+
+  describe('helpers UI (icônes, menu, initiales, toggles)', () => {
+    beforeEach(() => createComponent('owner'));
+
+    it('toastIcon mappe chaque type de toast', () => {
+      expect(component.toastIcon('success')).toBe('@tui.check-circle');
+      expect(component.toastIcon('error')).toBe('@tui.circle-x');
+      expect(component.toastIcon('warning')).toBe('@tui.triangle-alert');
+      expect(component.toastIcon('info')).toBe('@tui.info');
+    });
+
+    it('toggleWorkspaceMenu bascule et closeWorkspaceMenu ferme', () => {
+      expect(component.workspaceMenuOpen()).toBe(false);
+      component.toggleWorkspaceMenu();
+      expect(component.workspaceMenuOpen()).toBe(true);
+      component.closeWorkspaceMenu();
+      expect(component.workspaceMenuOpen()).toBe(false);
+    });
+
+    it('workspaceInitialsFor gère vide, un mot et deux mots', () => {
+      expect(component.workspaceInitialsFor('')).toBe('DA');
+      expect(component.workspaceInitialsFor('Congo')).toBe('CO');
+      expect(component.workspaceInitialsFor('Day After')).toBe('DA');
+    });
+
+    it('workspaceMemberLabelFor accorde le pluriel', () => {
+      expect(component.workspaceMemberLabelFor(1)).toBe('1 membre');
+      expect(component.workspaceMemberLabelFor(3)).toBe('3 membres');
+    });
+
+    it('toggleShowSysadminPassword et toggleCollapsed basculent leur signal', () => {
+      expect(component.showSysadminPassword()).toBe(false);
+      component.toggleShowSysadminPassword();
+      expect(component.showSysadminPassword()).toBe(true);
+      const collapsed = component.collapsed();
+      component.toggleCollapsed();
+      expect(component.collapsed()).toBe(!collapsed);
+    });
+
+    it('logout appelle auth.signOut', () => {
+      const auth = TestBed.inject(AuthService) as any;
+      component.logout();
+      expect(auth.signOut).toHaveBeenCalled();
+    });
+  });
 });

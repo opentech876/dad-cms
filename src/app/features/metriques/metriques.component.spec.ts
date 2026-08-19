@@ -214,4 +214,45 @@ describe('MetriquesComponent', () => {
       expect(component.globalCtr()).toBeNull();
     });
   });
+
+  describe('ngOnInit / helpers / export', () => {
+    it('ngOnInit remplit les signaux depuis les services', async () => {
+      mockService.getDeviceStats.mockReturnValueOnce(of({ total: 5, android: 3, ios: 2 }));
+      mockInsights.getMetricsExtras.mockReturnValueOnce(of(makeExtras({ team_velocity: [] })));
+      await component.ngOnInit();
+      expect(component.deviceStats().total).toBe(5);
+      expect(component.loading()).toBe(false);
+    });
+
+    it('formatAction met en forme les actions snake_case', () => {
+      expect(component.formatAction('mark_paid')).toBe('Mark Paid');
+    });
+
+    it('monthLabel renvoie le libellé du mois ou le numéro', () => {
+      expect(component.monthLabel(1)).toBeTruthy();
+      expect(component.monthLabel(99)).toBe('99');
+    });
+
+    it('exportExposureCsv ne fait rien sans ligne', () => {
+      const createSpy = jest.spyOn(document, 'createElement');
+      (component as any).advertiserExposure = () => [];
+      component.exportExposureCsv();
+      expect(createSpy).not.toHaveBeenCalledWith('a');
+      createSpy.mockRestore();
+    });
+
+    it('exportExposureCsv déclenche un téléchargement quand il y a des lignes', () => {
+      const click = jest.fn();
+      const anchor = { href: '', download: '', click } as any;
+      jest.spyOn(document, 'createElement').mockReturnValueOnce(anchor);
+      (global as any).URL.createObjectURL = jest.fn(() => 'blob:x');
+      (global as any).URL.revokeObjectURL = jest.fn();
+      (component as any).advertiserExposure = (() => [
+        { company_name: 'ACME', impressions: 10, clicks: 1, days_active: 2, positions: ['footer'] },
+      ]) as any;
+      component.exportExposureCsv();
+      expect(click).toHaveBeenCalled();
+      expect(anchor.download).toContain('exposition-annonceurs-');
+    });
+  });
 });
