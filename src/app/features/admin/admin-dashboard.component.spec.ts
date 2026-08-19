@@ -59,4 +59,14 @@ describe('AdminDashboardComponent', () => {
     await component.reload();
     expect(admin.dashboardStats).toHaveBeenCalledTimes(1);
   });
+
+  it('totalMemberships vaut 0 quand il n\'y a pas encore de stats', () => {
+    expect(component.totalMemberships()).toBe(0);
+  });
+
+  it('utilise un message générique quand l\'erreur n\'en porte pas', async () => {
+    admin.dashboardStats.mockReturnValueOnce(throwError(() => ({})));
+    await component.ngOnInit();
+    expect(component.error()).toContain('Échec');
+  });
 });

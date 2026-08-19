@@ -1,7 +1,7 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AdminComponent } from './admin.component';
 import { AdminService, AdminWorkspace } from '../../core/admin/admin.service';
 import { WorkspaceContextService } from '../../core/workspace/workspace-context.service';
@@ -203,6 +203,25 @@ describe('AdminComponent', () => {
       component.inviteEmail.set('   ');
       await component.submitInviteManager();
       expect(admin.inviteManager).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('robustesse', () => {
+    it('reload() vide la liste quand listWorkspaces échoue', async () => {
+      admin.listWorkspaces.mockReturnValueOnce(throwError(() => new Error('down')));
+      await component.reload();
+      expect(component.workspaces()).toEqual([]);
+      expect(component.loading()).toBe(false);
+    });
+
+    it('closeCreateModal ne ferme pas pendant une sauvegarde', () => {
+      component.openCreateModal();
+      component.createSaving.set(true);
+      component.closeCreateModal();
+      expect(component.showCreateModal()).toBe(true);
+      component.createSaving.set(false);
+      component.closeCreateModal();
+      expect(component.showCreateModal()).toBe(false);
     });
   });
 });
