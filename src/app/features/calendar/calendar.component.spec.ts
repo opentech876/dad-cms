@@ -924,5 +924,82 @@ describe('CalendarComponent', () => {
       expect(component.showTrash()).toBe(false);
       expect(component.trashItems()).toEqual([]);
     });
+
+    it('restoreCalendar affiche une erreur quand la RPC échoue', async () => {
+      (mockCalendarService as any).restoreCalendar = jest.fn().mockReturnValue(of({ success: false, error: 'nope' }));
+      await component.restoreCalendar('cal-del');
+      expect(mockToast.error).toHaveBeenCalledWith('nope');
+    });
+  });
+
+  describe('purge + vidage de la corbeille', () => {
+    beforeEach(async () => {
+      (mockCalendarService as any).purgeCalendar = jest.fn().mockReturnValue(of({ success: true }));
+      (mockCalendarService as any).emptyCalendarTrash = jest.fn().mockReturnValue(of({ success: true, purged: 2 }));
+      (mockCalendarService as any).listDeletedCalendars = jest.fn().mockReturnValue(of([{ id: 'cal-del', name: 'Vieux', year: 2019 }]));
+      await component.ngOnInit();
+      await component.openTrash();
+    });
+
+    it('purgeCalendar supprime définitivement une ligne', async () => {
+      await component.purgeCalendar('cal-del', 'Vieux');
+      expect((mockCalendarService as any).purgeCalendar).toHaveBeenCalledWith('cal-del');
+      expect(mockToast.success).toHaveBeenCalled();
+    });
+
+    it('purgeCalendar affiche une erreur en cas d\'échec', async () => {
+      (mockCalendarService as any).purgeCalendar = jest.fn().mockReturnValue(of({ success: false, error: 'boom' }));
+      await component.purgeCalendar('cal-del', 'Vieux');
+      expect(mockToast.error).toHaveBeenCalledWith('boom');
+    });
+
+    it('openEmptyTrashModal / closeEmptyTrashModal', () => {
+      component.openEmptyTrashModal();
+      expect(component.emptyTrashModalOpen()).toBe(true);
+      component.closeEmptyTrashModal();
+      expect(component.emptyTrashModalOpen()).toBe(false);
+    });
+
+    it('confirmEmptyTrash vide la corbeille quand le mot-clé correspond', async () => {
+      component.openEmptyTrashModal();
+      component.emptyTrashConfirm.set('SUPPRIMER');
+      await component.confirmEmptyTrash();
+      expect((mockCalendarService as any).emptyCalendarTrash).toHaveBeenCalled();
+      expect(mockToast.success).toHaveBeenCalled();
+    });
+
+    it('confirmEmptyTrash expose une erreur en cas d\'échec', async () => {
+      (mockCalendarService as any).emptyCalendarTrash = jest.fn().mockReturnValue(of({ success: false, error: 'échec' }));
+      component.openEmptyTrashModal();
+      component.emptyTrashConfirm.set('SUPPRIMER');
+      await component.confirmEmptyTrash();
+      expect(component.emptyTrashError()).toBe('échec');
+    });
+  });
+
+  describe('campagnes + filtre du jour', () => {
+    beforeEach(async () => {
+      await component.ngOnInit();
+      component.selectCalendar('cal-1'); // année 2024
+    });
+
+    it('campaignByMmdd mappe les jours couverts par une campagne active', () => {
+      component.activeCampaigns.set([
+        { id: 'a1', name: 'MTN', active: true, start_date: '2024-08-01', end_date: '2024-08-31' } as any,
+        { id: 'a2', name: 'Inactive', active: false, start_date: '2024-08-01', end_date: '2024-08-31' } as any,
+      ]);
+      expect(component.campaignByMmdd().get('08-15')).toBe('MTN');
+    });
+
+    it('filteredDayEvents filtre par recherche', () => {
+      component.dayModalEvents.set([
+        { id: 'e1', title: 'Indépendance', event_date: '1960-08-15', displayPosition: 1 } as any,
+        { id: 'e2', title: 'Autre', event_date: '1970-01-02', displayPosition: 2 } as any,
+      ]);
+      component.dayModalSearch.set('indép');
+      expect(component.filteredDayEvents()).toHaveLength(1);
+      component.dayModalSearch.set('');
+      expect(component.filteredDayEvents()).toHaveLength(2);
+    });
   });
 });
