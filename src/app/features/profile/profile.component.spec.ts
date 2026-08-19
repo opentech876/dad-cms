@@ -350,4 +350,120 @@ describe('ProfileComponent', () => {
       );
     });
   });
+
+  describe('avatar / secondary email / MFA', () => {
+    beforeEach(async () => {
+      global.URL.createObjectURL = jest.fn(() => 'blob:x');
+      global.URL.revokeObjectURL = jest.fn();
+      (mockWorkspace as any).uploadAvatar = jest.fn().mockReturnValue(of({ success: true, avatarUrl: 'http://cdn/a.png' }));
+      await component.ngOnInit();
+    });
+
+    it('onAvatarChange stocke le fichier + preview', () => {
+      const file = new File([new Uint8Array(3)], 'a.png', { type: 'image/png' });
+      component.onAvatarChange({ target: { files: [file] } } as any);
+      expect(component.avatarFile()).toBe(file);
+      expect(component.avatarPreview()).toBeTruthy();
+    });
+
+    it('uploadAvatar: succès puis erreur', async () => {
+      component.avatarFile.set(new File([new Uint8Array(3)], 'a.png', { type: 'image/png' }));
+      await component.uploadAvatar();
+      expect(component.avatarUrl()).toBe('http://cdn/a.png');
+      expect(mockToast.success).toHaveBeenCalled();
+
+      (mockWorkspace as any).uploadAvatar = jest.fn().mockReturnValue(of({ success: false, error: 'boom' }));
+      component.avatarFile.set(new File([new Uint8Array(3)], 'a.png', { type: 'image/png' }));
+      await component.uploadAvatar();
+      expect(mockToast.error).toHaveBeenCalledWith('boom');
+    });
+
+    it('saveSecondaryEmail: invalide / identique / succès / suppression', async () => {
+      component.secondaryEmail.set('pas-un-email');
+      await component.saveSecondaryEmail();
+      expect(component.secondaryEmailError()).toContain('invalide');
+
+      component.secondaryEmail.set(component.userEmail());
+      await component.saveSecondaryEmail();
+      expect(component.secondaryEmailError()).toContain('différente');
+
+      component.secondaryEmail.set('secours@test.com');
+      await component.saveSecondaryEmail();
+      expect(mockSupabase.updateSecondaryEmail).toHaveBeenCalledWith('secours@test.com');
+
+      component.secondaryEmail.set('');
+      await component.saveSecondaryEmail();
+      expect(mockSupabase.updateSecondaryEmail).toHaveBeenCalledWith(null);
+    });
+
+    it('saveSecondaryEmail: erreur DB', async () => {
+      mockSupabase.updateSecondaryEmail.mockResolvedValueOnce({ data: null, error: { message: 'x' } });
+      component.secondaryEmail.set('secours@test.com');
+      await component.saveSecondaryEmail();
+      expect(component.secondaryEmailError()).toContain('Erreur');
+    });
+
+    it('mfaEnrolled computed', () => {
+      component.mfaFactors.set([{ status: 'verified' }]);
+      expect(component.mfaEnrolled()).toBe(true);
+      component.mfaFactors.set([{ status: 'unverified' }]);
+      expect(component.mfaEnrolled()).toBe(false);
+    });
+
+    it('startMfaEnrollment: nettoie un facteur pending puis enrôle', async () => {
+      mockSupabase.listMfaFactors.mockResolvedValueOnce({ data: { totp: [{ id: 'old', status: 'unverified' }] }, error: null });
+      mockSupabase.enrollTotp.mockResolvedValueOnce({ data: { id: 'f1', totp: { qr_code: 'qr', secret: 's' } }, error: null });
+      await component.startMfaEnrollment();
+      expect(mockSupabase.unenrollTotp).toHaveBeenCalledWith('old');
+      expect(component.mfaPendingFactor()?.id).toBe('f1');
+    });
+
+    it('startMfaEnrollment: erreur enroll', async () => {
+      mockSupabase.enrollTotp.mockResolvedValueOnce({ data: null, error: { message: 'nope' } });
+      await component.startMfaEnrollment();
+      expect(component.mfaError()).toContain('enrôlement');
+    });
+
+    it('confirmMfaEnrollment: code court / succès / erreur', async () => {
+      component.mfaPendingFactor.set({ id: 'f1', qr: 'q', secret: 's' });
+      component.mfaCode.set('123');
+      await component.confirmMfaEnrollment();
+      expect(mockSupabase.verifyTotpEnrollment).not.toHaveBeenCalled();
+
+      component.mfaCode.set('123456');
+      await component.confirmMfaEnrollment();
+      expect(mockSupabase.verifyTotpEnrollment).toHaveBeenCalledWith('f1', '123456');
+      expect(component.mfaPendingFactor()).toBeNull();
+
+      component.mfaPendingFactor.set({ id: 'f1', qr: 'q', secret: 's' });
+      component.mfaCode.set('000000');
+      mockSupabase.verifyTotpEnrollment.mockResolvedValueOnce({ data: null, error: { message: 'bad' } });
+      await component.confirmMfaEnrollment();
+      expect(component.mfaError()).toContain('invalide');
+    });
+
+    it('cancelMfaEnrollment nettoie le facteur', () => {
+      component.mfaPendingFactor.set({ id: 'f1', qr: 'q', secret: 's' });
+      component.cancelMfaEnrollment();
+      expect(mockSupabase.unenrollTotp).toHaveBeenCalledWith('f1');
+      expect(component.mfaPendingFactor()).toBeNull();
+    });
+
+    it('disableMfa: succès puis erreur', async () => {
+      await component.disableMfa('f1');
+      expect(mockSupabase.unenrollTotp).toHaveBeenCalledWith('f1');
+      mockSupabase.unenrollTotp.mockResolvedValueOnce({ data: null, error: { message: 'x' } });
+      await component.disableMfa('f2');
+      expect(mockToast.error).toHaveBeenCalled();
+    });
+
+    it('cancelEmailChange + toggleShowNewPassword', () => {
+      component.pendingNewEmail.set('x@y.com');
+      component.cancelEmailChange();
+      expect(component.pendingNewEmail()).toBe('');
+      const before = component.showNewPassword();
+      component.toggleShowNewPassword();
+      expect(component.showNewPassword()).toBe(!before);
+    });
+  });
 });
