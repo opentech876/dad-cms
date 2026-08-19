@@ -15,7 +15,11 @@ const config: Config = {
     '!src/app/app.routes.ts',
   ],
   coverageThreshold: {
-    global: { statements: 70, branches: 70, functions: 70, lines: 70 },
+    // Pragmatic split: 90% on statements/functions/lines (all comfortably
+    // above), 80% on branches — real components plateau in the low-80s on
+    // branches because of defensive `??`/`?.`/error paths that aren't worth
+    // contorting a test to reach. Current: st 93.8 / br 80.2 / fn 92.3 / ln 96.4.
+    global: { statements: 90, branches: 80, functions: 90, lines: 90 },
   },
 };
 
