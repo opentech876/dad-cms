@@ -208,5 +208,57 @@ describe('CompaniesComponent', () => {
       await component.renameType(FAKE_TYPES[0] as any);
       expect(mockCompanyType.renameType).toHaveBeenCalledWith('t1', 'Télécom');
     });
+
+    it('addType() ignore un libellé vide', async () => {
+      component.newTypeLabel.set('   ');
+      await component.addType();
+      expect(mockCompanyType.createType).not.toHaveBeenCalled();
+    });
+
+    it('addType() affiche un message dédié pour un doublon', async () => {
+      mockCompanyType.createType.mockReturnValueOnce(of({ success: false, error: 'duplicate_label' }));
+      component.newTypeLabel.set('Télécom');
+      await component.addType();
+      expect(mockToast.error).toHaveBeenCalledWith('Ce type existe déjà.');
+    });
+
+    it('renameType() ne fait rien si le prompt est annulé', async () => {
+      window.prompt = jest.fn(() => null);
+      await component.renameType(FAKE_TYPES[0] as any);
+      expect(mockCompanyType.renameType).not.toHaveBeenCalled();
+    });
+
+    it('renameType() signale un doublon', async () => {
+      window.prompt = jest.fn(() => 'Banque');
+      mockCompanyType.renameType.mockReturnValueOnce(of({ success: false, error: 'duplicate_label' }));
+      await component.renameType(FAKE_TYPES[0] as any);
+      expect(mockToast.error).toHaveBeenCalledWith('Ce type existe déjà.');
+    });
+
+    it('removeType() annulé par la confirmation ne supprime pas', async () => {
+      window.confirm = jest.fn(() => false);
+      await component.removeType(FAKE_TYPES[2] as any);
+      expect(mockCompanyType.deleteType).not.toHaveBeenCalled();
+    });
+
+    it('deleteCompany() supprime après confirmation', async () => {
+      window.confirm = jest.fn(() => true);
+      await component.deleteCompany('c1');
+      expect(mockCompany.deleteCompany).toHaveBeenCalledWith('c1');
+      expect(mockToast.success).toHaveBeenCalledWith('Compagnie supprimée.');
+    });
+
+    it('deleteCompany() affiche une erreur quand le service échoue', async () => {
+      window.confirm = jest.fn(() => true);
+      mockCompany.deleteCompany.mockReturnValueOnce(of({ success: false, error: 'liée' }));
+      await component.deleteCompany('c1');
+      expect(mockToast.error).toHaveBeenCalledWith('liée');
+    });
+
+    it('deleteCompany() annulé ne supprime pas', async () => {
+      window.confirm = jest.fn(() => false);
+      await component.deleteCompany('c1');
+      expect(mockCompany.deleteCompany).not.toHaveBeenCalled();
+    });
   });
 });
