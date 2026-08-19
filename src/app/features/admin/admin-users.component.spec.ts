@@ -129,4 +129,18 @@ describe('AdminUsersComponent', () => {
       expect(component.orphanCount()).toBe(1); // Only USER_ALL_DELETED
     });
   });
+
+  describe('filteredUsers — branches de recherche', () => {
+    beforeEach(async () => { await component.ngOnInit(); });
+
+    it('filtre par nom d\'espace de travail (membership)', () => {
+      component.searchQuery.set('diouga');
+      expect(component.filteredUsers().length).toBe(3);
+    });
+
+    it('renvoie une liste vide quand rien ne correspond (nom nul inclus)', () => {
+      component.searchQuery.set('zzz-aucun-match');
+      expect(component.filteredUsers().length).toBe(0);
+    });
+  });
 });
