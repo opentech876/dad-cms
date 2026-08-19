@@ -368,5 +368,31 @@ describe('DashboardComponent', () => {
 
       expect(component.activityFeed()).toEqual([]);
     });
+
+    it('utilise des valeurs de repli pour acteur/action/table inconnus', async () => {
+      mockInsights.getDashboardStats.mockReturnValue(
+        of(
+          makeOpStats({
+            activity: [
+              {
+                actor_name: null,
+                action: 'ACTION_INCONNUE',
+                table_name: 'table_inconnue',
+                record_label: null,
+                changed_at: new Date().toISOString(),
+              } as any,
+            ],
+          }),
+        ),
+      );
+
+      await component.ngOnInit();
+
+      const row = component.activityFeed()[0];
+      expect(row.who).toBe('Système');
+      expect(row.initials).toBe('S');
+      expect(row.action).toBe('action_inconnue');
+      expect(row.target).toBe('table_inconnue');
+    });
   });
 });

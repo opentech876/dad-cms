@@ -288,5 +288,20 @@ describe('CuratorWorkspaceComponent', () => {
       component.onCreateImageChange({ target: { files: [] } } as any);
       expect(component.createImageFile()).toBeNull();
     });
+
+    it('imageUrlMap mappe les événements ayant une image', () => {
+      component.libraryEvents.set([{ id: 'e1', image_path: 'p.jpg' } as any, { id: 'e2', image_path: null } as any]);
+      const map = component.imageUrlMap();
+      expect(map.get('e1')).toBe('https://cdn/p.jpg');
+      expect(map.has('e2')).toBe(false);
+    });
+
+    it('saveDayEditor refuse le même événement sur les deux positions', async () => {
+      component.editorMmdd.set('08-15');
+      component.editorPos1.set('ev-1');
+      component.editorPos2.set('ev-1');
+      await component.saveDayEditor();
+      expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('deux positions'));
+    });
   });
 });
