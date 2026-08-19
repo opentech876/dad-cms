@@ -585,4 +585,209 @@ describe('AdCampaignsComponent', () => {
       });
     });
   });
+
+  describe('éditeur + actions', () => {
+    beforeEach(async () => {
+      mockService.listCampaigns.mockReturnValue(of([
+        makeCampaign({ id: 'c1', paid_at: null, manager_confirmed_at: null, validated_at: null }),
+      ]));
+      await component['_reload']();
+    });
+
+    it('openEditor(id) pré-remplit les signaux', () => {
+      component.openEditor('c1');
+      expect(component.editorView()).toBe(true);
+      expect(component.editorCampaignId()).toBe('c1');
+      expect(component.editorName()).toBe('MTN Congo');
+    });
+
+    it('openEditor() sans id ouvre un éditeur vide', () => {
+      component.openEditor();
+      expect(component.editorCampaignId()).toBeNull();
+      expect(component.editorName()).toBe('');
+    });
+
+    it('closeEditor ferme la vue', () => {
+      component.openEditor('c1');
+      component.closeEditor();
+      expect(component.editorView()).toBe(false);
+    });
+
+    it('editorCurrentStatus couvre inactive/planifiee/active/sans-dates', () => {
+      component.editorActive.set(false);
+      expect(component.editorCurrentStatus()).toBe('terminee');
+      component.editorActive.set(true);
+      component.editorStartDate.set(TOMORROW); component.editorEndDate.set(TOMORROW);
+      expect(component.editorCurrentStatus()).toBe('planifiee');
+      component.editorStartDate.set(YESTERDAY); component.editorEndDate.set(TOMORROW);
+      expect(component.editorCurrentStatus()).toBe('active');
+      component.editorStartDate.set('');
+      expect(component.editorCurrentStatus()).toBe('terminee');
+    });
+
+    it('isDurationExceeded + validationItems (erreur > 14 j, warn 8–14 j)', () => {
+      component.editorStartDate.set('2026-01-01');
+      component.editorEndDate.set('2026-01-20');
+      expect(component.isDurationExceeded()).toBe(true);
+      expect(component.validationItems().some(i => i.kind === 'error')).toBe(true);
+      component.editorEndDate.set('2026-01-10');
+      expect(component.validationItems().some(i => i.kind === 'warn' && i.label.includes('Durée'))).toBe(true);
+    });
+
+    it('editorBannerUrl: preview local > path > null', () => {
+      component.editorLocalPreview.set('blob:x');
+      expect(component.editorBannerUrl()).toBe('blob:x');
+      component.editorLocalPreview.set(null);
+      component.editorImagePath.set('c1/banner.jpg');
+      expect(component.editorBannerUrl()).toBe('https://example.com/banner.jpg');
+      component.editorImagePath.set(null);
+      expect(component.editorBannerUrl()).toBeNull();
+    });
+
+    it('markPaidFromEditor: succès → toast + resync', async () => {
+      component.openEditor('c1');
+      await component.markPaidFromEditor();
+      expect((mockService as any).markPaid).toHaveBeenCalledWith('c1');
+      expect(mockToast.success).toHaveBeenCalled();
+    });
+    it('markPaidFromEditor: erreur → toast.error', async () => {
+      component.openEditor('c1');
+      (mockService as any).markPaid.mockReturnValueOnce(of({ success: false, error: 'boom' }));
+      await component.markPaidFromEditor();
+      expect(mockToast.error).toHaveBeenCalledWith('boom');
+    });
+    it('confirmFromEditor: succès', async () => {
+      component.openEditor('c1');
+      await component.confirmFromEditor();
+      expect((mockService as any).confirmCampaign).toHaveBeenCalledWith('c1');
+    });
+    it('markPaidRow / confirmRow', async () => {
+      await component.markPaidRow('c1');
+      await component.confirmRow('c1');
+      expect((mockService as any).markPaid).toHaveBeenCalledWith('c1');
+      expect((mockService as any).confirmCampaign).toHaveBeenCalledWith('c1');
+    });
+    it('markPaidRow: erreur → toast', async () => {
+      (mockService as any).markPaid.mockReturnValueOnce(of({ success: false, error: 'x' }));
+      await component.markPaidRow('c1');
+      expect(mockToast.error).toHaveBeenCalled();
+    });
+
+    it('save active avec conflit → ouvre le dialog overlap', async () => {
+      mockService.findOverlappingCampaigns.mockReturnValue(of([makeCampaign({ id: 'other' })]));
+      component.openEditor('c1');
+      component.editorStartDate.set(YESTERDAY); component.editorEndDate.set(TOMORROW);
+      component.editorCompanyId.set('co-mtn');
+      await component.save(true);
+      expect(component.overlapDialogVisible()).toBe(true);
+      expect(component.overlapList().length).toBe(1);
+    });
+    it('save active sans conflit → enregistre', async () => {
+      mockService.findOverlappingCampaigns.mockReturnValue(of([]));
+      component.openEditor('c1');
+      component.editorStartDate.set(YESTERDAY); component.editorEndDate.set(TOMORROW);
+      component.editorCompanyId.set('co-mtn');
+      await component.save(true);
+      expect(component.overlapDialogVisible()).toBe(false);
+      expect(mockService.updateCampaign).toHaveBeenCalled();
+    });
+    it('confirmOverlap relance la sauvegarde; cancelOverlap réinitialise', async () => {
+      mockService.findOverlappingCampaigns.mockReturnValue(of([makeCampaign({ id: 'other' })]));
+      component.openEditor('c1');
+      component.editorStartDate.set(YESTERDAY); component.editorEndDate.set(TOMORROW);
+      component.editorCompanyId.set('co-mtn');
+      await component.save(true);
+      await component.confirmOverlap();
+      expect(mockService.updateCampaign).toHaveBeenCalled();
+      component.overlapList.set([makeCampaign()]);
+      component.overlapDialogVisible.set(true);
+      component.cancelOverlap();
+      expect(component.overlapDialogVisible()).toBe(false);
+      expect(component.overlapList()).toEqual([]);
+    });
+
+    it('save (création) sans compagnie → erreur', async () => {
+      component.openEditor();
+      component.editorCompanyId.set(null);
+      component.editorName.set('Nouvelle');
+      await component.save(false);
+      expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('compagnie'));
+    });
+    it('save (création) avec compagnie → createCampaign + fermeture', async () => {
+      component.openEditor();
+      component.editorCompanyId.set('co-mtn');
+      component.editorName.set('Nouvelle');
+      component.editorStartDate.set(YESTERDAY); component.editorEndDate.set(TOMORROW);
+      await component.save(false);
+      expect(mockService.createCampaign).toHaveBeenCalled();
+      expect(component.editorView()).toBe(false);
+    });
+
+    it('deleteCampaign: succès / erreur / sans id', async () => {
+      component.openEditor('c1');
+      await component.deleteCampaign();
+      expect(mockService.deleteCampaign).toHaveBeenCalledWith('c1');
+      component.openEditor('c1');
+      mockService.deleteCampaign.mockReturnValueOnce(of({ success: false, error: 'nope' }));
+      await component.deleteCampaign();
+      expect(mockToast.error).toHaveBeenCalled();
+      component.editorCampaignId.set(null);
+      await component.deleteCampaign();
+    });
+
+    it('durationDays / formatDate / prevPage borné', () => {
+      expect(component.durationDays('2026-01-01', '2026-01-07')).toBe(7);
+      expect(component.formatDate('')).toBe('—');
+      expect(component.formatDate('2026-01-01')).toBe('01/01/2026');
+      component.prevPage();
+      expect(component.currentPage()).toBe(0);
+    });
+  });
+
+  describe('listRows filtres avancés', () => {
+    beforeEach(async () => {
+      mockService.listCampaigns.mockReturnValue(of([
+        makeCampaign({ id: 'a', start_date: '2026-03-01', end_date: '2026-03-10', created_at: '2026-01-15T00:00:00Z' }),
+        makeCampaign({ id: 'b', start_date: '2025-06-01', end_date: '2025-06-10', created_at: '2025-05-20T00:00:00Z', paid_at: null, manager_confirmed_at: null, validated_at: null }),
+      ]));
+      await component['_reload']();
+    });
+
+    it('filtre par année', () => {
+      component.setFilterYear('2026');
+      expect(component.listRows().map(r => r.id)).toEqual(['a']);
+    });
+    it('filtre par année + mois', () => {
+      component.setFilterYear('2026');
+      component.setFilterMonth('03');
+      expect(component.listRows().map(r => r.id)).toEqual(['a']);
+    });
+    it('filtre par mois seul (toutes années)', () => {
+      component.setFilterMonth('06');
+      expect(component.listRows().map(r => r.id)).toEqual(['b']);
+    });
+    it('filtre par état de validation', () => {
+      component.setFilterValidation('validated');
+      expect(component.listRows().map(r => r.id)).toEqual(['a']);
+    });
+    it("filtre par date d'activation (from/to)", () => {
+      component.setActivationFrom('2026-01-01');
+      component.setActivationTo('2026-12-31');
+      expect(component.listRows().map(r => r.id)).toEqual(['a']);
+    });
+    it('filtre par date de création (from/to)', () => {
+      component.setCreatedFrom('2026-01-01');
+      component.setCreatedTo('2026-02-01');
+      expect(component.listRows().map(r => r.id)).toEqual(['a']);
+    });
+    it('hasDateFilters + clearDateFilters', () => {
+      component.setActivationFrom('2026-01-01');
+      expect(component.hasDateFilters()).toBe(true);
+      component.clearDateFilters();
+      expect(component.hasDateFilters()).toBe(false);
+    });
+    it('availableFilterYears liste les années présentes', () => {
+      expect(component.availableFilterYears()).toEqual(['2025', '2026']);
+    });
+  });
 });
