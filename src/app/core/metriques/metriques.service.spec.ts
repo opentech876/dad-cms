@@ -160,4 +160,46 @@ describe('MetriquesService', () => {
       expect(result[1].percent).toBe(0);
     });
   });
+
+  describe('branches supplémentaires', () => {
+    it('getDeviceStats distingue android, ios et autres plateformes', async () => {
+      clientMock.from = jest.fn(() =>
+        buildSelectChain({
+          data: [
+            { id: 'a', platform: 'android' },
+            { id: 'b', platform: 'ios' },
+            { id: 'c', platform: 'web' },
+          ],
+          error: null,
+        }),
+      ) as any;
+      const res = await firstValueFrom(service.getDeviceStats());
+      expect(res).toMatchObject({ total: 3, android: 1, ios: 1 });
+    });
+
+    it('getDeviceStats propage une erreur', async () => {
+      clientMock.from = jest.fn(() => buildSelectChain({ data: null, error: { message: 'rls' } })) as any;
+      await expect(firstValueFrom(service.getDeviceStats())).rejects.toBeTruthy();
+    });
+
+    it('getDeviceLogs propage une erreur', async () => {
+      clientMock.from = jest.fn(() => buildSelectChain({ data: null, error: { message: 'rls' } })) as any;
+      await expect(firstValueFrom(service.getDeviceLogs())).rejects.toBeTruthy();
+    });
+
+    it('getCampaignTaps retombe sur « — » quand la campagne liée est absente', async () => {
+      clientMock.from = jest.fn((table: string) => {
+        if (table === 'ad_campaign_device_views') return buildSelectChain({ data: [{ campaign_id: 'c9', ad_campaigns: null }], error: null });
+        if (table === 'ad_campaign_device_clicks') return buildSelectChain({ data: [], error: null });
+        return buildSelectChain({ data: [], error: null });
+      }) as any;
+      const res = await firstValueFrom(service.getCampaignTaps());
+      expect(res[0]).toMatchObject({ campaign_name: '—', advertiser: '—' });
+    });
+
+    it('getCmsActivity propage une erreur', async () => {
+      clientMock.rpc = jest.fn(() => Promise.resolve({ data: null, error: { message: 'boom' } })) as any;
+      await expect(firstValueFrom(service.getCmsActivity())).rejects.toBeTruthy();
+    });
+  });
 });
