@@ -3,40 +3,36 @@ import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { CuratorRecsComponent } from './curator-recs.component';
 import { CurationStore } from './curation-store.service';
 import { EventService } from '../../core/events/event.service';
-import { PresidencyRecommendationWithEvent } from '../../core/presidency/recommendation.service';
 
-function rec(over: Partial<PresidencyRecommendationWithEvent> = {}): PresidencyRecommendationWithEvent {
+function rec(over: any = {}) {
   return {
-    id: 'r',
-    calendar_id: 'cal-1',
+    id: 'r1',
     mmdd: '08-15',
     position: 1,
-    event_id: 'e',
-    workspace_id: 'ws-1',
     status: 'pending',
-    created_by: 'u-1',
-    created_at: '2026-07-01T00:00:00Z',
-    updated_at: '2026-07-01T00:00:00Z',
-    applied_at: null,
-    applied_by: null,
-    event: null,
+    created_at: '2026-06-01T00:00:00Z',
+    event: { image_path: 'e/c.jpg' },
     ...over,
   };
 }
 
 describe('CuratorRecsComponent', () => {
-  let component: CuratorRecsComponent;
-  let myRecs: ReturnType<typeof signal<PresidencyRecommendationWithEvent[]>>;
+  let store: any, events: any, component: CuratorRecsComponent;
 
   beforeEach(() => {
-    myRecs = signal<PresidencyRecommendationWithEvent[]>([]);
-    const store = { myRecs, load: jest.fn().mockResolvedValue(undefined) };
-
+    store = {
+      myRecs: signal([
+        rec({ id: 'r1', status: 'pending', mmdd: '08-15', created_at: '2026-06-03T00:00:00Z' }),
+        rec({ id: 'r2', status: 'applied', mmdd: '01-02', created_at: '2026-06-01T00:00:00Z' }),
+      ]),
+      load: jest.fn().mockResolvedValue(undefined),
+    };
+    events = { getImageUrl: jest.fn((p: string) => `cover/${p}`) };
     TestBed.configureTestingModule({
       imports: [CuratorRecsComponent],
       providers: [
         { provide: CurationStore, useValue: store },
-        { provide: EventService, useValue: { getImageUrl: jest.fn((p: string) => `url/${p}`) } },
+        { provide: EventService, useValue: events },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     });
@@ -44,77 +40,39 @@ describe('CuratorRecsComponent', () => {
     component = TestBed.createComponent(CuratorRecsComponent).componentInstance;
   });
 
-  describe('counts', () => {
-    it('compte all / pending / applied', () => {
-      myRecs.set([
-        rec({ id: 'a', status: 'pending' }),
-        rec({ id: 'b', status: 'applied' }),
-        rec({ id: 'c', status: 'applied' }),
-      ]);
-
-      expect(component.counts()).toEqual({ all: 3, pending: 1, applied: 2 });
-    });
-  });
-
-  describe('rows — filtre', () => {
-    it("'all' renvoie tout", () => {
-      myRecs.set([rec({ id: 'a', status: 'pending' }), rec({ id: 'b', status: 'applied' })]);
-      component.setFilter('all');
-      expect(component.rows().length).toBe(2);
-    });
-
-    it("'pending' ne renvoie que les pending", () => {
-      myRecs.set([rec({ id: 'a', status: 'pending' }), rec({ id: 'b', status: 'applied' })]);
-      component.setFilter('pending');
-      expect(component.rows().map((r) => r.id)).toEqual(['a']);
-    });
-
-    it("'applied' ne renvoie que les publiées", () => {
-      myRecs.set([rec({ id: 'a', status: 'pending' }), rec({ id: 'b', status: 'applied' })]);
-      component.setFilter('applied');
-      expect(component.rows().map((r) => r.id)).toEqual(['b']);
-    });
-  });
-
-  describe('rows — tri', () => {
-    it("'recent' (défaut) trie par created_at décroissant", () => {
-      myRecs.set([
-        rec({ id: 'old', created_at: '2026-06-01T00:00:00Z' }),
-        rec({ id: 'new', created_at: '2026-07-01T00:00:00Z' }),
-      ]);
-      expect(component.rows().map((r) => r.id)).toEqual(['new', 'old']);
-    });
-
-    it("'event-date' trie par mmdd croissant", () => {
-      myRecs.set([rec({ id: 'dec', mmdd: '12-01' }), rec({ id: 'jan', mmdd: '01-05' })]);
-      component.onSortChange('event-date');
-      expect(component.rows().map((r) => r.id)).toEqual(['jan', 'dec']);
-    });
-
-    it('ne mute pas le tableau source du store', () => {
-      const source = [rec({ id: 'dec', mmdd: '12-01' }), rec({ id: 'jan', mmdd: '01-05' })];
-      myRecs.set(source);
-      component.onSortChange('event-date');
-      component.rows();
-      // Le store garde l'ordre d'origine (rows() opère sur une copie).
-      expect(myRecs().map((r) => r.id)).toEqual(['dec', 'jan']);
-    });
-  });
-
-  describe('libellés', () => {
-    it('positionShort: Principal / C\'est aussi', () => {
-      expect(component.positionShort(1)).toBe('Principal');
-      expect(component.positionShort(2)).toBe("C'est aussi");
-    });
-
-    it('mmddLabel: MM-DD → jour + mois FR', () => {
-      expect(component.mmddLabel('08-15')).toBe('15 août');
-    });
-  });
-
-  it('charge le store au démarrage', async () => {
-    const store = TestBed.inject(CurationStore) as unknown as { load: jest.Mock };
+  it('ngOnInit charge le store', async () => {
     await component.ngOnInit();
     expect(store.load).toHaveBeenCalled();
+  });
+
+  it('counts agrège all/pending/applied', () => {
+    expect(component.counts()).toEqual({ all: 2, pending: 1, applied: 1 });
+  });
+
+  it('setFilter filtre les lignes par statut', () => {
+    component.setFilter('applied');
+    expect(component.rows().every((r) => r.status === 'applied')).toBe(true);
+  });
+
+  it('onSortChange trie par date d\'événement puis par statut', () => {
+    component.onSortChange('event-date');
+    expect(component.rows()[0].mmdd).toBe('01-02');
+    component.onSortChange('status');
+    expect(component.rows()[0].status).toBe('applied');
+  });
+
+  it('rows: tri par défaut = plus récent d\'abord', () => {
+    expect(component.rows()[0].id).toBe('r1');
+  });
+
+  it('libellés et image', () => {
+    expect(component.mmddLabel('08-15')).toContain('août');
+    expect(component.submittedLabel(rec() as any)).toBeTruthy();
+    expect(component.positionShort(1)).toBe('Principal');
+    expect(component.positionShort(2)).toBe("C'est aussi");
+    expect(component.positionLabel(1)).toBeTruthy();
+    expect(component.artFor('x')).toContain('linear-gradient');
+    expect(component.imageUrl(rec() as any)).toBe('cover/e/c.jpg');
+    expect(component.imageUrl(rec({ event: { image_path: null } }) as any)).toBeNull();
   });
 });

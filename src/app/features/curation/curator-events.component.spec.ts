@@ -5,84 +5,69 @@ import { CurationStore } from './curation-store.service';
 import { EventService } from '../../core/events/event.service';
 
 describe('CuratorEventsComponent', () => {
-  let component: CuratorEventsComponent;
-  let mockEvents: any;
+  let store: any, events: any, component: CuratorEventsComponent;
 
-  function build(): void {
-    mockEvents = {
-      getImageUrl: jest.fn((p: string) => `cover/${p}`),
-      getThumbUrl: jest.fn((p: string) => `thumb/${p}`),
-    };
-    const store = {
-      myEvents: signal<any[]>([]),
-      myEventsLoading: signal(false),
-      entries: signal<any[]>([]),
-      myRecs: signal<any[]>([]),
+  beforeEach(() => {
+    store = {
+      entries: signal([{ event_id: 'ev-1' }]),
+      myRecs: signal([{ event_id: 'ev-2' }]),
+      myEvents: signal([
+        { id: 'ev-1', title: 'Indépendance', event_date: '1960-08-15', image_path: 'e/c.jpg' },
+        { id: 'ev-3', title: 'Autre', event_date: '1970-01-02', image_path: null },
+      ]),
       load: jest.fn().mockResolvedValue(undefined),
       loadMyEvents: jest.fn().mockResolvedValue(undefined),
+    };
+    events = {
+      getThumbUrl: jest.fn((p: string) => `thumb/${p}`),
+      getImageUrl: jest.fn((p: string) => `cover/${p}`),
     };
     TestBed.configureTestingModule({
       imports: [CuratorEventsComponent],
       providers: [
         { provide: CurationStore, useValue: store },
-        { provide: EventService, useValue: mockEvents },
+        { provide: EventService, useValue: events },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     });
     TestBed.overrideComponent(CuratorEventsComponent, { set: { template: '' } });
-    const fixture = TestBed.createComponent(CuratorEventsComponent);
-    component = fixture.componentInstance;
-    return;
-  }
-
-  beforeEach(build);
-
-  describe('filtered — recherche', () => {
-    it('filtre mes événements par titre (insensible casse/accents)', () => {
-      const store = TestBed.inject(CurationStore) as any;
-      store.myEvents.set([
-        { id: '1', title: 'Indépendance du Congo', event_date: '1960-08-15' },
-        { id: '2', title: 'Festival FESPAM', event_date: '1996-08-01' },
-      ]);
-      component.search.set('congo');
-      expect(component.filtered().map((e) => e.id)).toEqual(['1']);
-    });
-
-    it('recherche vide → tout', () => {
-      const store = TestBed.inject(CurationStore) as any;
-      store.myEvents.set([{ id: '1', title: 'A', event_date: '2000-01-01' }]);
-      expect(component.filtered().length).toBe(1);
-    });
+    component = TestBed.createComponent(CuratorEventsComponent).componentInstance;
   });
 
-  describe('marqueurs assigné / recommandé', () => {
-    it('isAssigned/isRecommended reflètent les entrées et recommandations du store', () => {
-      const store = TestBed.inject(CurationStore) as any;
-      store.entries.set([{ event_id: 'e1' }]);
-      store.myRecs.set([{ event_id: 'e2' }]);
-      expect(component.isAssigned({ id: 'e1' } as any)).toBe(true);
-      expect(component.isAssigned({ id: 'e9' } as any)).toBe(false);
-      expect(component.isRecommended({ id: 'e2' } as any)).toBe(true);
-      expect(component.isRecommended({ id: 'e9' } as any)).toBe(false);
-    });
+  it('ngOnInit charge le store et les événements', async () => {
+    await component.ngOnInit();
+    expect(store.load).toHaveBeenCalled();
+    expect(store.loadMyEvents).toHaveBeenCalled();
   });
 
-  describe('thumbUrl / onThumbError', () => {
-    it('thumbUrl renvoie la vignette, null sans image', () => {
-      expect(component.thumbUrl({ image_path: 'e/cover.jpg' } as any)).toBe('thumb/e/cover.jpg');
-      expect(component.thumbUrl({ image_path: null } as any)).toBeNull();
-    });
+  it('filtered filtre par recherche', () => {
+    expect(component.filtered()).toHaveLength(2);
+    component.search.set('indépendance');
+    expect(component.filtered()).toHaveLength(1);
+  });
 
-    it('onThumbError bascule vers le cover une seule fois (garde anti-boucle)', () => {
-      const img: any = { dataset: {}, src: 'thumb/e/cover.jpg' };
-      component.onThumbError({ target: img } as any, 'e/cover.jpg');
-      expect(img.src).toBe('cover/e/cover.jpg');
-      expect(img.dataset.fellBack).toBe('1');
+  it('thumbUrl renvoie une URL ou null', () => {
+    expect(component.thumbUrl({ image_path: 'e/c.jpg' } as any)).toBe('thumb/e/c.jpg');
+    expect(component.thumbUrl({ image_path: null } as any)).toBeNull();
+  });
 
-      // Second error (cover also failed): must NOT reset src again → no loop.
-      mockEvents.getImageUrl.mockClear();
-      component.onThumbError({ target: img } as any, 'e/cover.jpg');
-      expect(mockEvents.getImageUrl).not.toHaveBeenCalled();
-    });
+  it('onThumbError bascule sur la couverture une seule fois', () => {
+    const img: any = { dataset: {}, src: '' };
+    component.onThumbError({ target: img } as any, 'e/c.jpg');
+    expect(img.src).toBe('cover/e/c.jpg');
+    expect(img.dataset['fellBack']).toBe('1');
+    // deuxième appel : déjà retombé → ne refait rien
+    img.src = 'unchanged';
+    component.onThumbError({ target: img } as any, 'e/c.jpg');
+    expect(img.src).toBe('unchanged');
+  });
+
+  it('eventYear / isAssigned / isRecommended / artFor', () => {
+    expect(component.eventYear({ event_date: '1960-08-15' } as any)).toBe('1960');
+    expect(component.eventYear({} as any)).toBe('');
+    expect(component.isAssigned({ id: 'ev-1' } as any)).toBe(true);
+    expect(component.isAssigned({ id: 'ev-9' } as any)).toBe(false);
+    expect(component.isRecommended({ id: 'ev-2' } as any)).toBe(true);
+    expect(component.artFor('x')).toContain('linear-gradient');
   });
 });
