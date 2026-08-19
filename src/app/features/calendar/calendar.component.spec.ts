@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, of, Subject } from 'rxjs';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { CalendarComponent } from './calendar.component';
 import { CalendarService } from '../../core/calendar/calendar.service';
 import { CalendarEntryService, CalendarEntryWithEvent } from '../../core/calendar/calendar-entry.service';
@@ -796,6 +796,133 @@ describe('CalendarComponent', () => {
       component.applyDialogVisible.set(true);
       await component.confirmApply();
       expect(component.applyDialogVisible()).toBe(false);
+    });
+  });
+
+  describe('navigation entre calendriers', () => {
+    beforeEach(async () => {
+      await component.ngOnInit();
+    });
+
+    it('selectCalendar met à jour selectedCalendarId', () => {
+      component.selectCalendar('cal-1');
+      expect(component.selectedCalendarId()).toBe('cal-1');
+    });
+
+    it('prevCalendar / nextCalendar déplacent la sélection sans erreur', () => {
+      component.selectCalendar('cal-2');
+      expect(() => { component.prevCalendar(); component.nextCalendar(); }).not.toThrow();
+    });
+  });
+
+  describe('affectation des créneaux (slots)', () => {
+    beforeEach(async () => {
+      (mockCalendarEntryService as any).assignEvent  = jest.fn().mockReturnValue(of({ success: true }));
+      (mockCalendarEntryService as any).unassignSlot = jest.fn().mockReturnValue(of({ success: true }));
+      await component.ngOnInit();
+      component.selectCalendar('cal-1');
+      component.selectedDay.set({ day: 15, month: 7 });
+    });
+
+    it('getSlotEvent / isSlotFilled / isEventAtPosition sans événement affecté', () => {
+      expect(component.getSlotEvent(1)).toBeNull();
+      expect(component.isSlotFilled(1)).toBe(false);
+      expect(component.isEventAtPosition('evt-x', 1)).toBe(false);
+    });
+
+    it('assignToSlot recharge les entrées après succès', async () => {
+      await component.assignToSlot('evt-1', 1);
+      expect((mockCalendarEntryService as any).assignEvent).toHaveBeenCalledWith('cal-1', '08-15', 'evt-1', 1);
+    });
+
+    it('assignToSlot affiche un toast rôle insuffisant', async () => {
+      (mockCalendarEntryService as any).assignEvent = jest.fn().mockReturnValue(of({ success: false, error: 'insufficient_privilege' }));
+      await component.assignToSlot('evt-1', 1);
+      expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('rôle'));
+    });
+
+    it('unassignFromSlot recharge les entrées après succès', async () => {
+      await component.unassignFromSlot(1);
+      expect((mockCalendarEntryService as any).unassignSlot).toHaveBeenCalledWith('cal-1', '08-15', 1);
+    });
+
+    it('unassignFromSlot affiche un toast erreur générique', async () => {
+      (mockCalendarEntryService as any).unassignSlot = jest.fn().mockReturnValue(of({ success: false, error: 'boom' }));
+      await component.unassignFromSlot(1);
+      expect(mockToast.error).toHaveBeenCalledWith('boom');
+    });
+
+    it('toggleSlot appelle assignToSlot quand le créneau est libre', async () => {
+      await component.toggleSlot('evt-1', 1);
+      expect((mockCalendarEntryService as any).assignEvent).toHaveBeenCalled();
+    });
+  });
+
+  describe('suppression de calendrier', () => {
+    beforeEach(async () => {
+      await component.ngOnInit();
+      component.selectCalendar('cal-1');
+    });
+
+    it('openDeleteModal ouvre le modal et réinitialise le champ', () => {
+      component.openDeleteModal();
+      expect(component.deleteModalOpen()).toBe(true);
+      expect(component.deleteConfirmName()).toBe('');
+    });
+
+    it('closeDeleteModal ferme le modal', () => {
+      component.openDeleteModal();
+      component.closeDeleteModal();
+      expect(component.deleteModalOpen()).toBe(false);
+    });
+
+    it('confirmDelete supprime quand le nom saisi correspond', async () => {
+      component.openDeleteModal();
+      component.deleteConfirmName.set('Calendrier 2024');
+      await component.confirmDelete();
+      expect(mockCalendarService.deleteCalendar).toHaveBeenCalledWith('cal-1');
+      expect(mockToast.success).toHaveBeenCalled();
+    });
+
+    it('confirmDelete expose une erreur quand la RPC échoue', async () => {
+      mockCalendarService.deleteCalendar.mockReturnValueOnce(of({ success: false, error: 'nope' }));
+      component.openDeleteModal();
+      component.deleteConfirmName.set('Calendrier 2024');
+      await component.confirmDelete();
+      expect(component.deleteError()).toBe('nope');
+    });
+  });
+
+  describe('corbeille (trash)', () => {
+    beforeEach(async () => {
+      (mockCalendarService as any).listDeletedCalendars = jest.fn().mockReturnValue(of([{ id: 'cal-del', name: 'Vieux', year: 2019 }]));
+      (mockCalendarService as any).restoreCalendar = jest.fn().mockReturnValue(of({ success: true }));
+      await component.ngOnInit();
+    });
+
+    it('openTrash charge les éléments supprimés', async () => {
+      await component.openTrash();
+      expect(component.showTrash()).toBe(true);
+      expect(component.trashItems().length).toBe(1);
+    });
+
+    it('refreshTrash capture une erreur de chargement', async () => {
+      (mockCalendarService as any).listDeletedCalendars = jest.fn().mockReturnValue(throwError(() => new Error('boom')));
+      await component.refreshTrash();
+      expect(component.trashError()).toBeTruthy();
+      expect(component.trashItems()).toEqual([]);
+    });
+
+    it('restoreCalendar restaure un calendrier', async () => {
+      await component.restoreCalendar('cal-del');
+      expect((mockCalendarService as any).restoreCalendar).toHaveBeenCalledWith('cal-del');
+    });
+
+    it('closeTrash vide la vue', async () => {
+      await component.openTrash();
+      component.closeTrash();
+      expect(component.showTrash()).toBe(false);
+      expect(component.trashItems()).toEqual([]);
     });
   });
 });
