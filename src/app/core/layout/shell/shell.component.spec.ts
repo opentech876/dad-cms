@@ -1030,4 +1030,33 @@ describe('ShellComponent — navigation par rôle', () => {
       expect(auth.signOut).toHaveBeenCalled();
     });
   });
+
+  describe('redimensionnement de la barre latérale', () => {
+    beforeEach(() => createComponent('owner'));
+
+    it('startResize ne fait rien en mode mobile', () => {
+      component.isMobile.set(true);
+      const before = component.sidebarWidth();
+      component.startResize({ clientX: 100, preventDefault: jest.fn() } as any);
+      expect(component.sidebarWidth()).toBe(before);
+    });
+
+    it('startResize suit le pointeur et persiste la largeur au relâchement', () => {
+      component.isMobile.set(false);
+      component.startResize({ clientX: 300, preventDefault: jest.fn() } as any);
+      window.dispatchEvent(Object.assign(new Event('pointermove'), { clientX: 900 }));
+      expect(component.sidebarWidth()).toBe(360); // clampé au maximum
+      window.dispatchEvent(new Event('pointerup'));
+      expect(localStorage.getItem('dad-sidebar-width')).toBe('360');
+    });
+
+    it('un glissement sous le seuil bascule en mode replié', () => {
+      component.isMobile.set(false);
+      component.collapsed.set(false);
+      component.startResize({ clientX: 500, preventDefault: jest.fn() } as any);
+      window.dispatchEvent(Object.assign(new Event('pointermove'), { clientX: 50 }));
+      expect(component.collapsed()).toBe(true);
+      window.dispatchEvent(new Event('pointerup'));
+    });
+  });
 });
