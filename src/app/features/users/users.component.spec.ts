@@ -586,4 +586,21 @@ describe('UsersComponent', () => {
       expect(mockWorkspace.inviteUser).not.toHaveBeenCalled();
     });
   });
+
+  describe('helpers branches restantes', () => {
+    it('initials retombe sur l\'userId quand le nom est absent', () => {
+      expect(component.initials({ fullName: null, userId: 'ab12cd' } as any)).toBe('AB');
+    });
+
+    it('isTempOwner est vrai pour un owner avec expiration', () => {
+      expect(component.isTempOwner({ role: 'owner', expiresAt: '2030-01-01' } as any)).toBe(true);
+      expect(component.isTempOwner({ role: 'editeur', expiresAt: '2030-01-01' } as any)).toBe(false);
+    });
+
+    it('onDocumentClick ferme le menu d\'actions', () => {
+      component.openActionsMenu('u1');
+      component.onDocumentClick();
+      expect(component.activeMenuUserId()).toBeNull();
+    });
+  });
 });
