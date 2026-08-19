@@ -107,6 +107,26 @@ describe('CompanyService', () => {
       }));
       expect(eqCalls).toContainEqual(['id', 'c1']);
     });
+
+    it("retourne 'duplicate_name' quand le code Postgres est 23505", async () => {
+      mockSupabase.client = buildClient({ error: { code: '23505', message: 'unique violation' } });
+      const res = await firstValueFrom(service.updateCompany('c1', { name: 'Doublon' }));
+      expect(res).toEqual({ success: false, error: 'duplicate_name' });
+    });
+
+    it('retourne le message d\'erreur brut pour toute autre erreur', async () => {
+      mockSupabase.client = buildClient({ error: { code: '42501', message: 'rls denied' } });
+      const res = await firstValueFrom(service.updateCompany('c1', { name: 'X' }));
+      expect(res).toEqual({ success: false, error: 'rls denied' });
+    });
+  });
+
+  describe('createCompany() — erreurs non-uniques', () => {
+    it('retourne le message d\'erreur brut quand le code n\'est pas 23505', async () => {
+      mockSupabase.client = buildClient({ rows: null, error: { code: '42501', message: 'rls denied' } });
+      const res = await firstValueFrom(service.createCompany({ name: 'X', type: 'telecom' } as any));
+      expect(res).toEqual({ success: false, error: 'rls denied' });
+    });
   });
 
   describe('deleteCompany()', () => {

@@ -106,6 +106,19 @@ describe('LoginComponent', () => {
       await component.submit();
       expect(mockSupabase.signInWithPassword).not.toHaveBeenCalled();
     });
+
+    it('affiche un message de limite quand sendOtp signale un rate-limit', async () => {
+      mockSupabase.sendOtp.mockResolvedValue({ data: null, error: { message: 'For security purposes, you can only request this after 60s' } });
+      await component.submit();
+      expect(component.errorMessage()).toContain('Trop de tentatives');
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+    });
+
+    it('affiche un message "non invitée" pour une autre erreur sendOtp', async () => {
+      mockSupabase.sendOtp.mockResolvedValue({ data: null, error: { message: 'user not found' } });
+      await component.submit();
+      expect(component.errorMessage()).toContain('invitée');
+    });
   });
 
   describe('setMode()', () => {

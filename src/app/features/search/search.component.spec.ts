@@ -104,6 +104,18 @@ describe('SearchComponent', () => {
       const v = component.visibleResults();
       expect(v.events.length + v.campaigns.length + v.companies.length + v.calendars.length).toBe(4);
     });
+
+    it("chaque filtre n'expose que son propre groupe", () => {
+      component.setFilter('campaign');
+      expect(component.visibleResults().campaigns.length).toBe(1);
+      expect(component.visibleResults().events.length).toBe(0);
+      component.setFilter('company');
+      expect(component.visibleResults().companies.length).toBe(1);
+      expect(component.visibleResults().campaigns.length).toBe(0);
+      component.setFilter('calendar');
+      expect(component.visibleResults().calendars.length).toBe(1);
+      expect(component.visibleResults().companies.length).toBe(0);
+    });
   });
 
   describe('goToResult', () => {
