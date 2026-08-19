@@ -227,4 +227,66 @@ describe('CuratorWorkspaceComponent', () => {
       expect(component.createError()).toBe('RLS refusée');
     });
   });
+
+  describe('accordéon, éditeur et helpers', () => {
+    beforeEach(() => {
+      (global as any).URL.createObjectURL = jest.fn(() => 'blob:x');
+      (global as any).URL.revokeObjectURL = jest.fn();
+      fixture.componentRef.setInput('calendarYear', 2026);
+    });
+
+    it('toggleMonth / isExpanded basculent l\'état d\'un mois', () => {
+      const open = component.isExpanded(3);
+      component.toggleMonth(3);
+      expect(component.isExpanded(3)).toBe(!open);
+      component.toggleMonth(3);
+      expect(component.isExpanded(3)).toBe(open);
+    });
+
+    it('reloadLibrary recharge la bibliothèque', async () => {
+      await component.reloadLibrary();
+      expect(mockEvent.listEvents).toHaveBeenCalled();
+      expect(component.libraryEvents().length).toBeGreaterThan(0);
+    });
+
+    it('closeDayEditor réinitialise l\'éditeur', () => {
+      component.editorOpen.set(true);
+      component.editorMmdd.set('08-15');
+      component.closeDayEditor();
+      expect(component.editorOpen()).toBe(false);
+      expect(component.editorMmdd()).toBe('');
+    });
+
+    it('editorDayLabel formate le jour courant', () => {
+      component.editorMmdd.set('08-15');
+      expect(component.editorDayLabel()).toContain('août');
+    });
+
+    it('imageUrl renvoie null sans image et une URL sinon', () => {
+      expect(component.imageUrl(null)).toBeNull();
+      expect(component.imageUrl({ id: 'ev-x', image_path: null } as any)).toBeNull();
+    });
+
+    it('closeCreateModal ferme sauf pendant une sauvegarde', () => {
+      component.createOpen.set(true);
+      component.createSaving.set(true);
+      component.closeCreateModal();
+      expect(component.createOpen()).toBe(true);
+      component.createSaving.set(false);
+      component.closeCreateModal();
+      expect(component.createOpen()).toBe(false);
+    });
+
+    it('onCreateImageChange stocke le fichier et crée un aperçu', () => {
+      const file = new File(['x'], 'p.jpg', { type: 'image/jpeg' });
+      component.onCreateImageChange({ target: { files: [file] } } as any);
+      expect(component.createImageFile()).toBe(file);
+      expect(component.createImagePreview()).toBe('blob:x');
+    });
+
+    it('onCreateImageChange ignore l\'absence de fichier', () => {
+      component.onCreateImageChange({ target: { files: [] } } as any);
+      expect(component.createImageFile()).toBeNull();
+    });
+  });
 });

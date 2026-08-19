@@ -57,4 +57,18 @@ describe('WorkspaceContextService', () => {
     expect(service.activeWorkspaceId()).toBe('ws-2');
     expect(localStorage.getItem('dad-workspace-id')).toBe('ws-2');
   });
+
+  it('notifyWorkspacesChanged émet sur workspacesChanged$', () => {
+    const spy = jest.fn();
+    service.workspacesChanged$.subscribe(spy);
+    service.notifyWorkspacesChanged();
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('notifyProfileChanged émet sur profileChanged$', () => {
+    const spy = jest.fn();
+    service.profileChanged$.subscribe(spy);
+    service.notifyProfileChanged();
+    expect(spy).toHaveBeenCalled();
+  });
 });
