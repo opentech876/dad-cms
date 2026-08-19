@@ -925,4 +925,48 @@ describe('EventsComponent', () => {
       });
     });
   });
+
+  describe('runImport + onImageChange', () => {
+    beforeEach(() => {
+      (mockEventService as any).batchCreateEvents = jest.fn().mockReturnValue(of({ inserted: 2 }));
+    });
+
+    it('runImport ne fait rien sans aperçu', async () => {
+      component.importPreview.set([]);
+      await component.runImport();
+      expect((mockEventService as any).batchCreateEvents).not.toHaveBeenCalled();
+    });
+
+    it('runImport insère par lots puis passe à « done »', async () => {
+      component.importPreview.set([
+        { date: '1960-08-15', title: 'A', description: 'x', rawDate: '', source: '', historian: '' },
+        { date: '1961-01-02', title: 'B', description: 'y', rawDate: '', source: '', historian: '' },
+      ] as any);
+      await component.runImport();
+      expect((mockEventService as any).batchCreateEvents).toHaveBeenCalled();
+      expect(component.importInserted()).toBe(2);
+      expect(component.importStatus()).toBe('done');
+    });
+
+    it('runImport interrompt et expose l\'erreur en cas d\'échec d\'un lot', async () => {
+      (mockEventService as any).batchCreateEvents = jest.fn().mockReturnValue(of({ inserted: 0, error: 'DB down' }));
+      component.importPreview.set([
+        { date: '1960-08-15', title: 'A', description: 'x', rawDate: '', source: '', historian: '' },
+      ] as any);
+      await component.runImport();
+      expect(component.importError()).toBe('DB down');
+    });
+
+    it('onImageChange enregistre le fichier et son aperçu', () => {
+      const file = new File(['x'], 'cover.jpg', { type: 'image/jpeg' });
+      Object.defineProperty(file, 'size', { value: 2048 });
+      component.onImageChange({ target: { files: [file] } } as any);
+      expect(component.editorImageName()).toBe('cover.jpg');
+      expect(component.editorImageFile()).toBe(file);
+    });
+
+    it('onImageChange ignore l\'absence de fichier', () => {
+      expect(() => component.onImageChange({ target: { files: [] } } as any)).not.toThrow();
+    });
+  });
 });
