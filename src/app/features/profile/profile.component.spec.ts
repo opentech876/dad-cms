@@ -466,4 +466,31 @@ describe('ProfileComponent', () => {
       expect(component.showNewPassword()).toBe(!before);
     });
   });
+
+  describe('computeds d\'affichage', () => {
+    it('initials: initiales du nom, sinon 1re lettre de l\'e-mail, sinon ?', () => {
+      component.fullName.set('Elvis Olembe');
+      expect(component.initials()).toBe('EO');
+      component.fullName.set('');
+      component.userEmail.set('alice@test.com');
+      expect(component.initials()).toBe('A');
+      component.userEmail.set('');
+      expect(component.initials()).toBe('?');
+    });
+
+    it('roleLabel: libellé du rôle ou chaîne vide', () => {
+      component.role.set('owner');
+      expect(component.roleLabel()).toBeTruthy();
+      component.role.set(null);
+      expect(component.roleLabel()).toBe('');
+    });
+
+    it('displayName: nom complet sinon e-mail', () => {
+      component.fullName.set('Elvis');
+      expect(component.displayName()).toBe('Elvis');
+      component.fullName.set('   ');
+      component.userEmail.set('a@b.co');
+      expect(component.displayName()).toBe('a@b.co');
+    });
+  });
 });
