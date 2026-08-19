@@ -209,4 +209,32 @@ describe('NotificationService', () => {
       expect(result).toBeUndefined();
     });
   });
+
+  describe('getActorProfile()', () => {
+    function stubProfiles(result: { data: any; error: any }) {
+      const maybeSingle = jest.fn().mockResolvedValue(result);
+      const eq2 = jest.fn().mockReturnValue({ maybeSingle });
+      const eq1 = jest.fn().mockReturnValue({ eq: eq2 });
+      const select = jest.fn().mockReturnValue({ eq: eq1 });
+      clientMock.from = jest.fn().mockReturnValue({ select });
+    }
+
+    it('renvoie null sans acteur ou sans workspace', async () => {
+      expect(await firstValueFrom(service.getActorProfile(null, 'ws-1'))).toBeNull();
+      expect(await firstValueFrom(service.getActorProfile('u1', null))).toBeNull();
+    });
+
+    it('renvoie le profil quand il existe', async () => {
+      stubProfiles({ data: { full_name: 'Elvis', avatar_url: 'a.jpg' }, error: null });
+      expect(await firstValueFrom(service.getActorProfile('u1', 'ws-1'))).toEqual({
+        full_name: 'Elvis',
+        avatar_url: 'a.jpg',
+      });
+    });
+
+    it('renvoie null en cas d\'erreur ou de profil absent', async () => {
+      stubProfiles({ data: null, error: { message: 'rls' } });
+      expect(await firstValueFrom(service.getActorProfile('u1', 'ws-1'))).toBeNull();
+    });
+  });
 });

@@ -331,4 +331,19 @@ describe('RecommendationService', () => {
       expect(res.error).toBe('insufficient_privilege');
     });
   });
+
+  describe('applySingle()', () => {
+    it('appelle apply_single_recommendation avec l\'id et renvoie success', async () => {
+      mockSupabase.client = buildClient({ rpcData: null });
+      const res = await firstValueFrom(service.applySingle('rec-1'));
+      expect(rpcSpy).toHaveBeenCalledWith('apply_single_recommendation', { p_recommendation_id: 'rec-1' });
+      expect(res).toEqual({ success: true });
+    });
+
+    it('renvoie success false quand le RPC échoue', async () => {
+      mockSupabase.client = buildClient({ rpcError: { message: 'insufficient_privilege' } });
+      const res = await firstValueFrom(service.applySingle('rec-1'));
+      expect(res).toEqual({ success: false, error: 'insufficient_privilege' });
+    });
+  });
 });

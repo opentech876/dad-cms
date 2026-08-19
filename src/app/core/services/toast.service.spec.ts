@@ -63,6 +63,14 @@ describe('ToastService', () => {
     expect(service.toasts()[0].type).toBe('info');
   });
 
+  it('génère un id de repli quand crypto.randomUUID est indisponible', () => {
+    const originalCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true });
+    service.show('Sans crypto', 'info');
+    expect(service.toasts()[0].id).toBeTruthy();
+    Object.defineProperty(globalThis, 'crypto', { value: originalCrypto, configurable: true });
+  });
+
   it('gère plusieurs toasts indépendants', () => {
     service.show('A', 'success', 1000);
     service.show('B', 'error', 2000);
