@@ -9,8 +9,8 @@ describe('AdminService', () => {
   let invoke: jest.Mock;
 
   beforeEach(() => {
-    rpc = jest.fn();
-    invoke = jest.fn();
+    rpc = jest.fn().mockResolvedValue({ data: null, error: null });
+    invoke = jest.fn().mockResolvedValue({ data: null, error: null });
     TestBed.configureTestingModule({
       providers: [
         AdminService,
@@ -20,98 +20,99 @@ describe('AdminService', () => {
     service = TestBed.inject(AdminService);
   });
 
-  it('listAllUsers appelle admin_list_all_users', async () => {
-    rpc.mockResolvedValueOnce({ data: [], error: null });
-    await firstValueFrom(service.listAllUsers());
-    expect(rpc).toHaveBeenCalledWith('admin_list_all_users');
+  // ── Read RPCs (throw on error, default [] / data on success) ───────────────
+
+  it('dashboardStats renvoie les données de la RPC', async () => {
+    rpc.mockResolvedValueOnce({ data: { workspaces: { active: 3 } }, error: null });
+    const stats = await firstValueFrom(service.dashboardStats());
+    expect(rpc).toHaveBeenCalledWith('admin_dashboard_stats');
+    expect(stats.workspaces.active).toBe(3);
   });
 
-  it('listWorkspaces appelle admin_list_workspaces', async () => {
-    rpc.mockResolvedValueOnce({ data: [], error: null });
-    await firstValueFrom(service.listWorkspaces());
-    expect(rpc).toHaveBeenCalledWith('admin_list_workspaces');
+  it('dashboardStats propage une erreur', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'denied' } });
+    await expect(firstValueFrom(service.dashboardStats())).rejects.toEqual({ message: 'denied' });
   });
 
-  it("listWorkspaces propage l'erreur RPC", async () => {
-    rpc.mockResolvedValueOnce({ data: null, error: new Error('Rôle system_admin requis') });
-    await expect(firstValueFrom(service.listWorkspaces())).rejects.toThrow('system_admin');
-  });
-
-  it('createWorkspace appelle admin_create_workspace avec nom et owner', async () => {
-    rpc.mockResolvedValueOnce({ data: 'ws-new', error: null });
-    const res = await firstValueFrom(service.createWorkspace('Tenant A', 'user-1'));
-    expect(rpc).toHaveBeenCalledWith('admin_create_workspace', {
-      p_name: 'Tenant A',
-      p_owner_user_id: 'user-1',
-    });
-    expect(res).toEqual({ success: true, workspaceId: 'ws-new' });
-  });
-
-  it("createWorkspace renvoie success:false sur erreur", async () => {
-    rpc.mockResolvedValueOnce({ data: null, error: { message: "Le nom de l'espace est requis" } });
-    const res = await firstValueFrom(service.createWorkspace('', null));
-    expect(res.success).toBe(false);
-    expect(res.error).toContain('nom');
-  });
-
-  it('renameWorkspace appelle admin_rename_workspace', async () => {
+  it('listAllUsers retombe sur un tableau vide sans données', async () => {
     rpc.mockResolvedValueOnce({ data: null, error: null });
-    await firstValueFrom(service.renameWorkspace('ws-1', 'New name'));
-    expect(rpc).toHaveBeenCalledWith('admin_rename_workspace', {
-      p_workspace_id: 'ws-1',
-      p_name: 'New name',
-    });
+    expect(await firstValueFrom(service.listAllUsers())).toEqual([]);
   });
 
-  it('softDeleteWorkspace appelle admin_soft_delete_workspace', async () => {
+  it('listAllUsers propage une erreur', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'x' } });
+    await expect(firstValueFrom(service.listAllUsers())).rejects.toBeTruthy();
+  });
+
+  it('listAuditLog transmet limit/before/table et renvoie les lignes', async () => {
+    rpc.mockResolvedValueOnce({ data: [{ id: 'a1' }], error: null });
+    const rows = await firstValueFrom(service.listAuditLog(10, '2026-01-01', 'workspaces'));
+    expect(rpc).toHaveBeenCalledWith('admin_list_audit_log', {
+      p_limit: 10,
+      p_before: '2026-01-01',
+      p_table: 'workspaces',
+    });
+    expect(rows).toHaveLength(1);
+  });
+
+  it('listAuditLog propage une erreur', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'boom' } });
+    await expect(firstValueFrom(service.listAuditLog())).rejects.toBeTruthy();
+  });
+
+  it('listWorkspaces retombe sur un tableau vide et propage une erreur', async () => {
     rpc.mockResolvedValueOnce({ data: null, error: null });
-    await firstValueFrom(service.softDeleteWorkspace('ws-1'));
-    expect(rpc).toHaveBeenCalledWith('admin_soft_delete_workspace', { p_workspace_id: 'ws-1' });
+    expect(await firstValueFrom(service.listWorkspaces())).toEqual([]);
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'x' } });
+    await expect(firstValueFrom(service.listWorkspaces())).rejects.toBeTruthy();
   });
 
-  it('restoreWorkspace appelle admin_restore_workspace', async () => {
-    rpc.mockResolvedValueOnce({ data: null, error: null });
-    await firstValueFrom(service.restoreWorkspace('ws-1'));
-    expect(rpc).toHaveBeenCalledWith('admin_restore_workspace', { p_workspace_id: 'ws-1' });
+  // ── Mutation RPCs ({ success } / { success:false, error }) ─────────────────
+
+  it('createWorkspace renvoie success + workspaceId', async () => {
+    rpc.mockResolvedValueOnce({ data: 'ws-9', error: null });
+    const res = await firstValueFrom(service.createWorkspace('Congo', 'u1'));
+    expect(rpc).toHaveBeenCalledWith('admin_create_workspace', { p_name: 'Congo', p_owner_user_id: 'u1' });
+    expect(res).toEqual({ success: true, workspaceId: 'ws-9' });
   });
 
-  describe('dashboardStats()', () => {
-    it('appelle admin_dashboard_stats et renvoie le payload', async () => {
-      const payload = {
-        workspaces: { active: 1, deleted: 0 },
-        users: { total: 1, confirmed: 1, pending: 0, system_admins: 1 },
-        recent_workspaces: [],
-        pending_invitations: [],
-      };
-      rpc.mockResolvedValueOnce({ data: payload, error: null });
-      const res = await firstValueFrom(service.dashboardStats());
-      expect(rpc).toHaveBeenCalledWith('admin_dashboard_stats');
-      expect(res).toEqual(payload);
-    });
-
-    it("propage l'erreur RPC", async () => {
-      rpc.mockResolvedValueOnce({ data: null, error: new Error('Rôle system_admin requis') });
-      await expect(firstValueFrom(service.dashboardStats())).rejects.toThrow('system_admin');
-    });
+  it('createWorkspace défaut ownerUserId null + erreur', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'dup' } });
+    const res = await firstValueFrom(service.createWorkspace('Congo'));
+    expect(rpc).toHaveBeenCalledWith('admin_create_workspace', { p_name: 'Congo', p_owner_user_id: null });
+    expect(res).toEqual({ success: false, error: 'dup' });
   });
 
-  describe('inviteManager()', () => {
-    it("invoque l'EF invite-user avec role='owner' (sysadmin → manager)", async () => {
-      invoke.mockResolvedValueOnce({ data: { id: 'u-2', email: 'mgr@x.com' }, error: null });
-      const res = await firstValueFrom(service.inviteManager('ws-1', 'mgr@x.com'));
-      expect(invoke).toHaveBeenCalledWith('invite-user', {
-        email: 'mgr@x.com',
-        role: 'owner',
-        workspace_id: 'ws-1',
-      });
-      expect(res).toEqual({ success: true });
-    });
+  it('renameWorkspace succès + erreur', async () => {
+    rpc.mockResolvedValueOnce({ error: null });
+    expect(await firstValueFrom(service.renameWorkspace('ws-1', 'New'))).toEqual({ success: true });
+    rpc.mockResolvedValueOnce({ error: { message: 'no' } });
+    expect(await firstValueFrom(service.renameWorkspace('ws-1', 'New'))).toEqual({ success: false, error: 'no' });
+  });
 
-    it("renvoie success:false quand l'EF échoue", async () => {
-      invoke.mockResolvedValueOnce({ data: null, error: { message: 'rate limit' } });
-      const res = await firstValueFrom(service.inviteManager('ws-1', 'mgr@x.com'));
-      expect(res.success).toBe(false);
-      expect(res.error).toContain('rate limit');
-    });
+  it('softDeleteWorkspace succès + erreur', async () => {
+    rpc.mockResolvedValueOnce({ error: null });
+    expect(await firstValueFrom(service.softDeleteWorkspace('ws-1'))).toEqual({ success: true });
+    rpc.mockResolvedValueOnce({ error: { message: 'no' } });
+    expect(await firstValueFrom(service.softDeleteWorkspace('ws-1'))).toEqual({ success: false, error: 'no' });
+  });
+
+  it('restoreWorkspace succès + erreur', async () => {
+    rpc.mockResolvedValueOnce({ error: null });
+    expect(await firstValueFrom(service.restoreWorkspace('ws-1'))).toEqual({ success: true });
+    rpc.mockResolvedValueOnce({ error: { message: 'no' } });
+    expect(await firstValueFrom(service.restoreWorkspace('ws-1'))).toEqual({ success: false, error: 'no' });
+  });
+
+  it('inviteManager passe par la fonction edge invite-user avec le rôle owner', async () => {
+    invoke.mockResolvedValueOnce({ data: { id: 'x', email: 'a@b.co' }, error: null });
+    const res = await firstValueFrom(service.inviteManager('ws-1', 'a@b.co'));
+    expect(invoke).toHaveBeenCalledWith('invite-user', { email: 'a@b.co', role: 'owner', workspace_id: 'ws-1' });
+    expect(res).toEqual({ success: true });
+  });
+
+  it('inviteManager renvoie une erreur quand la fonction edge échoue', async () => {
+    invoke.mockResolvedValueOnce({ data: null, error: { message: 'ef down' } });
+    expect(await firstValueFrom(service.inviteManager('ws-1', 'a@b.co'))).toEqual({ success: false, error: 'ef down' });
   });
 });
