@@ -241,6 +241,27 @@ describe('MetriquesComponent', () => {
       createSpy.mockRestore();
     });
 
+    it('logBreakdown agrège par action et compte les succès', () => {
+      component.deviceLogs.set([
+        { action: 'register', outcome: 'success' },
+        { action: 'register', outcome: 'error' },
+        { action: 'sync', outcome: 'success' },
+      ] as any);
+      const b = component.logBreakdown();
+      expect(b[0]).toMatchObject({ action: 'register', count: 2, success: 1 });
+    });
+
+    it('activityPoints: vide sans données, points calculés sinon', () => {
+      component.cmsActivity.set([]);
+      expect(component.activityPoints().points).toEqual([]);
+      component.cmsActivity.set([
+        { date: '2026-05-04', count: 10 },
+        { date: '2026-05-05', count: 5 },
+      ] as any);
+      expect(component.activityPoints().points).toHaveLength(2);
+      expect(component.activityPoints().max).toBe(10);
+    });
+
     it('exportExposureCsv déclenche un téléchargement quand il y a des lignes', () => {
       const click = jest.fn();
       const anchor = { href: '', download: '', click } as any;
