@@ -807,4 +807,39 @@ describe('EventsComponent', () => {
       expect(result.skippedEmpty).toBe(1);
     });
   });
+
+  describe('éditeur — validation, image, vignette', () => {
+    beforeEach(async () => { await component.ngOnInit(); });
+
+    it('validationItems reflète les champs remplis', () => {
+      component.openEditor();
+      component.editorTitle.set('Indépendance');
+      component.editorDate.set('1960-08-15');
+      component.editorDescription.set('x'.repeat(60));
+      const items = component.validationItems();
+      expect(items[0].ok).toBe(true);
+      expect(items[1].ok).toBe(true);
+      expect(items[2].ok).toBe(true);
+    });
+
+    it('saveDraft avec image → upload cover + vignette', async () => {
+      component.openEditor();
+      component.editorTitle.set('Titre');
+      component.editorDate.set('2026-08-15');
+      component.editorImageFile.set(new File([new Uint8Array(10)], 'x.jpg', { type: 'image/jpeg' }));
+      await component.saveDraft();
+      expect(mockEventService.uploadImage).toHaveBeenCalled();
+      expect(mockEventService.uploadThumbnailFor).toHaveBeenCalled();
+    });
+
+    it('onThumbError bascule sur le cover une seule fois', () => {
+      const img: any = { dataset: {}, src: '' };
+      component.onThumbError({ target: img } as any, 'evt-1/cover.jpg');
+      expect(img.dataset.fellBack).toBe('1');
+      const after = img.src;
+      expect(after).toBeTruthy();
+      component.onThumbError({ target: img } as any, 'evt-1/cover.jpg');
+      expect(img.src).toBe(after);
+    });
+  });
 });
