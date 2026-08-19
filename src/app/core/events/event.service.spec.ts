@@ -474,4 +474,47 @@ describe('EventService', () => {
       expect(result.success).toBe(false);
     });
   });
+
+  describe('batchCreateEvents()', () => {
+    it('renvoie inserted:0 pour un tableau vide sans appel réseau', async () => {
+      const res = await firstValueFrom(service.batchCreateEvents([]));
+      expect(res).toEqual({ inserted: 0 });
+      expect(mockSupabase.client.from).not.toHaveBeenCalled();
+    });
+
+    it('insère le lot et renvoie le nombre inséré', async () => {
+      const insert = jest.fn().mockResolvedValue({ error: null });
+      mockSupabase.client.from.mockReturnValue({ insert });
+      const res = await firstValueFrom(service.batchCreateEvents([MOCK_CREATE_DTO, MOCK_CREATE_DTO]));
+      expect(res).toEqual({ inserted: 2 });
+      expect(insert).toHaveBeenCalled();
+    });
+
+    it("renvoie une erreur quand l'insert échoue", async () => {
+      mockSupabase.client.from.mockReturnValue({
+        insert: jest.fn().mockResolvedValue({ error: { message: 'boom' } }),
+      });
+      const res = await firstValueFrom(service.batchCreateEvents([MOCK_CREATE_DTO]));
+      expect(res).toEqual({ inserted: 0, error: 'boom' });
+    });
+  });
+
+  describe('uploadThumbnail()', () => {
+    it('téléverse la miniature et renvoie son chemin', async () => {
+      const res = await firstValueFrom(
+        service.uploadThumbnail('evt-1/cover.jpg', new File(['x'], 't.jpg')),
+      );
+      expect(res.path).toBeTruthy();
+    });
+
+    it('renvoie une erreur quand le téléversement échoue', async () => {
+      mockStorage.from.mockReturnValue({
+        upload: jest.fn().mockResolvedValue({ data: null, error: { message: 'up fail' } }),
+      });
+      const res = await firstValueFrom(
+        service.uploadThumbnail('evt-1/cover.jpg', new File(['x'], 't.jpg')),
+      );
+      expect(res).toEqual({ path: null, error: 'up fail' });
+    });
+  });
 });
