@@ -790,4 +790,32 @@ describe('AdCampaignsComponent', () => {
       expect(component.availableFilterYears()).toEqual(['2025', '2026']);
     });
   });
+
+  describe('setters de filtre + pagination', () => {
+    it('chaque setter réinitialise la pagination', () => {
+      component.currentPage.set(3);
+      component.setSelectedStatus('paid');
+      expect(component.selectedStatus()).toBe('paid');
+      expect(component.currentPage()).toBe(0);
+
+      component.currentPage.set(3);
+      component.setFilterCompanyId('c1');
+      expect(component.filterCompanyId()).toBe('c1');
+      expect(component.currentPage()).toBe(0);
+
+      component.currentPage.set(3);
+      component.setFilterYear('2026');
+      expect(component.filterYear()).toBe('2026');
+      expect(component.currentPage()).toBe(0);
+    });
+
+    it('prevPage reste borné à 0 et nextPage ne dépasse pas la dernière page', () => {
+      component.currentPage.set(0);
+      component.prevPage();
+      expect(component.currentPage()).toBe(0);
+      component.currentPage.set(component.totalPages() - 1);
+      component.nextPage();
+      expect(component.currentPage()).toBe(component.totalPages() - 1);
+    });
+  });
 });
