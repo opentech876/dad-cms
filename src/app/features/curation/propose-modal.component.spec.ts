@@ -7,6 +7,10 @@ import { EventService } from '../../core/events/event.service';
 import { RecommendationService } from '../../core/presidency/recommendation.service';
 import { ToastService } from '../../core/services/toast.service';
 
+jest.mock('../../core/utils/image.utils', () => ({
+  compressImage: jest.fn((f: File) => Promise.resolve(f)),
+}));
+
 describe('ProposeModalComponent', () => {
   let component: ProposeModalComponent;
   let mockEvents: any;
@@ -261,6 +265,39 @@ describe('ProposeModalComponent', () => {
       component.onImageChange({ target: { files: [new File(['x'], 'p.jpg')] } } as any);
       component.ngOnDestroy();
       expect((global as any).URL.revokeObjectURL).toHaveBeenCalled();
+    });
+  });
+
+  describe('submit — mode création', () => {
+    beforeEach(() => {
+      (global as any).URL.createObjectURL = jest.fn(() => 'blob:x');
+      (global as any).URL.revokeObjectURL = jest.fn();
+      component.setTab('create');
+      component.setPosition(1);
+      component.title.set('Nouvel événement');
+      component.yearStr.set('1960');
+      component.imageFile.set(new File(['x'], 'p.jpg', { type: 'image/jpeg' }));
+    });
+
+    it('crée l\'événement, téléverse l\'image et propose le créneau', async () => {
+      await component.submit();
+      expect(mockEvents.createEvent).toHaveBeenCalledWith(expect.objectContaining({ origin: 'curateur' }));
+      expect(mockEvents.uploadImage).toHaveBeenCalled();
+      expect(mockEvents.uploadThumbnailFor).toHaveBeenCalled();
+      expect(mockRecs.upsertSlot).toHaveBeenCalled();
+    });
+
+    it('avertit quand le téléversement de l\'image échoue', async () => {
+      mockEvents.uploadImage.mockReturnValueOnce(of({ path: null }));
+      await component.submit();
+      expect(mockToast.warning).toHaveBeenCalled();
+    });
+
+    it('expose une erreur quand la création échoue', async () => {
+      mockEvents.createEvent.mockReturnValueOnce(of({ success: false, error: 'refus' }));
+      await component.submit();
+      expect(component.error()).toBe('refus');
+      expect(mockRecs.upsertSlot).not.toHaveBeenCalled();
     });
   });
 });
