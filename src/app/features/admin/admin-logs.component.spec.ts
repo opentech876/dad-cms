@@ -159,5 +159,47 @@ describe('AdminLogsComponent', () => {
     it('fallback sur "Système" si aucun', () => {
       expect(component.actorLabel(makeEntry({ actor_name: null, actor_email: null }))).toBe('Système');
     });
+
+    it('actorInitial met la première lettre en majuscule (ou ? si vide)', () => {
+      expect(component.actorInitial(makeEntry({ actor_name: 'elvis' }))).toBe('E');
+      expect(component.actorInitial(makeEntry({ actor_name: '', actor_email: '' }))).toBe('?');
+    });
+  });
+
+  describe('describe() — verbe/cible/ton par table et action', () => {
+    it('workspaces: création, suppression définitive, soft-delete, restauration, renommage, MAJ', () => {
+      expect(component.describe(makeEntry({ table_name: 'workspaces', action: 'INSERT' })).tone).toBe('created');
+      expect(component.describe(makeEntry({ table_name: 'workspaces', action: 'DELETE' })).tone).toBe('deleted');
+      expect(component.describe(makeEntry({ table_name: 'workspaces', action: 'UPDATE', old_data: {}, new_data: { deleted_at: 'x' } })).verb).toContain('supprimé l’espace');
+      expect(component.describe(makeEntry({ table_name: 'workspaces', action: 'UPDATE', old_data: { deleted_at: 'x' }, new_data: {} })).tone).toBe('restored');
+      expect(component.describe(makeEntry({ table_name: 'workspaces', action: 'UPDATE', old_data: { name: 'A' }, new_data: { name: 'B' } })).verb).toContain('renommé');
+      expect(component.describe(makeEntry({ table_name: 'workspaces', action: 'UPDATE', old_data: { name: 'A' }, new_data: { name: 'A' } })).verb).toContain('mis à jour');
+    });
+
+    it('workspace_members: ajout, retrait, changement de rôle, MAJ générique', () => {
+      expect(component.describe(makeEntry({ table_name: 'workspace_members', action: 'INSERT', new_data: { role: 'editeur' } })).tone).toBe('created');
+      expect(component.describe(makeEntry({ table_name: 'workspace_members', action: 'INSERT', new_data: {} })).target).toContain('—');
+      expect(component.describe(makeEntry({ table_name: 'workspace_members', action: 'DELETE' })).tone).toBe('deleted');
+      expect(component.describe(makeEntry({ table_name: 'workspace_members', action: 'UPDATE', old_data: { role: 'editeur' }, new_data: { role: 'owner' } })).verb).toContain('modifié le rôle');
+      expect(component.describe(makeEntry({ table_name: 'workspace_members', action: 'UPDATE', old_data: {}, new_data: {} })).verb).toContain('mis à jour un membre');
+    });
+
+    it('user_roles: assignation, révocation, modification, MAJ générique', () => {
+      expect(component.describe(makeEntry({ table_name: 'user_roles', action: 'INSERT', new_data: { role: 'system_admin' } })).tone).toBe('created');
+      expect(component.describe(makeEntry({ table_name: 'user_roles', action: 'DELETE', old_data: { role: 'system_admin' } })).tone).toBe('deleted');
+      expect(component.describe(makeEntry({ table_name: 'user_roles', action: 'DELETE', old_data: {} })).target).toBe('—');
+      expect(component.describe(makeEntry({ table_name: 'user_roles', action: 'UPDATE', old_data: { role: 'a' }, new_data: { role: 'b' } })).verb).toContain('modifié un rôle');
+      expect(component.describe(makeEntry({ table_name: 'user_roles', action: 'UPDATE', old_data: {}, new_data: {} })).verb).toContain('mis à jour un rôle');
+    });
+
+    it('table inconnue: retombe sur action/table brutes', () => {
+      const r = component.describe(makeEntry({ table_name: 'autre' as any, action: 'UPDATE' }));
+      expect(r).toEqual({ verb: 'UPDATE', target: 'autre', icon: '@tui.circle', tone: 'updated' });
+    });
+
+    it('workspaceLabel retombe sur new_data/old_data/inconnu', () => {
+      expect(component.describe(makeEntry({ table_name: 'workspaces', action: 'INSERT', workspace_name: null, new_data: { name: 'DepuisNew' } })).target).toBe('DepuisNew');
+      expect(component.describe(makeEntry({ table_name: 'workspaces', action: 'DELETE', workspace_name: null, new_data: null, old_data: null })).target).toBe('(espace inconnu)');
+    });
   });
 });
